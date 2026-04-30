@@ -36,8 +36,10 @@ fi
 
 if [[ -f "$state_file" ]]; then
   # state-validate exit codes (D3): 0=valid, 1=corrupt, 2=schema older, 3=schema newer
-  "$SKILL_DIR/bin/state-validate" --slug "$slug"
-  validate_status=$?
+  # Capture exit code without tripping `set -e` (the script may run under
+  # `set -euo pipefail` in the harness).
+  validate_status=0
+  "$SKILL_DIR/bin/state-validate" --slug "$slug" || validate_status=$?
   case "$validate_status" in
     0)
       MODE="running"
@@ -150,7 +152,9 @@ Build the candidate queue from the Cartesian product of axes. Random shuffle wit
 ```bash
 # Pipe an axes JSON to state-init
 echo "$AXES_JSON" | "$SKILL_DIR/bin/state-init" --slug "$slug"
-"$SKILL_DIR/bin/state-update" --slug "$slug" --set ".candidate_queue = $QUEUE_JSON | .phase = \"running\""
+"$SKILL_DIR/bin/state-update" --slug "$slug" \
+  --argjson queue "$QUEUE_JSON" \
+  --set '.candidate_queue = $queue | .phase = "running"'
 ```
 
 ### Step 6 — Initialize research-log entry (or fall back)
@@ -167,10 +171,13 @@ if "$SKILL_DIR/bin/research-log-detect"; then
       --project "$PROJECT_SLUG" \
       --scope-slug "$SCOPE_SLUG")
   "$SKILL_DIR/bin/state-update" --slug "$slug" \
-    --set ".research_log.available = true | .research_log.session_path = \"$ENTRY\""
+    --arg entry "$ENTRY" \
+    --set '.research_log.available = true | .research_log.session_path = $entry'
 else
+  fallback="$home/projects/$slug/autoresearch/notes.md"
   "$SKILL_DIR/bin/state-update" --slug "$slug" \
-    --set ".research_log.available = false | .research_log.fallback_path = \"$home/projects/$slug/autoresearch/notes.md\""
+    --arg fallback "$fallback" \
+    --set '.research_log.available = false | .research_log.fallback_path = $fallback'
   printf "%s\n" "$INITIAL_ENTRY_BODY" | "$SKILL_DIR/bin/notes-append-local" --slug "$slug"
 fi
 ```
@@ -219,6 +226,39 @@ Triggered when state.json exists and phase=running. This is the workhorse iterat
 
 On a **successful iteration** (Step 5 below), reset `.consecutive_iteration_failures = 0` in the same `state-update` call that records the result. Then proceed with normal pacing in Step 9.
 
+**Concrete try-block pattern (bash has no native try):** Bash doesn't have try/catch. Use one of two patterns. Either (preferred for an explicit list of steps) gate every helper call with `||`:
+
+```bash
+# At the top of the iteration body
+on_iteration_error() {
+  local err_class="${1:-unknown}"
+  local err_context="${2:-}"
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] iteration error: $err_class: $err_context" >> "$state_dir/last-iteration.log"
+  # ...append research-log block, bump counters, compute backoff, ScheduleWakeup, exit 0...
+  exit 0
+}
+
+# Each step is gated. Treat ANY non-zero as a caught iteration error.
+"$SKILL_DIR/bin/state-update" --slug "$slug" --arg id "$CAND_ID" \
+  --set '(.candidate_queue[] | select(.id == $id) | .status) = "running" | .iteration_count += 1' \
+  || on_iteration_error state_update "marking candidate running"
+
+run_experiment_with_axes "$CAND_ID" \
+  || on_iteration_error experiment "candidate $CAND_ID rerun"
+# ... etc for each step
+```
+
+Or (preferred when you want a single trap covering the whole body) use `trap ... ERR` plus `set -e`:
+
+```bash
+set -eE
+trap 'on_iteration_error trap "step exited non-zero"' ERR
+# Steps 2-8 here. ANY non-zero exit triggers the trap and on_iteration_error runs.
+trap - ERR  # clear the trap once Step 8 completes successfully.
+```
+
+The `||` form is more explicit and easier to debug; the `trap ERR` form is more compact. Pick one and use it consistently within the iteration body. **Do NOT mix patterns**, and **do NOT leave bash unconfigured** (no `set -e` and no `||` gates) — that's the failure mode where errors silently pass and the wrap never fires.
+
 ### Step 1 — Check stop conditions
 
 ```bash
@@ -243,7 +283,8 @@ Read the highest-priority candidate from `state.candidate_queue` where status=pe
 
 ```bash
 "$SKILL_DIR/bin/state-update" --slug "$slug" \
-  --set "(.candidate_queue[] | select(.id == \"$CAND_ID\") | .status) = \"running\" | .iteration_count += 1"
+  --arg id "$CAND_ID" \
+  --set '(.candidate_queue[] | select(.id == $id) | .status) = "running" | .iteration_count += 1'
 ```
 
 ### Step 3 — Run the experiment
@@ -270,7 +311,9 @@ If `exit_code != 0`, apply the failure pipeline:
      - Each attempt:
        ```bash
        STASH_REF=$("$SKILL_DIR/bin/stash-and-fix-prep")
-       "$SKILL_DIR/bin/state-update" --slug "$slug" --set ".pending_stash_ref = \"$STASH_REF\""
+       "$SKILL_DIR/bin/state-update" --slug "$slug" \
+         --arg ref "$STASH_REF" \
+         --set '.pending_stash_ref = $ref'
        # apply LLM-proposed Edit on $FIX_TARGET_FILE
        # rerun the experiment
        ```
@@ -290,10 +333,12 @@ If `exit_code != 0`, apply the failure pipeline:
        # Same candidate already counted — treat as unknown/skip, do NOT increment.
        :
      else
-       "$SKILL_DIR/bin/state-update" --slug "$slug" --set "
-         .consecutive_infra_count += 1
-         | .consecutive_infra_candidates += [\"$CAND_ID\"]
-       "
+       "$SKILL_DIR/bin/state-update" --slug "$slug" \
+         --arg id "$CAND_ID" \
+         --set '
+           .consecutive_infra_count += 1
+           | .consecutive_infra_candidates += [$id]
+         '
      fi
      count=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .consecutive_infra_count)
      if [[ "$count" -ge 2 ]]; then
@@ -315,26 +360,38 @@ On success or recovery:
 
 ```bash
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-"$SKILL_DIR/bin/state-update" --slug "$slug" --set "
-  .results_history += [{
-    id: \"$CAND_ID\",
-    axes: $AXES_JSON,
-    started_at: \"$STARTED_AT\",
-    ended_at: \"$NOW\",
-    status: \"$STATUS\",  # complete | fixed | failed
-    metric_value: $METRIC_VALUE,
-    fix_attempts: $FIX_ATTEMPTS,
-    error_class: $ERROR_CLASS,
-    commit_sha: \"$COMMIT_SHA\",
-    notes: \"\",
-    iteration_runtime_seconds: $RUNTIME_SECONDS,
-    llm_call_count_estimate: $LLM_CALL_COUNT
-  }]
-  | .last_iteration_completed_at = \"$NOW\"
-  | .consecutive_iteration_failures = 0
-  | .consecutive_infra_count = 0
-  | .consecutive_infra_candidates = []
-"
+# Build the result entry as JSON ahead of time so values flow through --argjson.
+# This avoids embedding LLM-controlled strings ($CAND_ID, $ERROR_CLASS, $COMMIT_SHA) directly into the jq filter.
+result_entry=$(jq -n \
+  --arg id "$CAND_ID" \
+  --argjson axes "$AXES_JSON" \
+  --arg started "$STARTED_AT" \
+  --arg ended "$NOW" \
+  --arg status "$STATUS" \
+  --argjson metric "${METRIC_VALUE:-null}" \
+  --argjson fix_attempts "${FIX_ATTEMPTS:-0}" \
+  --arg error_class "${ERROR_CLASS:-}" \
+  --arg commit_sha "${COMMIT_SHA:-}" \
+  --argjson runtime "${RUNTIME_SECONDS:-0}" \
+  --argjson llm_calls "${LLM_CALL_COUNT:-0}" \
+  '{
+    id: $id, axes: $axes, started_at: $started, ended_at: $ended,
+    status: $status, metric_value: $metric, fix_attempts: $fix_attempts,
+    error_class: (if $error_class == "" then null else $error_class end),
+    commit_sha: (if $commit_sha == "" then null else $commit_sha end),
+    notes: "", iteration_runtime_seconds: $runtime, llm_call_count_estimate: $llm_calls
+  }')
+
+"$SKILL_DIR/bin/state-update" --slug "$slug" \
+  --argjson entry "$result_entry" \
+  --arg now "$NOW" \
+  --set '
+    .results_history += [$entry]
+    | .last_iteration_completed_at = $now
+    | .consecutive_iteration_failures = 0
+    | .consecutive_infra_count = 0
+    | .consecutive_infra_candidates = []
+  '
 
 # Update current_best if applicable (per target_metric.op direction)
 ```
@@ -416,7 +473,10 @@ esac
 
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 "$SKILL_DIR/bin/state-update" --slug "$slug" \
-  --set ".phase = \"$PHASE_FINAL\" | .stop_reason = \"$STOP_REASON\" | .last_iteration_completed_at = \"$NOW\""
+  --arg phase "$PHASE_FINAL" \
+  --arg reason "$STOP_REASON" \
+  --arg now "$NOW" \
+  --set '.phase = $phase | .stop_reason = $reason | .last_iteration_completed_at = $now'
 
 # Compose final summary block via LLM, append to log
 final_block="## Final Summary

@@ -83,6 +83,30 @@ load helpers
   [ "$status" -eq 3 ]
 }
 
+@test "state-update --arg binds a string value safely (no jq interpolation)" {
+  echo '{"scope":"s","scope_slug":"sl","axes":{"a":["x"]},"target_metric":null}' \
+    | "$AUTORESEARCH_BIN/state-init" --slug test-project
+  # Value contains a jq metacharacter (double quote) that would break naive interpolation.
+  weird='c001"]'
+  "$AUTORESEARCH_BIN/state-update" --slug test-project \
+    --arg id "$weird" \
+    --set '.pending_stash_ref = $id'
+  run "$AUTORESEARCH_BIN/state-read" --slug test-project --path .pending_stash_ref
+  [ "$status" -eq 0 ]
+  [ "$output" = "$weird" ]
+}
+
+@test "state-update --argjson binds a JSON value (numbers/objects/arrays)" {
+  echo '{"scope":"s","scope_slug":"sl","axes":{"a":["x"]},"target_metric":null}' \
+    | "$AUTORESEARCH_BIN/state-init" --slug test-project
+  "$AUTORESEARCH_BIN/state-update" --slug test-project \
+    --argjson queue '[{"id":"c001","status":"pending"}]' \
+    --set '.candidate_queue = $queue'
+  state_file="$FAKE_GSTACK_HOME/projects/test-project/autoresearch/state.json"
+  [ "$(jq -r '.candidate_queue[0].id' "$state_file")" = "c001" ]
+  [ "$(jq -r '.candidate_queue[0].status' "$state_file")" = "pending" ]
+}
+
 @test "state-update fails non-zero when state dir is unwritable" {
   echo '{"scope":"s","scope_slug":"sl","axes":{"a":["x"]},"target_metric":null}' \
     | "$AUTORESEARCH_BIN/state-init" --slug test-project

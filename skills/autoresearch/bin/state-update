@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # bin/state-update — apply a jq filter to state.json (in-place).
-# Usage: state-update --slug <slug> --set '<jq-filter>'
+# Usage: state-update --slug <slug> [--arg name value]... [--argjson name value]... --set '<jq-filter>'
 # Example: state-update --slug X --set '.phase = "running"'
+# Example with binding: state-update --slug X --arg id "c001" \
+#   --set '(.candidate_queue[] | select(.id == $id) | .status) = "running"'
+#
+# --arg name value     binds $name in the jq filter to the string value
+# --argjson name value binds $name in the jq filter to a JSON value (numbers/objects/arrays/null)
+# Use --arg/--argjson instead of shell-string-interpolating values into the filter — interpolation
+# breaks if the value contains a double quote or backslash.
 #
 # Always touches .last_modified_at on every update (folded fix #2). Callers
 # that need to mark an iteration as completed must explicitly set
@@ -11,11 +18,14 @@
 # iteration wrapper catches it as an iteration error and triggers backoff.
 set -euo pipefail
 slug=""; filter=""
+declare -a jq_args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slug) slug="$2"; shift 2 ;;
     --set) filter="$2"; shift 2 ;;
-    *) echo "unknown arg" >&2; exit 2 ;;
+    --arg) jq_args+=(--arg "$2" "$3"); shift 3 ;;
+    --argjson) jq_args+=(--argjson "$2" "$3"); shift 3 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 [[ -z "$slug" || -z "$filter" ]] && { echo "--slug and --set required" >&2; exit 2; }
@@ -24,8 +34,9 @@ home="${GSTACK_HOME:-$HOME/.gstack}"
 file="$home/projects/$slug/autoresearch/state.json"
 tmp=$(mktemp)
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-# Always update last_modified_at on every change
-if ! jq --arg now "$now" "($filter) | .last_modified_at = \$now" "$file" > "$tmp"; then
+# Always update last_modified_at on every change. Caller-supplied bindings come first so
+# the user filter can use them; --arg now is reserved for the always-on timestamp touch.
+if ! jq "${jq_args[@]}" --arg __now "$now" "($filter) | .last_modified_at = \$__now" "$file" > "$tmp"; then
   rm -f "$tmp"
   echo "state-update: jq filter failed" >&2
   exit 1

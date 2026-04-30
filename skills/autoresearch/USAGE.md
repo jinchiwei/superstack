@@ -54,6 +54,12 @@ See `DESIGN.md` for full schema. Phase transitions: `planning → running → (c
 - **INIT** — first invocation, no state.json. Plans axes, asks for confirmation, schedules iter 1.
 - **RUNNING** — every subsequent invocation (fired by ScheduleWakeup). Runs one iteration, replans, schedules next.
 
+## Gotchas
+
+- **commit-experiment uses `git add -A`.** Each successful iteration stages everything in the project repo and commits it. If you have uncommitted unrelated work in the project repo when /autoresearch runs, that work will be bundled into the first iteration commit. Start /autoresearch with a clean (or intentionally staged) working tree.
+- **/autoresearch mutates your working tree on code-fix attempts.** During a `code_bug` failure, the skill stashes your tree, applies an LLM-proposed Edit, reruns, and either keeps the fix (committing it via commit-experiment) or reverts it via `git checkout` + `git stash pop`. Mid-fix interruption is recoverable via the `pending_stash_ref` field in state.json.
+- **Single /autoresearch session per project.** Two concurrent sessions on the same project would race on state.json and on research-log appends. Not enforced; just avoid.
+
 ## When research-log isn't set up
 
 If `~/arcadia/research-log/` is absent or not a git repo, the skill falls back to a local `~/.gstack/projects/<slug>/autoresearch/notes.md`. Setup-agnostic.
