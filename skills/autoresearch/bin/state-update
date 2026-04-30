@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# bin/state-update — apply a jq filter to state.json (in-place).
+# Usage: state-update --slug <slug> --set '<jq-filter>'
+# Example: state-update --slug X --set '.phase = "running"'
+#
+# Always touches .last_modified_at on every update (folded fix #2). Callers
+# that need to mark an iteration as completed must explicitly set
+# .last_iteration_completed_at in the jq filter.
+#
+# Exits non-zero on disk-write failure (folded fix #3) so the SKILL.md
+# iteration wrapper catches it as an iteration error and triggers backoff.
+set -euo pipefail
+slug=""; filter=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --slug) slug="$2"; shift 2 ;;
+    --set) filter="$2"; shift 2 ;;
+    *) echo "unknown arg" >&2; exit 2 ;;
+  esac
+done
+[[ -z "$slug" || -z "$filter" ]] && { echo "--slug and --set required" >&2; exit 2; }
+
+home="${GSTACK_HOME:-$HOME/.gstack}"
+file="$home/projects/$slug/autoresearch/state.json"
+tmp=$(mktemp)
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Always update last_modified_at on every change
+if ! jq --arg now "$now" "($filter) | .last_modified_at = \$now" "$file" > "$tmp"; then
+  rm -f "$tmp"
+  echo "state-update: jq filter failed" >&2
+  exit 1
+fi
+if ! mv "$tmp" "$file"; then
+  rm -f "$tmp"
+  echo "state-update: failed to write $file (disk full / permissions?)" >&2
+  exit 1
+fi

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# bin/state-init — write initial state.json from JSON stdin.
+# Stdin: {"scope":..., "scope_slug":..., "axes":{...}, "target_metric":...}
+# Usage: state-init --slug <slug>
+#
+# Schema v1 includes fields locked by /plan-eng-review (D1-D4 + folded fixes):
+#   - pending_stash_ref         (D1: code-fix safety boundary)
+#   - consecutive_iteration_failures, last_error_at  (D2: iteration backoff)
+#   - consecutive_infra_count, consecutive_infra_candidates  (D4: infra-halt gate)
+#   - last_modified_at (any state-update touches this), last_iteration_completed_at
+#     (only set explicitly at iteration end)
+set -euo pipefail
+
+slug=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in --slug) slug="$2"; shift 2 ;; *) echo "unknown arg" >&2; exit 2 ;; esac
+done
+[[ -z "$slug" ]] && { echo "--slug required" >&2; exit 2; }
+
+home="${GSTACK_HOME:-$HOME/.gstack}"
+dir="$home/projects/$slug/autoresearch"
+mkdir -p "$dir"
+
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+session_id="ar-$(date -u +%Y-%m-%d-%H%M%S)"
+
+input=$(cat)
+
+jq -n --argjson input "$input" --arg now "$now" --arg sid "$session_id" '{
+  schema_version: 1,
+  session_id: $sid,
+  session_started_at: $now,
+  last_modified_at: $now,
+  last_iteration_completed_at: null,
+  phase: "planning",
+  scope: $input.scope,
+  scope_slug: $input.scope_slug,
+  target_metric: $input.target_metric,
+  axes: $input.axes,
+  candidate_queue: [],
+  results_history: [],
+  current_best: null,
+  pivot_history: [],
+  research_log: {available: false, session_path: null, fallback_path: null},
+  iteration_count: 0,
+  stop_reason: null,
+  pending_stash_ref: null,
+  consecutive_iteration_failures: 0,
+  last_error_at: null,
+  consecutive_infra_count: 0,
+  consecutive_infra_candidates: []
+}' > "$dir/state.json"
+
+echo "$dir/state.json"

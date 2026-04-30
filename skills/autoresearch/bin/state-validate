@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# bin/state-validate — validate state.json schema.
+# Usage: state-validate --slug <slug>
+#
+# Exit codes (locked by D3 in plan-eng-review):
+#   0 = valid current schema
+#   1 = corrupt JSON / missing required fields / file absent
+#   2 = schema_version older than current (recoverable via state-migrate)
+#   3 = schema_version newer than current (refuse to touch)
+set -euo pipefail
+
+CURRENT_SCHEMA_VERSION=1
+
+slug=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in --slug) slug="$2"; shift 2 ;; *) exit 2 ;; esac
+done
+[[ -z "$slug" ]] && exit 2
+home="${GSTACK_HOME:-$HOME/.gstack}"
+file="$home/projects/$slug/autoresearch/state.json"
+[[ -f "$file" ]] || exit 1
+
+# Must be parseable JSON with a numeric schema_version field
+if ! version=$(jq -e -r '.schema_version | numbers' "$file" 2>/dev/null); then
+  exit 1
+fi
+
+if [[ "$version" -gt "$CURRENT_SCHEMA_VERSION" ]]; then
+  exit 3
+fi
+if [[ "$version" -lt "$CURRENT_SCHEMA_VERSION" ]]; then
+  exit 2
+fi
+
+# Current version: confirm required fields are present.
+jq -e 'has("schema_version") and .schema_version=='"$CURRENT_SCHEMA_VERSION"'
+       and has("phase") and has("scope_slug") and has("axes")
+       and has("candidate_queue") and has("results_history")
+       and has("pending_stash_ref")
+       and has("consecutive_iteration_failures")
+       and has("last_error_at")
+       and has("consecutive_infra_count")
+       and has("consecutive_infra_candidates")
+       and has("last_modified_at")
+       and has("last_iteration_completed_at")' "$file" >/dev/null 2>&1 || exit 1
+exit 0

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# bin/state-read — read field from state.json via jq path.
+# Usage: state-read --slug <slug> --path <jq-path>
+set -euo pipefail
+slug=""; path=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --slug) slug="$2"; shift 2 ;;
+    --path) path="$2"; shift 2 ;;
+    *) echo "unknown arg" >&2; exit 2 ;;
+  esac
+done
+[[ -z "$slug" || -z "$path" ]] && { echo "--slug and --path required" >&2; exit 2; }
+home="${GSTACK_HOME:-$HOME/.gstack}"
+jq -r "$path" "$home/projects/$slug/autoresearch/state.json"
