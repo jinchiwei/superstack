@@ -9,8 +9,9 @@ setup_log_repo() {
   (
     cd "$RESEARCH_LOG_ROOT"
     git init -q
-    git -c user.email=test@test git -c user.name=test commit --allow-empty -q -m init >/dev/null 2>&1 || \
-      git commit --allow-empty -q -m init
+    git config user.email "autoresearch-tests@example.invalid"
+    git config user.name "Autoresearch Tests"
+    git commit --allow-empty -q -m init
   )
   export RESEARCH_LOG_ROOT
   export RESEARCH_LOG_GIT_PUSH=true

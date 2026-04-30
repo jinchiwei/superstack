@@ -340,7 +340,8 @@ If `exit_code != 0`, apply the failure pipeline:
        ```
      - **On rerun success:**
        - `commit-experiment` commits ONLY the fix that the LLM applied to the clean tree (the user's prior dirty state is still inside the stash at this point — it MUST be preserved).
-       - `if [[ "$STASH_REF" != "__CLEAN__" ]]; then git stash pop "$STASH_REF"; fi` — restore the user's pre-existing uncommitted work into the working tree. **Do NOT use `git stash drop` here.** Dropping discards user work that wasn't part of the fix. (Stash pop after the commit means the restored work shows as uncommitted on top of the fix commit; the next iteration's `commit-experiment` will sweep it via `git add -A` per the documented gotcha in USAGE.md.)
+       - Set `EXPERIMENT_ALREADY_COMMITTED=1` (a local shell flag for this iteration). Step 8 below checks this flag and skips its own `commit-experiment` call to avoid sweeping the about-to-be-popped user work into the same iteration commit.
+       - `if [[ "$STASH_REF" != "__CLEAN__" ]]; then git stash pop "$STASH_REF"; fi` — restore the user's pre-existing uncommitted work into the working tree. **Do NOT use `git stash drop` here.** Dropping discards user work that wasn't part of the fix. (The popped work stays uncommitted on top of the fix commit; eventual sweep happens at the next regular iteration's Step 8 per the documented gotcha in USAGE.md, OR the user can resolve it before then.)
        - Clear `pending_stash_ref` and reset `consecutive_infra_count` to 0.
      - **On rerun failure:**
        - `git checkout -- "$FIX_TARGET_FILE"` (revert bad edit; safe because Code-Fix prompt restricts edits to a single existing file). Run this BEFORE the stash pop.
@@ -371,9 +372,9 @@ If `exit_code != 0`, apply the failure pipeline:
        :
      fi
      ```
-   - `class=unknown`: log + skip + continue. Do NOT update infra counters.
+   - `class=unknown`: log + skip + continue. **Reset infra counters** here too — the unknown skip is a non-infra terminal outcome, so it breaks the "consecutive infra" chain (otherwise infra → unknown → infra would HALT despite being non-consecutive).
 
-**Reset rule (D4 LOCKED):** On any non-infra outcome (transient retry succeeded, code-fix succeeded, complete result), set `consecutive_infra_count = 0` and `consecutive_infra_candidates = []` in the same state-update call that records the result.
+**Reset rule (D4 LOCKED):** On any non-infra terminal outcome (transient retry succeeded, code-fix succeeded, complete result, **or unknown skip**), set `consecutive_infra_count = 0` and `consecutive_infra_candidates = []`. For complete/recovery results this happens in the Step 5 state-update; for transient retry success and unknown skips, do an explicit state-update at the point of the outcome.
 
 ### Step 5 — Update state with result
 
@@ -457,12 +458,18 @@ fi
 
 ### Step 8 — Commit project repo
 
+Skip if Step 4's code_bug success path already committed the fix — otherwise we'd sweep the just-popped user work into a second iteration commit (per /codex review P2-1).
+
 ```bash
-"$SKILL_DIR/bin/commit-experiment" \
-  --scope-slug "$SCOPE_SLUG" \
-  --iter "$ITER" \
-  --candidate "$CAND_ID" \
-  --message-suffix "metric=$METRIC_VALUE"
+if [[ "${EXPERIMENT_ALREADY_COMMITTED:-0}" -eq 1 ]]; then
+  : # Step 4 already committed the fix; do not commit again here.
+else
+  "$SKILL_DIR/bin/commit-experiment" \
+    --scope-slug "$SCOPE_SLUG" \
+    --iter "$ITER" \
+    --candidate "$CAND_ID" \
+    --message-suffix "metric=$METRIC_VALUE"
+fi
 ```
 
 ### Step 9 — Schedule next iteration
