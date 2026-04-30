@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# bin/research-log-detect — exit 0 if research-log is set up and pushable, 1 otherwise.
+set -euo pipefail
+root="${RESEARCH_LOG_ROOT:-$HOME/arcadia/research-log}"
+[[ -d "$root/.git" ]] && exit 0 || exit 1
