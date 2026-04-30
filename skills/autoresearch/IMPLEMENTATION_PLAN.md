@@ -1772,3 +1772,184 @@ The user wants the autoresearch implementation done in this fresh session — th
 ## Execution choice
 
 **Recommended: hand off to a fresh Claude Code session for /subagent-driven-development.** The current session has heavy AGF context, /pipeline meta-conversation, and prior compacted history. Build phase wants a clean context budget. Use the next-session handoff prompt above.
+
+---
+
+## REVIEW FINDINGS — /plan-eng-review (2026-04-30)
+
+> **For implementers:** these decisions are LOCKED. Apply them as part of the build. They modify Tasks 5, 7, 9, 12, 14, plus add Task 5b (state-migrate) and expand the test plan in Task 16. Do NOT re-litigate these decisions during implementation.
+
+### D1 — Stash discipline (Task 9 + Task 14 Step 4) — LOCKED: tighten
+
+**Plan deltas:**
+
+1. **Modify `bin/stash-and-fix-prep` (Task 9):** Always emit a STASH_REF on stdout. Use sentinel `__CLEAN__` when the working tree is clean.
+
+   ```bash
+   #!/usr/bin/env bash
+   set -euo pipefail
+   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
+   if git diff --quiet && git diff --cached --quiet && [[ -z "$(git ls-files --others --exclude-standard)" ]]; then
+     echo "__CLEAN__"
+     exit 0
+   fi
+   git stash push --include-untracked --message "autoresearch:code-fix-prep" >&2
+   git stash list --pretty='%gd' | head -1
+   ```
+
+2. **Add `pending_stash_ref` to state.json schema (Task 5):** Tracks the in-progress stash so a resumed session can detect mid-fix interruption.
+
+3. **Update Task 14 Step 4 failure pipeline:**
+   - On code-fix attempt: `STASH_REF=$($SKILL_DIR/bin/stash-and-fix-prep)`; write `pending_stash_ref` to state.json
+   - Apply LLM Edit → rerun
+   - **On rerun failure:**
+     - `git checkout -- "$FIX_TARGET_FILE"` (revert bad edit; safe because Code-Fix prompt restricts edits to single existing file)
+     - If `STASH_REF != "__CLEAN__"`: `git stash pop "$STASH_REF"` (restore prior uncommitted work)
+     - Try a different fix; mark candidate dead after 3 attempts
+   - **On rerun success:**
+     - `commit-experiment` commits the fix + any other uncommitted state
+     - If `STASH_REF != "__CLEAN__"`: `git stash drop "$STASH_REF"` (clean up the orphan)
+   - On any successful exit from the failure pipeline: clear `pending_stash_ref`
+
+4. **Resume reconciliation (SKILL.md Pre-flight, Task 13):** If `pending_stash_ref != null` on entry, append a recovery note to `QUESTIONS_FOR_USER.md` ("previous iteration interrupted mid-fix; stash <ref> may be in `git stash list`") and clear the field. Do NOT auto-pop on resume — working tree may have drifted.
+
+### D2 — Iteration-body error containment & adaptive backoff (Task 14 Step 9) — LOCKED: wrap
+
+**Plan deltas:**
+
+1. **Add to state.json schema (Task 5):**
+   - `consecutive_iteration_failures: 0` (reset on any successful iteration)
+   - `last_error_at: null` (ISO 8601 timestamp of most recent caught iteration error)
+
+2. **Wrap RUNNING mode body (Task 14):** The entire iteration body (Steps 2-8) is wrapped so that ANY caught error:
+   - Appends timestamped error to `state_dir/last-iteration.log`
+   - Appends `## ITERATION ERROR` block to research-log entry (or local notes fallback) with error class + partial context
+   - Increments `consecutive_iteration_failures`, sets `last_error_at`
+   - Does NOT set `phase=halted` — keep `phase=running`
+   - Computes backoff: `delay = min(3600, 1800 * (2 ** (consecutive_iteration_failures - 1)))` — first failure 1800s, second 3600s, capped
+   - Calls `ScheduleWakeup(prompt="/autoresearch", delaySeconds=$delay, reason="iteration error: <class>; backoff scheduled")`
+   - Exits cleanly
+
+3. **Happy path reset (Task 14 Step 9):** On successful iteration, reset `consecutive_iteration_failures = 0` in the same `state-update` call that records the result. Then proceed with normal pacing `delaySeconds = max(60, last_iteration_runtime * 0.05)`.
+
+### D3 — state.json schema migration registry (Task 5) — LOCKED: build framework now
+
+**Plan deltas:**
+
+1. **Add Task 5b: bin/state-migrate** (between current Task 5 and Task 6).
+   - Signature: `state-migrate --slug <slug>`
+   - Reads `schema_version` from state.json; runs `migrate_v{N}_to_v{N+1}` chain to bring up to current.
+   - Today: only `migrate_v1_to_v1()` exists as a no-op.
+   - Refuses to run if schema_version is GREATER than current (future-incompatible).
+
+2. **Update `bin/state-validate` (Task 5):** Distinct exit codes:
+   - `0`: valid current schema
+   - `1`: corrupt JSON / missing required fields
+   - `2`: schema_version older than current (recoverable via migrate)
+   - `3`: schema_version newer than current (refuse to touch)
+
+3. **Update SKILL.md Pre-flight (Task 13):**
+   - On exit 2: run `bin/state-migrate`. On migrate success → proceed. On migrate failure → append note to `QUESTIONS_FOR_USER.md`, refuse to run.
+   - On exit 3: print "state.json from a newer superstack version; either upgrade or delete state.json to start fresh"; DO NOT overwrite; exit.
+
+### D4 — Consecutive-infra-classifications halt gate (Task 12 + Task 14 Step 4) — LOCKED: count gate
+
+**Plan deltas:**
+
+1. **Add to state.json schema (Task 5):**
+   - `consecutive_infra_count: 0`
+   - `consecutive_infra_candidates: []` (list of candidate IDs whose latest failure was infra-classified — dedupes the count)
+
+2. **Update Task 14 Step 4 (infrastructure path):**
+   - When classifier returns `class=infrastructure`:
+     - If `current_candidate_id` already in `consecutive_infra_candidates`: do NOT increment; treat as `class=unknown` (skip + continue)
+     - Else: append candidate ID, increment `consecutive_infra_count`
+     - If `consecutive_infra_count >= 2`: HALT with `## INFRASTRUCTURE FAILURE` block
+     - Else: skip current candidate, continue loop, schedule next iteration normally
+   - On any non-infra outcome (transient retry succeeded, code-fix succeeded, complete result): RESET `consecutive_infra_count = 0` and `consecutive_infra_candidates = []`
+
+3. **Update prompts/error-classification.md (Task 12):** Add final reminder bullet:
+
+   > "Note: even if you classify infrastructure, the SKILL.md will not halt until 2 consecutive distinct candidates fail with infra classification. Your single judgment is one signal in a gate, not a halt switch. If uncertain, lean toward `unknown` (skip) — it has the same effect on the next iteration."
+
+### T1 — Test coverage additions — LOCKED: full coverage
+
+Add bats tests for all new D1-D4 logic in Task 16. New test files:
+
+- `tests/stash-and-fix-prep.bats` — clean tree → `__CLEAN__`, dirty tree → real ref, untracked-only → real ref, pop-after-fail end-to-end, drop-after-success end-to-end.
+- `tests/iteration-backoff.bats` — first failure 1800s, second 3600s, third+ stays 3600s (cap), success resets to 0 + reverts to normal pacing.
+- `tests/state-migrate.bats` — v1 input → v1 no-op identity, mock v0 input → exit 1 (no migration registered yet), state-validate exit codes for each case (0/1/2/3).
+- `tests/infra-halt-gate.bats` — single infra → no halt count=1, same candidate twice → count=1 (dedupe), two distinct candidates infra → count=2 halt, transient success between → reset to 0, code-fix success between → reset to 0.
+
+Plus close existing gaps in Task 7:
+- `tests/research-log-init-entry.bats` and `tests/research-log-append.bats` — at minimum smoke tests with `RESEARCH_LOG_GIT_PUSH=echo` (or similar) env override to mock the git push call. Verify file is created at expected path; verify markdown body matches stdin.
+
+### Folded-in fixes (no new task numbers)
+
+1. **Cost tracking per iteration** (DESIGN Open Question): Add to state.json schema (Task 5) per-result fields `iteration_runtime_seconds` (already implicit via started_at/ended_at) + `llm_call_count_estimate` (incremented during the iteration body wrapper from D2). User can sum across `results_history` for back-of-envelope token-cost calibration after the first real run.
+
+2. **state-update timestamp semantics:** Rename schema field `last_iteration_at` → `last_modified_at` (always updated on any state-update). Add separate `last_iteration_completed_at` set explicitly only at the end of a successful or failed iteration (not on planning-phase axis edits, not on intermediate state-update calls during a single iteration).
+
+3. **Disk-write-failure on state.json (critical gap surfaced in failure-modes review):** In `bin/state-update`, if the `mv tmp file` step fails, exit non-zero with a clear stderr message. SKILL.md treats state-update failure as an iteration error → triggers D2 wrap → backoff ScheduleWakeup. One-line fix in state-update + one branch in the iteration wrapper.
+
+### NOT in scope
+
+- Migration registry entries beyond `v1→v1` no-op (D3 builds the framework only; v2 schema doesn't exist yet)
+- Webhook / external monitoring of multi-day runs (STOP file + research-log push cover the user's check-in pathway)
+- Multi-machine state.json sync (single-machine assumption stands)
+- LLM token usage from Claude Code's internal telemetry (not surfaced to skill code; cost tracking uses heuristic call counts only)
+
+### What already exists (no rebuild)
+
+- ScheduleWakeup, AskUserQuestion (Claude Code primitives)
+- gstack project home convention (`~/.gstack/projects/<slug>/`)
+- research-log format rules (h1 title + structured blurb + Date/Project/Status block)
+- bats test patterns (`tests/helpers.bash` setup/teardown)
+
+### Build prerequisite
+
+`bats` is not installed on this build host. Plan Task 1 Step 3 calls this out. Before starting /subagent-driven-development:
+
+```bash
+bun add -g bats || sudo apt install -y bats
+which bats && bats --version  # verify
+```
+
+### Failure modes (post-D1-D4)
+
+| Failure mode | Test | Error handling | User signal |
+|---|---|---|---|
+| Code-fix Edit fails | T1 stash-and-fix-prep.bats | D1 revert+pop | research-log iter block |
+| Mid-fix session crash | T1 (resume reconciliation) | D1 pending_stash_ref recovery note | QUESTIONS_FOR_USER.md |
+| Iteration-body LLM error (any) | T1 iteration-backoff.bats | D2 wrap+ScheduleWakeup with backoff | research-log error block |
+| Schema bump on resume | T1 state-migrate.bats | D3 auto-migrate / refuse on too-new | QUESTIONS_FOR_USER.md (if refuse) |
+| Single mis-classified infra error | T1 infra-halt-gate.bats | D4 consecutive-count gate | research-log iter block |
+| Real infra failure (e.g., disk full) | T1 (boundary case) | D4 halts after 2 distinct candidates | ## INFRASTRUCTURE FAILURE block |
+| state.json disk-write failure | (via D2 wrap test) | folded fix #3 above | research-log error block |
+
+### Completion summary
+
+- Step 0 scope: accepted as-is (Approach B; all 18 tasks remain in scope)
+- Architecture: 4 issues found, all locked (D1=A, D2=A, D3=B, D4=A)
+- Code Quality: 1 minor folded into plan as Fix #2 (timestamp semantics)
+- Tests: 1 critical gap raised, locked (T1=A — full bats coverage for D1-D4)
+- Performance: 0 issues
+- Failure modes: 1 critical gap flagged + folded as Fix #3 (state.json disk-write failure)
+- Outside voice: deferred to /codex review (next pipeline step, runs against the diff)
+- Parallelization: sequential (tightly chained tasks)
+- Lake Score: 5/5 recommendations chose complete option
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run (Builder mode in /office-hours covered scope) |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | pending | queued in pipeline (post-build) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 5 issues found, all resolved (D1-D4 + T1); 1 critical failure-mode gap folded as Fix #3 |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | n/a (CLI/skill build, no UI) |
+| DX Review | `/plan-devex-review` | Developer experience | 0 | — | n/a (skill consumed by Claude Code, no separate DX surface) |
+
+**UNRESOLVED:** 0
+**VERDICT:** ENG CLEARED — ready for /subagent-driven-development
