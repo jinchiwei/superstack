@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# bin/stash-and-fix-prep — stash the working tree, output the stash ref to stdout.
+# Used before an agentic code-fix attempt. If the fix makes things worse,
+# the SKILL.md calls `git stash pop <ref>` to revert.
+#
+# Per D1 (locked in /plan-eng-review): always emit a sentinel on stdout so the
+# caller never has to distinguish empty stdout from "clean tree". The sentinel
+# is `__CLEAN__` for a clean tree; otherwise the real stash ref.
+set -euo pipefail
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
+
+if git diff --quiet && git diff --cached --quiet && [[ -z "$(git ls-files --others --exclude-standard)" ]]; then
+  echo "__CLEAN__"
+  exit 0
+fi
+git stash push --include-untracked --message "autoresearch:code-fix-prep" >&2
+git stash list --pretty='%gd' | head -1
