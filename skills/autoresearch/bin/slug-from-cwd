@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# bin/slug-from-cwd — print the project slug for the current working directory.
+# Slug = basename of git toplevel; falls back to basename of cwd if not a git repo.
+set -euo pipefail
+
+if root=$(git rev-parse --show-toplevel 2>/dev/null); then
+  basename "$root"
+else
+  basename "$PWD"
+fi
