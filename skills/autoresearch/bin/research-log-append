@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# bin/research-log-append — append a block to an existing entry, then commit + push.
+# Usage: research-log-append --file <path> --commit-message <msg>
+# Stdin: markdown block to append (will be prefixed with two newlines)
+#
+# Test hook: setting RESEARCH_LOG_GIT_PUSH=echo replaces the `git push`
+# invocation so tests can run without a real remote.
+set -euo pipefail
+file=""; msg=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --file) file="$2"; shift 2 ;;
+    --commit-message) msg="$2"; shift 2 ;;
+    *) exit 2 ;;
+  esac
+done
+[[ -z "$file" || -z "$msg" ]] && exit 2
+
+block=$(cat)
+{ printf "\n\n"; printf "%s\n" "$block"; } >> "$file"
+
+root="${RESEARCH_LOG_ROOT:-$HOME/arcadia/research-log}"
+push_cmd="${RESEARCH_LOG_GIT_PUSH:-git push origin main}"
+(
+  cd "$root"
+  git pull --rebase origin main >/dev/null 2>&1 || true
+  git add "$file"
+  git commit -m "$msg" >/dev/null
+  $push_cmd >/dev/null 2>&1 || echo "push deferred (offline?)" >&2
+)

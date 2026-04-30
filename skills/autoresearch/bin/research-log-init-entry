@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# bin/research-log-init-entry — create a new YYYY-MM-DD_autoresearch-<slug>.md
+# Usage: research-log-init-entry --top-level <brainlab|wolong|...> --project <slug> --scope-slug <slug>
+# Stdin: full markdown body of the initial entry
+# Stdout: absolute path to the created file
+#
+# Test hook: setting RESEARCH_LOG_GIT_PUSH=echo (or any other command) replaces
+# the `git push` invocation, which lets tests run without a real remote.
+set -euo pipefail
+top_level=""; project=""; scope_slug=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --top-level) top_level="$2"; shift 2 ;;
+    --project) project="$2"; shift 2 ;;
+    --scope-slug) scope_slug="$2"; shift 2 ;;
+    *) exit 2 ;;
+  esac
+done
+[[ -z "$top_level" || -z "$project" || -z "$scope_slug" ]] && exit 2
+
+root="${RESEARCH_LOG_ROOT:-$HOME/arcadia/research-log}"
+date=$(date +%Y-%m-%d)
+dir="$root/$top_level/$project"
+mkdir -p "$dir"
+file="$dir/${date}_autoresearch-${scope_slug}.md"
+cat > "$file"  # body from stdin
+
+push_cmd="${RESEARCH_LOG_GIT_PUSH:-git push origin main}"
+(
+  cd "$root"
+  git pull --rebase origin main >/dev/null 2>&1 || true
+  git add "$file"
+  git commit -m "autoresearch: init session entry $top_level/$project/$(basename "$file")" >/dev/null
+  $push_cmd >/dev/null 2>&1 || echo "push deferred (offline?)" >&2
+)
+echo "$file"

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# bin/notes-append-local — append to ~/.gstack/projects/<slug>/autoresearch/notes.md.
+# Usage: notes-append-local --slug <slug>
+# Stdin: markdown block to append
+set -euo pipefail
+slug=""
+while [[ $# -gt 0 ]]; do case "$1" in --slug) slug="$2"; shift 2 ;; *) exit 2 ;; esac; done
+[[ -z "$slug" ]] && exit 2
+
+home="${GSTACK_HOME:-$HOME/.gstack}"
+dir="$home/projects/$slug/autoresearch"
+mkdir -p "$dir"
+file="$dir/notes.md"
+[[ -f "$file" ]] || printf "# autoresearch notes for %s\n" "$slug" > "$file"
+{ printf "\n\n"; cat; } >> "$file"
+echo "$file"
