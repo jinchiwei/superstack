@@ -57,7 +57,8 @@ See `DESIGN.md` for full schema. Phase transitions: `planning → running → (c
 ## Gotchas
 
 - **commit-experiment uses `git add -A`.** Each successful iteration stages everything in the project repo and commits it. If you have uncommitted unrelated work in the project repo when /autoresearch runs, that work will be bundled into the first iteration commit. Start /autoresearch with a clean (or intentionally staged) working tree.
-- **/autoresearch mutates your working tree on code-fix attempts.** During a `code_bug` failure, the skill stashes your tree, applies an LLM-proposed Edit, reruns, and either keeps the fix (committing it via commit-experiment) or reverts it via `git checkout` + `git stash pop`. Mid-fix interruption is recoverable via the `pending_stash_ref` field in state.json.
+- **/autoresearch mutates your working tree on code-fix attempts.** During a `code_bug` failure, the skill stashes your tree, applies an LLM-proposed Edit on a clean tree, reruns, and either: (a) on success — commits the fix and `git stash pop`s your prior work back into the tree (you may see uncommitted state on top of the fix commit; the next `commit-experiment` sweeps it via `git add -A`); or (b) on failure — reverts via `git checkout -- <fix_target>` + `git stash pop`. Mid-fix interruption is recoverable via the `pending_stash_ref` field in state.json.
+- **Stash-pop conflicts on success path.** If your pre-existing uncommitted work touches the same lines as the LLM's fix, `git stash pop` after the success commit will leave conflict markers in the file. The stash is preserved (not dropped), so no data loss; you'll resolve the conflict on return.
 - **Single /autoresearch session per project.** Two concurrent sessions on the same project would race on state.json and on research-log appends. Not enforced; just avoid.
 
 ## When research-log isn't set up

@@ -226,7 +226,9 @@ Triggered when state.json exists and phase=running. This is the workhorse iterat
 
 On a **successful iteration** (Step 5 below), reset `.consecutive_iteration_failures = 0` in the same `state-update` call that records the result. Then proceed with normal pacing in Step 9.
 
-**Concrete try-block pattern (bash has no native try):** Bash doesn't have try/catch. Use one of two patterns. Either (preferred for an explicit list of steps) gate every helper call with `||`:
+**What the wrap covers — and what it does NOT:** The wrap is for **infrastructure errors in the iteration body** (helper exits non-zero, jq parse failure on LLM-produced JSON, state-update disk-write failure, etc). It is **NOT** for the experiment command itself. The experiment's non-zero exit code is *expected data* that flows into Step 4's classifier (transient / code_bug / infrastructure / unknown). If you `||`-gate the experiment to `on_iteration_error`, ordinary candidate failures bypass the classifier and the candidate stays marked `running` while the loop just backs off — exactly the failure mode D2 + D4 were designed to prevent.
+
+**Concrete try-block pattern (bash has no native try):** Bash doesn't have try/catch. Use one of two patterns. Either (preferred for an explicit list of steps) gate **non-experiment** helper calls with `||`, and capture the experiment's exit code without gating it:
 
 ```bash
 # At the top of the iteration body
@@ -238,26 +240,45 @@ on_iteration_error() {
   exit 0
 }
 
-# Each step is gated. Treat ANY non-zero as a caught iteration error.
+# Helper steps are gated. Any non-zero from these is an infrastructure failure of the wrap.
 "$SKILL_DIR/bin/state-update" --slug "$slug" --arg id "$CAND_ID" \
   --set '(.candidate_queue[] | select(.id == $id) | .status) = "running" | .iteration_count += 1' \
   || on_iteration_error state_update "marking candidate running"
 
-run_experiment_with_axes "$CAND_ID" \
-  || on_iteration_error experiment "candidate $CAND_ID rerun"
-# ... etc for each step
+# The experiment is NOT ||-gated. Its exit code is expected signal for Step 4.
+log="$state_dir/last-iteration.log"
+{ <user's training command with axes substituted> ; } > "$log" 2>&1
+exit_code=$?  # This drives Step 4's failure pipeline if non-zero.
+
+# After Step 4 runs (and either retries / code-fixes / records failure), continue to:
+"$SKILL_DIR/bin/state-update" --slug "$slug" ... \
+  || on_iteration_error state_update "recording result"
+# ... etc for each remaining helper step
 ```
 
-Or (preferred when you want a single trap covering the whole body) use `trap ... ERR` plus `set -e`:
+Or (preferred when you want a single trap covering the whole body) use `trap ... ERR` plus `set -e`, with the experiment command exempted:
 
 ```bash
 set -eE
 trap 'on_iteration_error trap "step exited non-zero"' ERR
-# Steps 2-8 here. ANY non-zero exit triggers the trap and on_iteration_error runs.
-trap - ERR  # clear the trap once Step 8 completes successfully.
+
+# Steps 2 helpers here under the trap.
+
+# Disable the trap around the experiment. Non-zero is expected signal, not error.
+set +e; trap - ERR
+{ <user's training command with axes substituted> ; } > "$log" 2>&1
+exit_code=$?
+# Step 4 failure pipeline runs here based on exit_code (no trap).
+
+# Re-arm the trap for Steps 5-8 helpers.
+set -eE
+trap 'on_iteration_error trap "step exited non-zero"' ERR
+
+# ... Steps 5-8 ...
+trap - ERR  # clear once Step 8 completes
 ```
 
-The `||` form is more explicit and easier to debug; the `trap ERR` form is more compact. Pick one and use it consistently within the iteration body. **Do NOT mix patterns**, and **do NOT leave bash unconfigured** (no `set -e` and no `||` gates) — that's the failure mode where errors silently pass and the wrap never fires.
+The `||` form is more explicit and easier to debug; the `trap ERR` form is more compact. Pick one and use it consistently. **Do NOT** mix patterns. **Do NOT** leave bash unconfigured (no `set -e` and no `||` gates) — silent error pass-through is the failure mode the wrap was designed to prevent. **Do NOT** route the experiment command into `on_iteration_error` — its exit code is consumed by Step 4.
 
 ### Step 1 — Check stop conditions
 
@@ -318,8 +339,8 @@ If `exit_code != 0`, apply the failure pipeline:
        # rerun the experiment
        ```
      - **On rerun success:**
-       - `commit-experiment` commits the fix + any other uncommitted state
-       - `if [[ "$STASH_REF" != "__CLEAN__" ]]; then git stash drop "$STASH_REF"; fi` (clean up the orphan)
+       - `commit-experiment` commits ONLY the fix that the LLM applied to the clean tree (the user's prior dirty state is still inside the stash at this point — it MUST be preserved).
+       - `if [[ "$STASH_REF" != "__CLEAN__" ]]; then git stash pop "$STASH_REF"; fi` — restore the user's pre-existing uncommitted work into the working tree. **Do NOT use `git stash drop` here.** Dropping discards user work that wasn't part of the fix. (Stash pop after the commit means the restored work shows as uncommitted on top of the fix commit; the next iteration's `commit-experiment` will sweep it via `git add -A` per the documented gotcha in USAGE.md.)
        - Clear `pending_stash_ref` and reset `consecutive_infra_count` to 0.
      - **On rerun failure:**
        - `git checkout -- "$FIX_TARGET_FILE"` (revert bad edit; safe because Code-Fix prompt restricts edits to a single existing file). Run this BEFORE the stash pop.
