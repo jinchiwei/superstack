@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# bin/state-migrate — migrate state.json forward to the current schema_version.
+# Usage: state-migrate --slug <slug>
+#
+# Reads schema_version from state.json and runs migrate_v{N}_to_v{N+1} in chain
+# until the state matches CURRENT_SCHEMA_VERSION. Today only migrate_v1_to_v1
+# exists (no-op identity); the registry is set up so future v1->v2 migrations
+# can drop in cleanly.
+#
+# Exit codes:
+#   0 = migration complete (or no-op when already at current)
+#   1 = corrupt state / file absent / no migration registered for required step
+#   3 = schema_version is GREATER than current — refuse (future-incompatible)
+set -euo pipefail
+
+CURRENT_SCHEMA_VERSION=1
+
+slug=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in --slug) slug="$2"; shift 2 ;; *) exit 2 ;; esac
+done
+[[ -z "$slug" ]] && { echo "--slug required" >&2; exit 2; }
+
+home="${GSTACK_HOME:-$HOME/.gstack}"
+file="$home/projects/$slug/autoresearch/state.json"
+[[ -f "$file" ]] || { echo "state-migrate: $file not found" >&2; exit 1; }
+
+if ! version=$(jq -e -r '.schema_version | numbers' "$file" 2>/dev/null); then
+  echo "state-migrate: corrupt state.json (no numeric schema_version)" >&2
+  exit 1
+fi
+
+if [[ "$version" -gt "$CURRENT_SCHEMA_VERSION" ]]; then
+  echo "state-migrate: schema_version $version is newer than current $CURRENT_SCHEMA_VERSION; refusing to downgrade" >&2
+  exit 3
+fi
+
+# ---- Migration registry ----
+# Each migrate_vN_to_vM mutates state.json in-place. Add new entries here when
+# a schema bump lands.
+
+migrate_v1_to_v1() {
+  # No-op identity migration — placeholder for the registry framework. When v2
+  # arrives this becomes migrate_v1_to_v2 and actually rewrites state.
+  return 0
+}
+
+# ---- Driver loop ----
+while [[ "$version" -lt "$CURRENT_SCHEMA_VERSION" ]]; do
+  next=$((version + 1))
+  fn="migrate_v${version}_to_v${next}"
+  if ! declare -f "$fn" >/dev/null; then
+    echo "state-migrate: no migration registered ($fn) — cannot upgrade from v$version to v$next" >&2
+    exit 1
+  fi
+  if ! "$fn"; then
+    echo "state-migrate: $fn failed" >&2
+    exit 1
+  fi
+  # Bump schema_version on disk
+  tmp=$(mktemp)
+  jq --argjson v "$next" '.schema_version = $v' "$file" > "$tmp" && mv "$tmp" "$file"
+  version=$next
+done
+
+# Final no-op pass for current version (intentional — registry hook).
+if declare -f "migrate_v${CURRENT_SCHEMA_VERSION}_to_v${CURRENT_SCHEMA_VERSION}" >/dev/null; then
+  "migrate_v${CURRENT_SCHEMA_VERSION}_to_v${CURRENT_SCHEMA_VERSION}"
+fi
+
+exit 0
