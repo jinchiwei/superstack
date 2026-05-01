@@ -16,6 +16,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 
 import branding  # noqa: E402
+import argparse  # noqa: E402
+import datetime as dt  # noqa: E402
+import re  # noqa: E402
+
+from md_loader import load_markdown, extract_title  # noqa: E402
 
 try:
     from pptx import Presentation
@@ -26,6 +31,7 @@ try:
 except ImportError:
     raise SystemExit("python-pptx not installed. Run: pip install python-pptx")
 
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 # === Color helpers ===
 def _rgb(hex_str: str) -> RGBColor:
@@ -234,10 +240,83 @@ def add_end_slide(prs, *, message: str = "Thanks", contact: str = ""):
     return s
 
 
-# main() implemented in Task 6 (markdown parsing)
-def main():
-    print("build-pptx main() not yet implemented (Task 6 of plan)", file=sys.stderr)
-    return 1
+def _strip_html(text: str) -> str:
+    """Remove HTML tags from a string. Used to flatten rendered HTML back to plain text."""
+    return _HTML_TAG_RE.sub("", text).strip()
+
+
+def _split_slides(body_html: str) -> list[str]:
+    """Split rendered body HTML on <hr> elements (which markdown's `---` becomes).
+    Returns a list of HTML chunks, one per slide."""
+    parts = re.split(r"<hr\s*/?>", body_html)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _parse_slide_chunk(html_chunk: str) -> dict:
+    """Extract a slide title (first H1 or H2) and body paragraphs from one HTML chunk."""
+    title_match = re.search(r"<(h[12])[^>]*>(.*?)</\1>", html_chunk)
+    if title_match:
+        title = _strip_html(title_match.group(2))
+        rest = html_chunk[title_match.end():]
+    else:
+        title = ""
+        rest = html_chunk
+
+    paragraphs = []
+    for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", rest, re.DOTALL):
+        text = _strip_html(m.group(2)).strip()
+        if text:
+            if m.group(1) == "li":
+                paragraphs.append(f"•  {text}")
+            else:
+                paragraphs.append(text)
+    return {"title": title, "body": paragraphs}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="markdown → Jin-branded PPTX")
+    ap.add_argument("--input", required=True)
+    ap.add_argument("--output", required=True)
+    ap.add_argument("--no-cover", dest="no_cover", action="store_true",
+                    help="suppress title slide (start with first content slide)")
+    ap.add_argument("--no-end", dest="no_end", action="store_true",
+                    help="suppress closing 'Thanks' slide")
+    args = ap.parse_args()
+
+    loaded = load_markdown(args.input)
+    meta = loaded["meta"]
+    today = dt.date.today().isoformat()
+
+    prs = new_presentation()
+
+    # Title slide
+    if not args.no_cover:
+        add_title_slide(
+            prs,
+            eyebrow=str(meta.get("eyebrow", "")),
+            title=extract_title(loaded) or Path(args.input).stem,
+            subtitle=str(meta.get("subtitle", "")),
+            name=str(meta.get("name", "")),
+            org=str(meta.get("org", "")),
+            date=str(meta.get("date") or today),
+        )
+
+    # Content slides
+    chunks = _split_slides(loaded["body_html"])
+    for chunk in chunks:
+        slide = _parse_slide_chunk(chunk)
+        if slide["title"] or slide["body"]:
+            add_content_slide(prs, title=slide["title"] or "(untitled)",
+                              body_paragraphs=slide["body"])
+
+    # End slide
+    if not args.no_end:
+        add_end_slide(prs, message="Thanks",
+                      contact=str(meta.get("name") or ""))
+
+    prs.save(args.output)
+    print(f"wrote {args.output}")
+    return 0
 
 
 if __name__ == "__main__":
