@@ -186,7 +186,7 @@ def _candidate_slide(prs, *, iter_num, candidate, summary_text, status, metric,
         _add_text(s, "METRIC", left=10.6, top=1.1, width=2.0, height=0.25,
                   size=8, color=MUTED, font=MONO, bold=True, align=PP_ALIGN.CENTER)
         _add_text(s, str(metric), left=10.6, top=1.32, width=2.0, height=0.5,
-                  size=22, color=DEEPPINK, font=MONO, bold=True,
+                  size=22, color=BLUEVIOLET, font=MONO, bold=True,
                   align=PP_ALIGN.CENTER)
 
     # Hairline rule
@@ -272,7 +272,7 @@ def _summary_slide(prs, *, scope, candidates, target):
         x += 1.6
         # metric
         _add_text(s, str(c.get("metric") or "—"), left=x, top=y, width=2.0, height=row_h,
-                  size=12, color=DEEPPINK, font=MONO, bold=True,
+                  size=12, color=BLUEVIOLET, font=MONO, bold=True,
                   anchor=MSO_ANCHOR.MIDDLE)
         y += row_h
 
@@ -343,7 +343,7 @@ def main():
     _title_slide(prs, scope=args.scope, scope_text=session["scope_text"],
                  date_str=args.date, target=session["target"])
     # 2. Section divider — Iterations
-    _section_divider(prs, label="Iterations", color=BLUEVIOLET)
+    _section_divider(prs, label="Iterations", color=TURQUOISE)
     # 3..N. Per-iteration
     for c in session["candidates"]:
         _candidate_slide(prs, iter_num=c["iter"], candidate=c["candidate"],

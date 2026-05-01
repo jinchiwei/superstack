@@ -54,7 +54,7 @@ h1.title {
   margin: 0 0 4pt 0;
 }
 .target .label { color: #6B6B73; font-weight: 700; }
-.target .value { color: #FF1493; font-weight: 700; }
+.target .value { color: #8A2BE2; font-weight: 700; }
 .date {
   font-family: 'Geist Mono', monospace; font-size: 9pt; color: #6B6B73;
   margin: 0 0 18pt 0;
@@ -63,7 +63,7 @@ hr.rule { border: none; border-top: 0.5pt solid #DDDDDD; margin: 14pt 0; }
 
 h2.section {
   font-family: 'Geist', sans-serif; font-size: 14pt; font-weight: 700;
-  color: #8A2BE2; margin: 20pt 0 8pt 0;
+  color: #FF1493; margin: 20pt 0 8pt 0;
   bookmark-level: 1; bookmark-label: content(text);
 }
 
@@ -78,7 +78,7 @@ h2.section {
   margin: 0 0 6pt 0; color: #14141C;
 }
 .iter-block .meta .label { color: #6B6B73; font-weight: 700; }
-.iter-block .meta .metric { color: #FF1493; font-weight: 700; }
+.iter-block .meta .metric { color: #8A2BE2; font-weight: 700; }
 .iter-block pre {
   font-family: 'Geist Mono', monospace; font-size: 9pt; color: #14141C;
   background: #FAFAFC; border-left: 2pt solid #E5E5EA;
@@ -102,7 +102,7 @@ table.results td {
 }
 table.results td.iter { color: #6B6B73; font-weight: 700; }
 table.results td.candidate { font-family: 'Geist', sans-serif; font-size: 10pt; }
-table.results td.metric { color: #FF1493; font-weight: 700; }
+table.results td.metric { color: #8A2BE2; font-weight: 700; }
 """
 
 

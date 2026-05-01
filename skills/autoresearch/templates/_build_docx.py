@@ -141,7 +141,7 @@ def main():
         target_p = doc.add_paragraph()
         target_p.paragraph_format.space_after = Pt(2)
         _styled(target_p, "Target — ", font=MONO, size=10, color=MUTED, bold=True)
-        _styled(target_p, session["target"], font=MONO, size=10, color=DEEPPINK, bold=True)
+        _styled(target_p, session["target"], font=MONO, size=10, color=BLUEVIOLET, bold=True)
 
     date_p = doc.add_paragraph()
     _styled(date_p, args.date, font=MONO, size=9, color=MUTED)
@@ -151,7 +151,7 @@ def main():
     # Iterations
     h = doc.add_paragraph()
     h.paragraph_format.space_before = Pt(8)
-    _styled(h, "Iterations", font=BODY, size=14, color=BLUEVIOLET, bold=True)
+    _styled(h, "Iterations", font=BODY, size=14, color=DEEPPINK, bold=True)
 
     for c in session["candidates"]:
         # Section header: candidate name
@@ -166,7 +166,7 @@ def main():
         _styled(meta_line, "Status: ", font=MONO, size=9, color=MUTED, bold=True)
         _styled(meta_line, c["status"], font=MONO, size=9, color=INK)
         _styled(meta_line, "      Metric: ", font=MONO, size=9, color=MUTED, bold=True)
-        _styled(meta_line, str(c["metric"]), font=MONO, size=9, color=DEEPPINK, bold=True)
+        _styled(meta_line, str(c["metric"]), font=MONO, size=9, color=BLUEVIOLET, bold=True)
 
         # Body — show first ~30 lines of summary, plain
         body_text = (c["summary"] or "").strip()
@@ -181,7 +181,7 @@ def main():
     # Results table
     h2 = doc.add_paragraph()
     h2.paragraph_format.space_before = Pt(10)
-    _styled(h2, "Results", font=BODY, size=14, color=BLUEVIOLET, bold=True)
+    _styled(h2, "Results", font=BODY, size=14, color=DEEPPINK, bold=True)
 
     if session["candidates"]:
         tbl = doc.add_table(rows=1 + len(session["candidates"]), cols=4)
@@ -199,7 +199,7 @@ def main():
             _styled(cells[2].paragraphs[0], c["status"],
                     font=MONO, size=9, color=INK)
             _styled(cells[3].paragraphs[0], str(c["metric"]),
-                    font=MONO, size=9, color=DEEPPINK, bold=True)
+                    font=MONO, size=9, color=BLUEVIOLET, bold=True)
 
     doc.save(out)
     print(f"wrote {out}")
