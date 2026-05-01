@@ -22,6 +22,8 @@ try:
     from docx import Document
     from docx.enum.style import WD_STYLE_TYPE
     from docx.shared import Pt, RGBColor, Inches
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
 except ImportError:
     raise SystemExit("python-docx not installed. Run: pip install python-docx")
 
@@ -32,8 +34,31 @@ def _hex_to_rgb(hex_str: str) -> RGBColor:
     return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
+def _force_font_on_style(style, font_name: str) -> None:
+    """Override Word's theme font fallback by setting w:rFonts attributes directly.
+
+    python-docx's `style.font.name = X` writes only one rFonts attribute and leaves
+    theme references (asciiTheme, hAnsiTheme) intact, so Word's heading styles still
+    resolve to "+Headings" (Calibri by default). We explicitly set all four script
+    attributes (ascii, hAnsi, cs, eastAsia) AND remove any theme attributes.
+    """
+    rpr = style.element.get_or_add_rPr()
+    rfonts = rpr.find(qn("w:rFonts"))
+    if rfonts is None:
+        rfonts = OxmlElement("w:rFonts")
+        rpr.append(rfonts)
+    # Set all script attributes explicitly
+    for attr in ("w:ascii", "w:hAnsi", "w:cs", "w:eastAsia"):
+        rfonts.set(qn(attr), font_name)
+    # Clear theme attributes that would otherwise win
+    for theme_attr in ("w:asciiTheme", "w:hAnsiTheme", "w:cstheme", "w:eastAsiaTheme"):
+        if rfonts.get(qn(theme_attr)) is not None:
+            del rfonts.attrib[qn(theme_attr)]
+
+
 def _style_run_font(style, *, font_name: str, size_pt: float, color_hex: str, bold: bool = False):
     style.font.name = font_name
+    _force_font_on_style(style, font_name)
     style.font.size = Pt(size_pt)
     style.font.color.rgb = _hex_to_rgb(color_hex)
     style.font.bold = bold
