@@ -64,12 +64,14 @@ hr.rule { border: none; border-top: 0.5pt solid #DDDDDD; margin: 14pt 0; }
 h2.section {
   font-family: 'Geist', sans-serif; font-size: 14pt; font-weight: 700;
   color: #8A2BE2; margin: 20pt 0 8pt 0;
+  bookmark-level: 1; bookmark-label: content(text);
 }
 
 .iter-block { margin: 10pt 0 18pt 0; page-break-inside: avoid; }
 .iter-block .candidate {
   font-family: 'Geist', sans-serif; font-size: 12pt; font-weight: 700;
   color: #14141C; margin: 0 0 2pt 0;
+  bookmark-level: 2; bookmark-label: content(text);
 }
 .iter-block .meta {
   font-family: 'Geist Mono', monospace; font-size: 9pt;
