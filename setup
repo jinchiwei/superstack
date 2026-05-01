@@ -81,16 +81,20 @@ for skill in $SUPERPOWERS_SKILLS; do
 done
 
 # --- 3. custom skills from this repo ---
+# Compare the WHOLE skill directory, not just SKILL.md — otherwise changes to
+# templates/, USAGE.md, prompts/, bin/, etc. silently get skipped here even
+# when SKILL.md is unchanged. (`diff -rq -x .git` reports differences across
+# all subtrees; an empty diff means the install matches the source.)
 echo ""
 echo "[3/3] Installing custom pipeline skills..."
 for skill in $CUSTOM_SKILLS; do
-    src="$REPO_DIR/skills/$skill/SKILL.md"
-    dst="$SKILLS_DIR/$skill/SKILL.md"
-    if [ -f "$dst" ] && diff -q "$src" "$dst" >/dev/null 2>&1; then
+    src_dir="$REPO_DIR/skills/$skill"
+    dst_dir="$SKILLS_DIR/$skill"
+    if [ -d "$dst_dir" ] && [ -z "$(diff -rq -x '.git' "$src_dir" "$dst_dir" 2>/dev/null)" ]; then
         echo "  $skill already up to date, skipped."
     else
-        mkdir -p "$SKILLS_DIR/$skill"
-        cp -r "$REPO_DIR/skills/$skill/"* "$SKILLS_DIR/$skill/"
+        mkdir -p "$dst_dir"
+        cp -r "$src_dir/"* "$dst_dir/"
         echo "  Installed $skill"
     fi
 done
