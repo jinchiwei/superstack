@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# bin/session-readme — maintain results/<date>_<scope>/README.md as the session dashboard.
+#
+# Append-mode: adds a row to the candidates table for one completed iteration.
+# Init-mode: creates the README with header + scope + axes + empty table.
+#
+# Usage:
+#   session-readme init --scope-slug <s> --scope-text <t> --target <m> --axes-json <j> [--date <YYYY-MM-DD>]
+#   session-readme append --scope-slug <s> --iter <N> --candidate-slug <c> --status <s> --metric <m> [--date <YYYY-MM-DD>]
+set -euo pipefail
+
+mode="${1:-}"; shift || true
+
+scope=""; date_override=""; iter=""; candidate=""; status=""; metric=""
+scope_text=""; target=""; axes_json=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --scope-slug) scope="$2"; shift 2 ;;
+    --scope-text) scope_text="$2"; shift 2 ;;
+    --target) target="$2"; shift 2 ;;
+    --axes-json) axes_json="$2"; shift 2 ;;
+    --date) date_override="$2"; shift 2 ;;
+    --iter) iter="$2"; shift 2 ;;
+    --candidate-slug) candidate="$2"; shift 2 ;;
+    --status) status="$2"; shift 2 ;;
+    --metric) metric="$2"; shift 2 ;;
+    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    *) echo "session-readme: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -z "$scope" ]] && { echo "session-readme: --scope-slug required" >&2; exit 2; }
+
+date_str="${date_override:-$(date -u +%Y-%m-%d)}"
+session_dir="results/${date_str}_${scope}"
+readme="${session_dir}/README.md"
+mkdir -p "$session_dir"
+
+case "$mode" in
+  init)
+    [[ -z "$scope_text" || -z "$target" ]] && {
+      echo "session-readme init: --scope-text, --target required" >&2; exit 2
+    }
+    {
+      printf "# autoresearch session: %s\n\n" "$scope"
+      printf "**Date:** %s\n" "$date_str"
+      printf "**Scope:** %s\n" "$scope_text"
+      printf "**Target metric:** %s\n\n" "$target"
+      if [[ -n "$axes_json" ]]; then
+        printf "## Axes\n\n"
+        printf '```json\n%s\n```\n\n' "$axes_json"
+      fi
+      printf "## Candidates\n\n"
+      printf "| iter | candidate | status | metric |\n"
+      printf "|------|-----------|--------|--------|\n"
+    } > "$readme"
+    echo "$readme"
+    ;;
+  append)
+    [[ -z "$iter" || -z "$candidate" || -z "$status" ]] && {
+      echo "session-readme append: --iter, --candidate-slug, --status required" >&2; exit 2
+    }
+    [[ ! -f "$readme" ]] && {
+      # idempotent fallback: write a minimal header so append doesn't crash
+      printf "# autoresearch session: %s\n\nDate: %s\n\n## Candidates\n\n| iter | candidate | status | metric |\n|------|-----------|--------|--------|\n" "$scope" "$date_str" > "$readme"
+    }
+    iter_padded=$(printf "%02d" "$iter")
+    metric_cell="${metric:-—}"
+    printf "| %s | %s | %s | %s |\n" "$iter_padded" "$candidate" "$status" "$metric_cell" >> "$readme"
+    echo "$readme"
+    ;;
+  *)
+    echo "session-readme: mode must be 'init' or 'append', got '$mode'" >&2
+    exit 2
+    ;;
+esac

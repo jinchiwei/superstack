@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# bin/init-project — one-shot scaffold for autoresearch in a new project.
+# Creates exp/, results/, docs/ shells, adds exp/ to .gitignore, drops
+# branded _build_pptx.py / _build_pdf.py / _build_docx.py templates into docs/.
+#
+# Idempotent: existing files are not overwritten unless --force is passed.
+#
+# Usage:
+#   init-project [--no-templates] [--force]
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TEMPLATES="$SKILL_DIR/templates"
+
+want_templates=1
+force=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-templates) want_templates=0; shift ;;
+    --force) force=1; shift ;;
+    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    *) echo "init-project: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+ensure_dir() {
+  local d="$1"
+  if [[ -d "$d" ]]; then
+    echo "  $d/ already exists"
+  else
+    mkdir -p "$d"
+    echo "  created $d/"
+  fi
+}
+
+ensure_file() {
+  # ensure_file <dest> <src> [--exec]
+  local dest="$1" src="$2" exec_flag="${3:-}"
+  if [[ -f "$dest" && "$force" -ne 1 ]]; then
+    echo "  $dest already exists (use --force to overwrite)"
+  else
+    cp "$src" "$dest"
+    [[ "$exec_flag" == "--exec" ]] && chmod +x "$dest"
+    echo "  wrote $dest"
+  fi
+}
+
+echo "=== autoresearch init-project in $PWD ==="
+
+ensure_dir exp
+ensure_dir results
+ensure_dir docs
+
+echo ""
+echo "[gitignore]"
+gi=".gitignore"
+[[ -f "$gi" ]] || touch "$gi"
+if grep -qE '^exp/?$|^/exp/?$' "$gi"; then
+  echo "  exp/ already in .gitignore"
+else
+  {
+    echo ""
+    echo "# autoresearch: raw experiment artifacts (large, not committed)"
+    echo "exp/"
+  } >> "$gi"
+  echo "  appended exp/ to .gitignore"
+fi
+
+if [[ "$want_templates" -eq 1 ]]; then
+  echo ""
+  echo "[doc templates]"
+  if [[ -d "$TEMPLATES" ]]; then
+    [[ -f "$TEMPLATES/_build_pptx.py" ]] && ensure_file docs/_build_pptx.py "$TEMPLATES/_build_pptx.py"
+    [[ -f "$TEMPLATES/_build_pdf.py" ]]  && ensure_file docs/_build_pdf.py  "$TEMPLATES/_build_pdf.py"
+    [[ -f "$TEMPLATES/_build_docx.py" ]] && ensure_file docs/_build_docx.py "$TEMPLATES/_build_docx.py"
+    [[ -f "$TEMPLATES/style.py" ]] && ensure_file docs/style.py "$TEMPLATES/style.py"
+  else
+    echo "  (no templates dir at $TEMPLATES — skipping)"
+  fi
+fi
+
+echo ""
+echo "Done. Layout:"
+echo "  exp/      — raw artifacts (gitignored)"
+echo "  results/  — synthesized outputs, one dir per (date, scope, candidate)"
+echo "  docs/     — human-authored writeups + report builders"

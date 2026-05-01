@@ -157,6 +157,24 @@ echo "$AXES_JSON" | "$SKILL_DIR/bin/state-init" --slug "$slug"
   --set '.candidate_queue = $queue | .phase = "running"'
 ```
 
+### Step 5b — Initialize project layout + session README
+
+If this is the first autoresearch session in the project (no `exp/` or `results/` dirs yet), bootstrap the layout. Idempotent — skips existing files.
+
+```bash
+"$SKILL_DIR/bin/init-project"
+# Then write the session dashboard
+TODAY=$(date -u +%Y-%m-%d)
+"$SKILL_DIR/bin/session-readme" init \
+  --scope-slug "$SCOPE_SLUG" \
+  --scope-text "$SCOPE_TEXT" \
+  --target "$TARGET_DESCRIPTION" \
+  --axes-json "$AXES_JSON" \
+  --date "$TODAY"
+```
+
+`init-project` creates `exp/`, `results/`, `docs/`, adds `exp/` to `.gitignore`, and drops branded `_build_pptx.py` / `_build_pdf.py` / `_build_docx.py` templates into `docs/`. The user can edit those freely — autoresearch invokes them at termination if present.
+
 ### Step 6 — Initialize research-log entry (or fall back)
 
 ```bash
@@ -308,18 +326,44 @@ Read the highest-priority candidate from `state.candidate_queue` where status=pe
   --set '(.candidate_queue[] | select(.id == $id) | .status) = "running" | .iteration_count += 1'
 ```
 
+### Step 2.5 — Compute output dirs + export env vars
+
+Before running the experiment, compute the standard `results/` and `exp/` paths for this iteration and export them so the candidate's command can write outputs there.
+
+```bash
+TODAY=$(date -u +%Y-%m-%d)
+SCOPE_SLUG=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .scope_slug)
+
+# Candidate slug: short, filename-safe ID for this candidate (e.g. its axes condensed).
+# Prefer the candidate's own .slug if state.json carries one; else derive from CAND_ID.
+CAND_SLUG=$("$SKILL_DIR/bin/state-read" --slug "$slug" \
+  --path ".candidate_queue[] | select(.id == \"$CAND_ID\") | .slug // .id")
+
+export AUTORESEARCH_OUT_RESULTS=$("$SKILL_DIR/bin/results-dir" \
+  --scope-slug "$SCOPE_SLUG" --iter "$ITER" --candidate-slug "$CAND_SLUG" --date "$TODAY")
+export AUTORESEARCH_OUT_EXP=$("$SKILL_DIR/bin/exp-dir" \
+  --scope-slug "$SCOPE_SLUG" --iter "$ITER" --candidate-slug "$CAND_SLUG" --date "$TODAY")
+```
+
+Both env vars are absolute-or-relative paths to dirs that already exist (the helpers `mkdir -p` them). The candidate's command MUST honor them — see Step 3.
+
 ### Step 3 — Run the experiment
 
-The skill does NOT prescribe how to invoke the user's training/eval — that comes from project context (CLAUDE.md should have it, or the LLM infers from the project README/Makefile). Capture stdout+stderr to `last-iteration.log` in the state dir.
+The skill does NOT prescribe how to invoke the user's training/eval — that comes from project context (CLAUDE.md should have it, or the LLM infers from the project README/Makefile). The materialized command MUST write its outputs into `$AUTORESEARCH_OUT_RESULTS` (synthesized: figures, csv, `summary.md`) and `$AUTORESEARCH_OUT_EXP` (raw: checkpoints, big intermediate files). The skill propagates these env vars; the LLM is responsible for using them in the command it constructs.
+
+Capture stdout+stderr to `last-iteration.log` in the state dir.
 
 ```bash
 log="$state_dir/last-iteration.log"
-# Example invocation; the LLM materializes the actual command from project context + the candidate's axes
+# Example invocation; the LLM materializes the actual command from project context + the candidate's axes.
+# Inside the command, scripts read $AUTORESEARCH_OUT_RESULTS / $AUTORESEARCH_OUT_EXP for output paths.
 { <user's training command with axes substituted> ; } > "$log" 2>&1
 exit_code=$?
 ```
 
-If `exit_code == 0`, parse the metric from the log (the LLM extracts it; the format depends on the project — usually a known stdout pattern or a metrics JSON written by the run).
+After the command, the skill REQUIRES that `$AUTORESEARCH_OUT_RESULTS/summary.md` was written. If missing, treat as an iteration failure (class=infrastructure) — the candidate didn't produce its required artifact.
+
+If `exit_code == 0` AND `summary.md` exists, parse the metric from the log or from `summary.md` (the LLM extracts it; the format depends on the project — usually a known stdout pattern or a metrics JSON written by the run).
 
 ### Step 4 — Handle failure (if any)
 
@@ -456,6 +500,20 @@ else
 fi
 ```
 
+### Step 7b — Append iteration row to session README
+
+```bash
+"$SKILL_DIR/bin/session-readme" append \
+  --scope-slug "$SCOPE_SLUG" \
+  --iter "$ITER" \
+  --candidate-slug "$CAND_SLUG" \
+  --status "$STATUS" \
+  --metric "${METRIC_VALUE:-}" \
+  --date "$TODAY"
+```
+
+This appends a row to `results/<date>_<scope>/README.md` — the at-a-glance session dashboard.
+
 ### Step 8 — Commit project repo
 
 Skip if Step 4's code_bug success path already committed the fix — otherwise we'd sweep the just-popped user work into a second iteration commit (per /codex review P2-1).
@@ -526,6 +584,24 @@ else
   printf "%s" "$final_block" | "$SKILL_DIR/bin/notes-append-local" --slug "$slug"
 fi
 ```
+
+### Generate session reports
+
+After the final summary is written, invoke any project-local doc builders to produce a shareable session report. Each builder is called with the standard `--date` + `--scope` args and writes to `docs/runs/<date>_<scope>/`.
+
+```bash
+SESSION_DATE=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .session_started_at | cut -dT -f1)
+[[ -z "$SESSION_DATE" || "$SESSION_DATE" == "null" ]] && SESSION_DATE=$(date -u +%Y-%m-%d)
+
+for builder in docs/_build_pptx.py docs/_build_docx.py docs/_build_pdf.py; do
+  if [[ -f "$builder" ]]; then
+    python "$builder" --date "$SESSION_DATE" --scope "$SCOPE_SLUG" \
+      || echo "warning: $builder failed (continuing — reports are best-effort)"
+  fi
+done
+```
+
+The templates dropped by `init-project` honor this contract. If the project has its own opinionated builders (with different signatures), the user can either match the contract or replace this Step entirely. Report builds are best-effort — a builder failure does NOT prevent session termination.
 
 ## Question deferral mailbox
 

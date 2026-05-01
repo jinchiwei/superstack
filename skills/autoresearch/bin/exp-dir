@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# bin/exp-dir — print (and mkdir -p) the exp/ dir for an autoresearch iteration.
+# Path: <cwd>/exp/<YYYY-MM-DD>_<scope-slug>/iter-<NN>_<candidate-slug>/
+# Mirrors results-dir but under exp/ (intended for raw, gitignored artifacts).
+#
+# Usage:
+#   exp-dir --scope-slug <s> --iter <N> --candidate-slug <c> [--date <YYYY-MM-DD>] [--no-create]
+set -euo pipefail
+
+scope=""
+candidate=""
+iter=""
+date_override=""
+create=1
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --scope-slug) scope="$2"; shift 2 ;;
+    --candidate-slug) candidate="$2"; shift 2 ;;
+    --iter) iter="$2"; shift 2 ;;
+    --date) date_override="$2"; shift 2 ;;
+    --no-create) create=0; shift ;;
+    -h|--help)
+      sed -n '2,9p' "$0"; exit 0 ;;
+    *) echo "exp-dir: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -z "$scope" || -z "$candidate" || -z "$iter" ]] && {
+  echo "exp-dir: --scope-slug, --candidate-slug, --iter all required" >&2
+  exit 2
+}
+
+date_str="${date_override:-$(date -u +%Y-%m-%d)}"
+iter_padded=$(printf "%02d" "$iter")
+slug2="iter-${iter_padded}_${candidate}"
+dir="exp/${date_str}_${scope}/${slug2}"
+
+[[ "$create" -eq 1 ]] && mkdir -p "$dir"
+echo "$dir"

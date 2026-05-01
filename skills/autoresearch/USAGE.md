@@ -45,6 +45,39 @@ State is persisted at `~/.gstack/projects/<slug>/autoresearch/state.json`. To re
 - Deferred questions: `~/.gstack/projects/<slug>/autoresearch/QUESTIONS_FOR_USER.md`
 - Live narrative: research-log entry (if set up) or local `notes.md`
 
+## Project layout
+
+The skill writes per-iteration outputs into a date+scope+candidate hierarchy in your project root, mirroring the convention used in `brainlab/projects/ad/agf/ad-genetics-fwf/`:
+
+```
+<project>/
+  exp/                                          (gitignored, raw artifacts)
+    YYYY-MM-DD_<scope>/
+      iter-NN_<candidate>/                      checkpoints, big logs
+  results/                                      (committed, synthesized)
+    YYYY-MM-DD_<scope>/
+      README.md                                 session dashboard (axes, metrics table)
+      iter-NN_<candidate>/
+        summary.md                              required: per-iter blurb
+        figures/, *.csv, etc.
+  docs/
+    _build_pptx.py / _build_docx.py / _build_pdf.py   templates dropped by init-project
+    runs/
+      YYYY-MM-DD_<scope>/SESSION_REPORT.{pptx,docx,pdf}   produced at termination
+```
+
+Each iteration's command receives two env vars from the skill:
+- `$AUTORESEARCH_OUT_RESULTS` — absolute or repo-relative path to that iteration's results dir
+- `$AUTORESEARCH_OUT_EXP` — same for exp/
+
+Scripts in your candidate command MUST honor these (write `summary.md`, figures, etc. into `$AUTORESEARCH_OUT_RESULTS`; checkpoints into `$AUTORESEARCH_OUT_EXP`). The skill bootstraps the layout via `bin/init-project` on first run; safe to re-run.
+
+## Session reports
+
+At termination, the skill invokes any of `docs/_build_pptx.py`, `docs/_build_docx.py`, `docs/_build_pdf.py` that exist, calling each with `--date <date> --scope <scope>`. Templates dropped by `init-project` use the standard brand palette (turquoise / deeppink / amber / blueviolet, Geist + Geist Mono) and read `results/<date>_<scope>/` plus per-iteration `summary.md`. Edit the templates to fit your project; the contract is the CLI args plus the input/output paths.
+
+Report builds are best-effort: failures (missing `python-pptx` etc.) are logged but don't block termination. Required pip packages: `python-pptx`, `python-docx`, `weasyprint markdown`.
+
 ## state.json schema (v1)
 
 See `DESIGN.md` for full schema. Phase transitions: `planning → running → (completed | halted | cancelled)`.
