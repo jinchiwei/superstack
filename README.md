@@ -60,7 +60,7 @@ Or from Claude Code:
 |--------|--------|
 | **gstack** | browse, qa, ship, design-\*, plan-\*, review, office-hours, and [more](https://github.com/garrytan/gstack) |
 | **superpowers** | subagent-driven-development, test-driven-development, verification-before-completion, writing-plans |
-| **this repo** | pipeline, pipeline-update |
+| **this repo** | pipeline, pipeline-update, autoresearch |
 | **this repo, Codex only** | claude second-opinion skill |
 
 ## The pipeline
@@ -94,3 +94,42 @@ If a step fails or you hit a bug mid-pipeline:
 For Codex, the equivalent pipeline uses `$gstack-*` skills and replaces the old
 Claude-side `/codex review` step with `$claude review`, which calls Claude Code with
 xhigh effort for an outside-model pass.
+
+## /autoresearch
+
+Long-running autonomous research loop. Use when you want to iterate over a search space
+(architectures, input modes, hyperparameters, etc.) for hours-to-days, with adaptive
+replanning, agentic code-fix on failures, and a STOP-file kill switch. One invocation
+per session — the skill self-paces via `ScheduleWakeup` and runs without prompts after
+launch.
+
+```
+/autoresearch "iterate over architectures, input modes, loss functions for the FW model.
+                target: val_corr > 0.85"
+```
+
+You'll be asked once at launch to confirm the planned axes. After that:
+
+- **One iteration per ScheduleWakeup tick** — pick next candidate, run the experiment,
+  classify any failure (transient / code_bug / infrastructure / unknown), replan the
+  queue, append to the live narrative, schedule the next iteration.
+- **State persisted** at `~/.gstack/projects/<slug>/autoresearch/state.json` so a Claude
+  Code crash mid-session is recoverable (run `/autoresearch` with no args to resume).
+- **Stop signals** — target metric reached, search space exhausted, `touch STOP` file,
+  or 2 consecutive distinct infrastructure failures (D4 halt gate).
+- **Standardized outputs** per iteration:
+  - `results/<YYYY-MM-DD>_<scope>/iter-<NN>_<candidate>/` — synthesized (figures,
+    metrics, `summary.md`); committed
+  - `exp/<YYYY-MM-DD>_<scope>/iter-<NN>_<candidate>/` — raw artifacts (checkpoints,
+    big logs); gitignored
+  - Candidate scripts honor `$AUTORESEARCH_OUT_RESULTS` and `$AUTORESEARCH_OUT_EXP`
+    (exported by the skill; no hardcoded paths).
+- **Brand-styled session reports** at termination — runs any of
+  `docs/_build_pptx.py`, `docs/_build_docx.py`, `docs/_build_pdf.py` that exist with
+  `--date <date> --scope <slug>`. Templates dropped by `init-project` use Geist + the
+  brand palette (turquoise / deeppink / amber / blueviolet) and produce a
+  conference-presentation-quality deck plus conservative paper-style docx/pdf.
+
+See `skills/autoresearch/USAGE.md` for full invocation, halt, and inspection patterns,
+and `skills/autoresearch/DESIGN.md` for the architecture (locked decisions D1-D4 on
+stash discipline, iteration error wrapping, schema migration, and infra halt gating).

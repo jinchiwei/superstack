@@ -76,7 +76,11 @@ Scripts in your candidate command MUST honor these (write `summary.md`, figures,
 
 At termination, the skill invokes any of `docs/_build_pptx.py`, `docs/_build_docx.py`, `docs/_build_pdf.py` that exist, calling each with `--date <date> --scope <scope>`. Templates dropped by `init-project` use the standard brand palette (turquoise / deeppink / amber / blueviolet, Geist + Geist Mono) and read `results/<date>_<scope>/` plus per-iteration `summary.md`. Edit the templates to fit your project; the contract is the CLI args plus the input/output paths.
 
-Report builds are best-effort: failures (missing `python-pptx` etc.) are logged but don't block termination. Required pip packages: `python-pptx`, `python-docx`, `weasyprint markdown`.
+Report builds are best-effort: failures (missing `python-pptx` etc.) are logged but don't block termination.
+
+Pip prereqs:
+- `pip install python-pptx python-docx markdown weasyprint`
+- macOS PDF builder also needs system libs: `brew install pango glib`
 
 ## state.json schema (v1)
 
