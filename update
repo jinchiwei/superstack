@@ -7,7 +7,7 @@ SKILLS_DIR="$HOME/.claude/skills"
 UPSTREAM_DIR="$REPO_DIR/.upstream"
 
 SUPERPOWERS_SKILLS="subagent-driven-development test-driven-development verification-before-completion writing-plans"
-CUSTOM_SKILLS="pipeline pipeline-update"
+CUSTOM_SKILLS="pipeline pipeline-update autoresearch"
 
 echo "=== superstack update ==="
 
