@@ -159,7 +159,7 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
         block = rest_no_tables[end:next_start]
         block_no_img = re.sub(r'<img[^>]*/?>', '', block)
         body_lines = []
-        for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", block_no_img, re.DOTALL):
+        for m in re.finditer(r"<(p|li)\b[^>]*>(.*?)</\1>", block_no_img, re.DOTALL):
             text = _strip_html(m.group(2)).strip()
             if text:
                 body_lines.append(text)
@@ -177,13 +177,13 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
     paragraphs: list[dict] = []
     if auto_cards:
         cards = auto_cards
-        for m in re.finditer(r"<p[^>]*>(.*?)</p>", body_region, re.DOTALL):
+        for m in re.finditer(r"<p\b[^>]*>(.*?)</p>", body_region, re.DOTALL):
             html = m.group(1).strip()
             if _strip_html(html):
                 paragraphs.append({"kind": "paragraph", "html": html,
                                    "pos": m.start()})
     else:
-        for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", body_region, re.DOTALL):
+        for m in re.finditer(r"<(p|li)\b[^>]*>(.*?)</\1>", body_region, re.DOTALL):
             html = m.group(2).strip()
             if _strip_html(html):
                 kind = "bullet" if m.group(1) == "li" else "paragraph"
