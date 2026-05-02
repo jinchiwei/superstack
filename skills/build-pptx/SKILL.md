@@ -72,6 +72,146 @@ The renderer dispatches to one of these layouts per slide based on the plan entr
 
 See `plan_prompt.md` for the full param schemas and decision rubric.
 
+## When invoked: auto-generate the layout plan inline
+
+When `/build-pptx <input.md>` runs, **before** invoking `python build.py`,
+decide what to do based on flags + sidecar state:
+
+| State | Action |
+|---|---|
+| `--no-plan` flag | Skip everything below; let `build.py --no-plan` use legacy v3 path. |
+| Sidecar exists AND no `--shake` | Skip auto-generation; let `build.py` replay the cached layouts. |
+| Sidecar absent OR `--shake` | **Generate the plan inline before rendering** (see steps below). |
+
+### Inline plan generation steps
+
+Run these in order whenever you need to (re)generate the sidecar:
+
+1. **Read the source markdown.** Get its full text from `<input>.md`.
+2. **Read `<skill_dir>/plan_prompt.md`** — the layout catalog, sandbox
+   API, decision rubric, and worked examples. The skill_dir is the
+   directory containing this `SKILL.md`.
+3. **Walk slide chunks.** From the markdown's HTML body, split on `<hr>`
+   to get one chunk per slide. For each chunk:
+   - Derive a stable `slide_id` via `plan.derive_slide_ids_from_chunks`
+   - Compute `content_hash = plan.hash_text(chunk_html)`
+   - Note H1 (carries forward) and H2 (per-slide)
+4. **Decide a layout `kind` per slide.** Most slides should be one of
+   the named kinds (`content-text`, `cards-grid`, `content-text-image`,
+   `content-image-only`, `cards-heterogeneous`, `three-pillars`,
+   `stat-callouts-right`, `bg-flip`, `timeline`). Reach for `freeform`
+   ONLY when no named layout fits — see the "When to use freeform"
+   section in `plan_prompt.md`.
+5. **For `freeform` slides, write the python snippet.** Use ONLY the
+   sandbox API documented in `plan_prompt.md`. Important constraints:
+   - No `import`, no dunder access, no `try`/`with`, no
+     `eval`/`exec`/`open`/`getattr`/etc.
+   - Stay inside the body region: `body_top, body_h, body_l, body_w`
+   - Use brand colors (`accent_rgb`, `INK_RGB`, `TURQUOISE_RGB`, ...)
+     and brand fonts (`MONO_FONT`, `SANS_FONT`)
+   - Test mentally: does it respect the geometry? Does it use the
+     listed primitives correctly?
+6. **Write the JSON to `<input>.md.layout.json`.** Schema:
+   ```json
+   {
+     "version": 1,
+     "deck_md_hash": "<sha256 of the markdown>",
+     "shake_seed": null,
+     "slides": [
+       {
+         "slide_id": "h1-...",
+         "kind": "content-text" | "freeform" | "section-divider" | ...,
+         "params": { ... layout-specific ... },
+         "content_hash": "<sha256 of the chunk HTML>"
+       },
+       ...
+     ]
+   }
+   ```
+   For section-divider entries, also include
+   `params.accent_hex = "#xxxxxx"` (the renderer needs the hex string,
+   not just the label) — look up via the keyword classifier on the H1
+   text:
+   - `branding.match_section_color(label)` returns the right hex.
+7. **Invoke the renderer:**
+   `python build.py --input <input.md> --output <output.pptx>`
+   The renderer reads the sidecar you just wrote and renders.
+
+### When to use `freeform` vs named layouts
+
+Default to named layouts. Reach for `freeform` only for slides where:
+- A chart pairs with stat callouts in a way `stat-callouts-right` doesn't
+  capture (custom positions, non-uniform tiles, annotation arrows)
+- 3 things compare side-by-side with arrows or connectors
+- A single big number with custom flanking annotations
+- Anything genuinely bespoke that would lose its shape if forced into a
+  named template
+
+Skip `freeform` for slides that fit `content-text` / `cards-grid` /
+`content-text-image` — determinism and consistency are easier with
+named layouts.
+
+### When validation fails
+
+If a freeform snippet is rejected by the AST validator at render time, the
+slide renders with a visible deeppink error chip:
+```
+[freeform code rejected: <reason>]
+```
+Read the error, fix the snippet in the sidecar, re-run. Same for runtime
+errors:
+```
+[freeform runtime error: <ExceptionType>: <message>]
+```
+
+The deck always renders to completion — a single bad slide doesn't crash
+the whole deck.
+
+### Examples
+
+For a slide that fits `cards-grid`:
+```json
+{
+  "slide_id": "h1-methodology/h2-cohorts",
+  "kind": "cards-grid",
+  "params": {
+    "title": "Cohorts",
+    "lede": "...",
+    "cards": [{"label": "UCSF", "body": "n=100"}, ...],
+    "section_label": "Methodology"
+  },
+  "content_hash": "..."
+}
+```
+
+For a bespoke slide that needs custom geometry:
+```json
+{
+  "slide_id": "h1-results/h2-headline",
+  "kind": "freeform",
+  "params": {
+    "title": "Headline AUC",
+    "lede": "Site-mixed external eval, 5-seed mean.",
+    "section_label": "Results",
+    "code": "_add_text(slide, '0.848', left=body_l, top=body_top + 0.5, width=body_w, height=2.5, size=120, color_rgb=accent_rgb, font=MONO_FONT, bold=True, align=PP_ALIGN.CENTER)\n_add_text(slide, '± 0.040 across 5 seeds', left=body_l, top=body_top + 3.2, width=body_w, height=0.5, size=18, color_rgb=MUTED_RGB, font=SANS_FONT, align=PP_ALIGN.CENTER)"
+  },
+  "content_hash": "..."
+}
+```
+
+For a section divider, you must set `accent_hex`:
+```json
+{
+  "slide_id": "divider-h1-results",
+  "kind": "section-divider",
+  "params": {
+    "label": "Results",
+    "accent_hex": "#F0C840"
+  },
+  "content_hash": "..."
+}
+```
+
 ## Branding source of truth
 
 `~/arcadia/superstack/skills/_shared/branding.py`.
