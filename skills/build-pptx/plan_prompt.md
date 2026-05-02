@@ -55,6 +55,8 @@ Plain prose / bulleted body. Use when the slide is text-only without a clear "co
 {"title": "...", "lede": "...", "primary_card": {"label": "Headline", "body": "...", "icon": null}, "secondary_cards": [{"label": "...", "body": "...", "icon": null}, ...]}
 ```
 
+**Auto-detect pattern (prefer this over `content-text`):** When a slide body has 2-3 bullets where each starts with a bold prefix acting as a label (`**Label.** explanatory body...`) — with or without an additional summary paragraph — use `cards-heterogeneous`. The bullets become `secondary_cards` (label = bold prefix stripped of trailing punctuation, body = remainder of the bullet); if there's a summary paragraph with its own bold key-finding, promote it to `primary_card` (label = the bold finding, body = the rest of the paragraph). The renderer stacks them as full-width rows when total cards ≤ 3, which is almost always more legible than raw prose bullets for executive-summary / headline-result patterns.
+
 **Icon homogeneity rule.** When all cards in a `cards-grid` or `cards-heterogeneous` row (or all stat-tiles in a `stat-callouts-right` row) belong to the same semantic category — all genes, all sites, all metrics, all phases — use **one shared icon OR no icon at all**. Distinct icons should signal distinct categories. For homogeneous rows, default to **no icon**: the labels already do the work, and assigning icons like `FaDna` to one gene and `FaFlask` to another is arbitrary and noisy.
 
 Use distinct icons only when items meaningfully differ in kind (e.g., a stat-tile row with one cohort metric, one model metric, one validation metric — three different things, three different icons OK).
