@@ -220,6 +220,12 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
     deck_org = str(meta.get("org", ""))
     deck_date = str(meta.get("date") or today)
 
+    # Resolve relative image paths against the markdown file's directory so
+    # `figures/foo.png` works regardless of CWD when the renderer was invoked.
+    import os as _os
+    _orig_cwd = _os.getcwd()
+    _os.chdir(md_path.parent)
+
     prs = new_presentation()
 
     # Cover
@@ -283,3 +289,4 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
         add_end_slide(prs, message="Thanks", contact=deck_name)
 
     prs.save(str(output_path))
+    _os.chdir(_orig_cwd)
