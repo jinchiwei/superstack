@@ -674,13 +674,16 @@ def add_section_divider(prs, *, label: str, index: int = 0,
     # DMG uses L=0.70 (no colorblock); we push to L=0.85 to clear the 0.6in colorblock.
     _add_rect(s, left=0.85, top=0.7, width=0.18, height=0.45, fill_rgb=accent)
 
-    # Eyebrow uppercase label, brand color (DMG: L=1.00, T=0.70, 14pt)
-    _add_text(s, label.upper(), left=1.15, top=0.7, width=11.0, height=0.4,
+    # Eyebrow = thematic category (Overview / Methodology / Results /
+    # Validation) based on accent color. NOT the H1 text — that goes in the
+    # big title below — so eyebrow and title don't repeat each other.
+    eyebrow_text = branding.category_for_accent(bg_hex)
+    _add_text(s, eyebrow_text, left=1.15, top=0.7, width=11.0, height=0.4,
               size=14, color_rgb=accent, font=branding.MONO_FONT, bold=True)
 
-    # Big section title — DMG places this at T=2.40 with a tall H=3.00 box (slack
-    # for multi-line section titles), top-anchored, 44pt
-    _add_text(s, label, left=0.85, top=2.4, width=12.0, height=3.0,
+    # Big section title — H1 text in ALL CAPS for boldness. DMG places this
+    # at T=2.40 with a tall H=3.00 box (slack for multi-line titles), 44pt.
+    _add_text(s, label.upper(), left=0.85, top=2.4, width=12.0, height=3.0,
               size=44, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True)
 
     # Hairline rule sits LOW — matches DMG T=5.60

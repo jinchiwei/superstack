@@ -91,6 +91,26 @@ _SECTION_KEYWORDS = (
 )
 
 
+# === Accent → category name for section divider eyebrows ===
+# The eyebrow is a thematic label that pairs with the H1 (used as the big
+# title); without this, a section divider repeats its H1 as both eyebrow
+# and title which feels redundant.
+_ACCENT_CATEGORY = {
+    TURQUOISE.upper():  "Overview",
+    DEEPPINK.upper():   "Methodology",
+    AMBER.upper():      "Results",
+    BLUEVIOLET.upper(): "Validation",
+}
+
+
+def category_for_accent(accent_hex: str) -> str:
+    """Display name for the section divider's eyebrow, given accent color.
+    Returns the category label so the eyebrow is a thematic anchor
+    (Overview / Methodology / Results / Validation) rather than a duplicate
+    of the slide's H1."""
+    return _ACCENT_CATEGORY.get(accent_hex.upper(), "Overview")
+
+
 def match_section_color(name: str) -> str:
     """Infer the section's accent color from its name via keyword matching.
 
