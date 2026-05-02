@@ -587,9 +587,16 @@ def add_end_slide(prs, *, message: str = "Thanks", contact: str = ""):
     return s
 
 
+_WS_RUN_RE = re.compile(r"\s+")
+
+
 def _strip_html(text: str) -> str:
-    """Remove HTML tags from a string. Used to flatten rendered HTML back to plain text."""
-    return _HTML_TAG_RE.sub("", text).strip()
+    """Remove HTML tags AND collapse any whitespace runs (newlines, tabs,
+    multiple spaces) to single spaces. The collapse is critical because
+    markdown sources soft-wrap paragraphs at ~78 chars; preserving those
+    newlines makes pptx treat every wrap as a hard break and shows random
+    mid-sentence line breaks in the rendered slide."""
+    return _WS_RUN_RE.sub(" ", _HTML_TAG_RE.sub("", text)).strip()
 
 
 def _split_slides(body_html: str) -> list[str]:
@@ -613,8 +620,50 @@ def _parse_table(html_table: str) -> list[list[str]]:
     return rows
 
 
+_DEFLIST_LABEL_MAX_LEN = 60  # short bold prefix qualifies as definition label
+_DEFLIST_BODY_MAX_LEN = 350  # too-long body suggests prose, not a card
+
+
+def _detect_def_cards_from_li_html(li_blocks: list[str]) -> list[dict] | None:
+    """Detect a definition-list pattern in a slide's <li> blocks and return
+    them as cards. Returns None if any item fails the pattern.
+
+    Recognized patterns (each <li>'s inner HTML must begin with):
+      <strong>Label</strong>: body         → card
+      <strong>Label</strong> — body        → card
+      <strong>Label</strong> — body        (em-dash)
+      <strong>Label</strong> body          (single space ok if label short)
+
+    Heuristic: label must be ≤ 60 chars (short), body must be ≤ 350 chars
+    (otherwise it is prose, not a card body). Need ≥2 cards to qualify.
+    """
+    cards = []
+    for raw in li_blocks:
+        m = re.match(r"^\s*<strong>(.+?)</strong>\s*", raw, re.DOTALL)
+        if not m:
+            return None
+        label = _strip_html(m.group(1)).strip().rstrip(":.")
+        if len(label) == 0 or len(label) > _DEFLIST_LABEL_MAX_LEN:
+            return None
+        rest = raw[m.end():]
+        rest = re.sub(r"^\s*[:—\-–]\s*", "", rest)  # strip separator
+        body = _strip_html(rest).strip()
+        if len(body) == 0 or len(body) > _DEFLIST_BODY_MAX_LEN:
+            return None
+        cards.append({"label": label, "body": body})
+    return cards if len(cards) >= 2 else None
+
+
 def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict:
-    """Extract a slide title, body paragraphs, images, tables, and h3-led cards."""
+    """Extract a slide title, body paragraphs, images, tables, and cards.
+
+    Cards come from one of two sources:
+      1. Explicit <h3>...</h3> blocks (each h3 + following body = one card)
+      2. Auto-detected definition-list bullets — when EVERY <li> on the slide
+         starts with <strong>Label</strong> followed by content, the whole
+         list is promoted to cards. Fixes the "wall of bullets" problem on
+         slides like Methodology Overview (cohorts/targets/models/...).
+    """
     title_match = re.search(r"<(h[12])[^>]*>(.*?)</\1>", html_chunk)
     if title_match:
         title = _strip_html(title_match.group(2))
@@ -623,7 +672,6 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
         title = ""
         rest = html_chunk
 
-    # Strip out tables and images first so they don't pollute the paragraph scan
     tables: list[list[list[str]]] = []
     for tbl_match in re.finditer(r"<table[^>]*>.*?</table>", rest, re.DOTALL):
         parsed = _parse_table(tbl_match.group(0))
@@ -641,8 +689,7 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
             images.append(path)
     rest_no_media = re.sub(r"<img[^>]*/?>", "", rest_no_tables)
 
-    # Cards: h3-led blocks. Each h3 starts a card whose body is all <p>/<li>
-    # content between this h3 and the next h3 (or end).
+    # H3-led cards (existing behavior)
     cards: list[dict] = []
     h3_positions = [(m.start(), m.end(), _strip_html(m.group(1)))
                     for m in re.finditer(r"<h3[^>]*>(.*?)</h3>", rest_no_media)]
@@ -656,16 +703,36 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
                 body_lines.append(text)
         cards.append({"label": label, "body": " ".join(body_lines)})
 
-    # Paragraphs OUTSIDE the cards (i.e., before the first h3) become the slide body
+    # Body region (before first h3, or all of rest if no h3)
     body_region = rest_no_media[:h3_positions[0][0]] if h3_positions else rest_no_media
-    paragraphs = []
-    for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", body_region, re.DOTALL):
-        text = _strip_html(m.group(2)).strip()
-        if text:
-            if m.group(1) == "li":
-                paragraphs.append(f"•  {text}")
-            else:
+
+    # Auto-detect definition-list bullets and promote to cards
+    li_blocks = [m.group(1) for m in
+                 re.finditer(r"<li[^>]*>(.*?)</li>", body_region, re.DOTALL)]
+    auto_cards = None
+    # Only auto-detect when there are no h3-cards already, no media, and the
+    # list is the dominant body element (not wrapping a paragraph + a list).
+    if li_blocks and not cards:
+        auto_cards = _detect_def_cards_from_li_html(li_blocks)
+
+    paragraphs: list[str] = []
+    if auto_cards:
+        cards = auto_cards
+        # Capture <p> paragraphs (intro prose before/around the list) but skip the
+        # <li>s since they are now cards.
+        for m in re.finditer(r"<p[^>]*>(.*?)</p>", body_region, re.DOTALL):
+            text = _strip_html(m.group(1)).strip()
+            if text:
                 paragraphs.append(text)
+    else:
+        for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", body_region, re.DOTALL):
+            text = _strip_html(m.group(2)).strip()
+            if text:
+                if m.group(1) == "li":
+                    paragraphs.append(f"•  {text}")
+                else:
+                    paragraphs.append(text)
+
     return {"title": title, "body": paragraphs, "images": images,
             "tables": tables, "cards": cards}
 
