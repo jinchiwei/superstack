@@ -194,6 +194,12 @@ hr {{
   margin: 14pt 0;
 }}
 
+/* === Images === */
+img {{
+  max-width: 100%; height: auto;
+  display: block; margin: 12pt auto;
+}}
+
 /* === TOC === */
 .toc {{ page-break-after: always; }}
 .toc h1 {{
@@ -276,7 +282,11 @@ def main() -> int:
     parts.append("</body></html>")
 
     css = _css_template(watermark=args.watermark, running_header=args.running_header)
-    HTML(string="\n".join(parts)).write_pdf(args.output, stylesheets=[CSS(string=css)])
+    # base_url so relative image paths in the markdown resolve against the
+    # markdown's directory, not the cwd of the invocation.
+    base_url = str(Path(args.input).resolve().parent)
+    HTML(string="\n".join(parts), base_url=base_url).write_pdf(
+        args.output, stylesheets=[CSS(string=css)])
     print(f"wrote {args.output}")
     return 0
 
