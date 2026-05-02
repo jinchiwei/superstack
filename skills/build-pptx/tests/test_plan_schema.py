@@ -133,3 +133,97 @@ def test_hash_text_is_stable():
     assert hash_text("hello") != hash_text("hello!")
     # SHA256 always produces 64 hex chars
     assert len(hash_text("anything")) == 64
+
+
+def test_assemble_plan_prompt_includes_catalog_and_chunks():
+    """The assembled prompt should include the static catalog AND the per-deck slide input."""
+    from plan import assemble_plan_prompt
+    md = "# Hello\n\nworld"
+    records = [
+        {"slide_id": "h1-hello", "content_hash": "abc",
+         "h1": "Hello", "h2": None,
+         "chunk_html": "<h1>Hello</h1><p>world</p>"},
+    ]
+    prompt = assemble_plan_prompt(md_text=md, slide_records=records)
+    # Catalog section is in the static template
+    assert "cards-grid" in prompt
+    assert "stat-callouts-right" in prompt
+    # Per-slide input is appended
+    assert "slide_id: h1-hello" in prompt
+    assert "content_hash: abc" in prompt
+    assert "<h1>Hello</h1>" in prompt
+    # The closing instruction
+    assert "Output the JSON" in prompt
+
+
+def test_merge_with_existing_preserves_unchanged_entries():
+    from plan import Plan, SlideEntry, merge_with_existing
+    existing = Plan(deck_md_hash="old_deck",
+                    slides=[SlideEntry(slide_id="h1-exec",
+                                       kind="bg-flip",  # user-chosen layout
+                                       params={"title": "Exec"},
+                                       content_hash="contentA")])
+    fresh = Plan(deck_md_hash="new_deck",
+                 slides=[SlideEntry(slide_id="h1-exec",
+                                    kind="content-text",  # default
+                                    params={"title": "Exec"},
+                                    content_hash="contentA")])
+    merged = merge_with_existing(fresh, existing)
+    # The bg-flip choice is preserved because content_hash matched
+    assert merged.slides[0].kind == "bg-flip"
+    # New deck_md_hash is taken from fresh
+    assert merged.deck_md_hash == "new_deck"
+
+
+def test_merge_with_existing_replaces_when_content_changed():
+    from plan import Plan, SlideEntry, merge_with_existing
+    existing = Plan(slides=[SlideEntry(slide_id="h1-exec",
+                                       kind="bg-flip",
+                                       params={},
+                                       content_hash="contentA")])
+    fresh = Plan(slides=[SlideEntry(slide_id="h1-exec",
+                                    kind="content-text",
+                                    params={},
+                                    content_hash="contentB")])
+    merged = merge_with_existing(fresh, existing)
+    # content_hash differs → take fresh choice
+    assert merged.slides[0].kind == "content-text"
+
+
+def test_merge_with_existing_drops_removed_slides():
+    from plan import Plan, SlideEntry, merge_with_existing
+    existing = Plan(slides=[SlideEntry(slide_id="h1-exec", kind="content-text",
+                                       params={}, content_hash="x"),
+                            SlideEntry(slide_id="h1-removed", kind="content-text",
+                                       params={}, content_hash="y")])
+    fresh = Plan(slides=[SlideEntry(slide_id="h1-exec", kind="content-text",
+                                    params={}, content_hash="x")])
+    merged = merge_with_existing(fresh, existing)
+    # h1-removed is gone
+    assert len(merged.slides) == 1
+    assert merged.slides[0].slide_id == "h1-exec"
+
+
+def test_merge_with_existing_handles_no_existing():
+    from plan import Plan, SlideEntry, merge_with_existing
+    fresh = Plan(slides=[SlideEntry(slide_id="x", kind="content-text",
+                                    params={}, content_hash="x")])
+    merged = merge_with_existing(fresh, None)
+    assert merged is fresh or merged.slides == fresh.slides
+
+
+def test_build_slide_records_extracts_h1_h2():
+    from plan import build_slide_records
+    chunks = [
+        "<h1>Methods</h1><p>intro</p>",
+        "<h2>Cohorts</h2><p>UCSF</p>",
+    ]
+    ids = ["h1-methods", "h1-methods/h2-cohorts"]
+    recs = build_slide_records(chunks=chunks, slide_ids=ids)
+    assert len(recs) == 2
+    assert recs[0]["h1"] == "Methods"
+    assert recs[0]["h2"] is None
+    assert recs[1]["h1"] == "Methods"  # carried over from previous slide
+    assert recs[1]["h2"] == "Cohorts"
+    # content_hash differs per chunk
+    assert recs[0]["content_hash"] != recs[1]["content_hash"]
