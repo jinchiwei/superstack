@@ -60,7 +60,7 @@ Or from Claude Code:
 |--------|--------|
 | **gstack** | browse, qa, ship, design-\*, plan-\*, review, office-hours, and [more](https://github.com/garrytan/gstack) |
 | **superpowers** | subagent-driven-development, test-driven-development, verification-before-completion, writing-plans |
-| **this repo** | pipeline, pipeline-update, autoresearch |
+| **this repo** | pipeline, pipeline-update, autoresearch, build-pdf, build-pptx, build-docx |
 | **this repo, Codex only** | claude second-opinion skill |
 
 ## The pipeline
@@ -133,3 +133,34 @@ You'll be asked once at launch to confirm the planned axes. After that:
 See `skills/autoresearch/USAGE.md` for full invocation, halt, and inspection patterns,
 and `skills/autoresearch/DESIGN.md` for the architecture (locked decisions D1-D4 on
 stash discipline, iteration error wrapping, schema migration, and infra halt gating).
+
+## /build-pdf, /build-pptx, /build-docx
+
+Three general-purpose markdown → branded document builders. They share one palette
+and font system (`skills/_shared/branding.py`) so a PDF, deck, and Word doc generated
+from the same source markdown look like they came from the same pen.
+
+```
+/build-pdf  notes.md             # branded PDF with cover, bookmarks, page numbers
+/build-pptx talk.md              # 16:9 deck, navy title + section dividers, color cohesion
+/build-docx draft.md             # Geist-styled Word doc via pandoc + reference.docx
+```
+
+- **Identity:** Geist Mono for structural elements (eyebrow, title, headings, code,
+  metric values, page numbers); Geist Sans for body prose. Cross-platform fallback
+  chains include Helvetica, system fonts, and CJK.
+- **Palette:** turquoise (#40E0D0), deeppink (#FF1493), amber (#F0C840), blueviolet
+  (#8A2BE2). Name renders turquoise, organization deeppink everywhere.
+- **build-pptx color cohesion:** each section's accent color is auto-inferred from the
+  H1 name (background/methods/results/limitations → turquoise/deeppink/amber/blueviolet)
+  and cascades through every brand-color element on the section's slides — left
+  accent bar, slide title, hairlines, table headers, callout cards.
+- **Frontmatter (optional):** `title`, `eyebrow`, `subtitle`, `name`, `org`, `date`.
+- **Special markdown:** `---` separates pptx slides; H1 starts a new section
+  (and emits a divider slide); H3 blocks under an H2 render as a card grid;
+  fenced markdown tables render with accent-colored headers; `![alt](path)` embeds
+  images with paths relative to the source markdown.
+
+Each skill is invocable directly via Python (e.g., `python skills/build-pptx/build.py
+--input deck.md --output deck.pptx`) and ships fixture-driven tests under
+`skills/<skill>/tests/`.
