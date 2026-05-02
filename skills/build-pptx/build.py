@@ -261,16 +261,21 @@ def _estimate_paragraph_height(text: str, *, width: float, size: float,
     """Rough estimate of rendered paragraph height in inches. Used to
     distribute extra vertical space across paragraphs when content is
     sparse — avoids the "wall of text bunched at top, empty bottom half"
-    look on text-only content slides."""
+    look on text-only content slides.
+
+    Returns a height with a 15% safety margin baked in: better to slightly
+    over-reserve than to under-allocate and have text overflow into the
+    figure below (slide 9 of DMG v3 style).
+    """
     if not text:
         return 0.0
-    # Geist/system sans averages ~0.07in/char at the requested pt size.
-    char_w = size * 0.0095  # in inches per char
+    # Geist/system sans averages ~0.0095in/char per pt of size for body text.
+    char_w = size * 0.0095
     chars_per_line = max(1, int(width / char_w))
     import math
     n_lines = max(1, math.ceil(len(text) / chars_per_line))
     line_h = size * line_spacing / 72.0
-    return n_lines * line_h
+    return n_lines * line_h * 1.15
 
 
 def _render_paragraph_block(slide, *, items: list, left: float, top: float,
@@ -317,11 +322,12 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
         # Account for default 8pt space_before on each item after the first.
         total_h += (len(items) - 1) * (8 / 72.0)
         slack = max(0.0, height - total_h)
-        # Convert slack to pt-per-gap; cap at ~36pt so spacing doesn't get
-        # absurd if content is tiny.
+        # Convert slack to pt-per-gap; cap at ~24pt so spacing doesn't get
+        # absurd if content is tiny. Tighter than the original 36pt because
+        # 2-paragraph slides were flying apart visually.
         if slack > 0:
             slack_pt = slack * 72.0
-            extra_pt = min(36.0, slack_pt / (len(items) - 1))
+            extra_pt = min(24.0, slack_pt / (len(items) - 1))
 
     first = True
     for item in items:
@@ -563,8 +569,20 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
         else:
             cursor = body_top
             if body:
-                # Compressed caption above the image, full body width.
-                cap_h = min(1.4, body_h * 0.28)
+                # Dynamic caption height: estimate text and reserve only what
+                # the text actually needs (with the 15% safety margin baked
+                # into _estimate_paragraph_height). A 1-paragraph caption
+                # gets ~0.5in instead of the old fixed 1.4in, freeing ~0.9in
+                # for the figure beneath it.
+                est_h = sum(
+                    _estimate_paragraph_height(
+                        _strip_html(it.get("html", "") if isinstance(it, dict)
+                                    else str(it).lstrip("• ").strip()),
+                        width=body_w, size=13)
+                    for it in body
+                )
+                est_h += (len(body) - 1) * (8 / 72.0)
+                cap_h = min(1.6, max(0.4, est_h + 0.10))
                 _render_paragraph_block(s, items=body, left=body_l, top=cursor,
                                         width=body_w, height=cap_h,
                                         accent_rgb=accent, size=13)

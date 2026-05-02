@@ -75,14 +75,19 @@ MONO_FONT = "Geist Mono"
 
 
 # === Section→color auto-inference ===
+# Order matters: more-specific categories come first so e.g. "Methodology
+# overview" classifies as DEEPPINK (methodology) rather than TURQUOISE
+# (overview). The TURQUOISE list is intentionally last because its keywords
+# (overview, context, intro, future) are generic enough to appear in headers
+# of every other category.
 _SECTION_KEYWORDS = (
-    (("background", "motivation", "introduction", "intro", "context", "conclusion",
-      "next", "future", "overview", "direction"), TURQUOISE),
     (("method", "methodology", "approach", "design", "framework", "cohort",
       "pipeline", "architecture", "model"), DEEPPINK),
     (("result", "finding", "performance", "outcome", "metric", "headline"), AMBER),
     (("validation", "limitation", "caveat", "robust", "external", "sensitivity",
       "discussion", "replication", "ablation"), BLUEVIOLET),
+    (("background", "motivation", "introduction", "intro", "context", "conclusion",
+      "next", "future", "overview", "direction"), TURQUOISE),
 )
 
 
