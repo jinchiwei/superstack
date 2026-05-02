@@ -274,8 +274,20 @@ def _add_card(slide, *, label: str, body: str, left: float, top: float,
               size=12, color_rgb=INK_RGB, font=branding.SANS_FONT)
 
 
+def _strip_html_keep_edges(text: str) -> str:
+    """Like _strip_html but does NOT strip leading/trailing whitespace.
+    Used inside _add_runs_from_html where edge spaces between adjacent runs
+    are meaningful — e.g., 'run <code>foo</code> on' must preserve the
+    spaces around the inline code so the output isn't 'runfooon'."""
+    return _WS_RUN_RE.sub(" ", _HTML_TAG_RE.sub("", text))
+
+
 def _add_runs_from_html(p, *, html_text: str, size: float) -> None:
-    """Append runs to paragraph p parsing inline <strong>/<em>/<code> spans."""
+    """Append runs to paragraph p parsing inline <strong>/<em>/<code> spans.
+
+    Edge whitespace between runs is preserved (we use _strip_html_keep_edges
+    instead of _strip_html) so spaces around inline tags survive — without
+    this, 'run <code>foo</code> on' renders as 'runfooon'."""
     parts = re.split(r"(<strong>.*?</strong>|<em>.*?</em>|<code>.*?</code>)",
                      html_text, flags=re.DOTALL)
     for part in parts:
@@ -284,15 +296,11 @@ def _add_runs_from_html(p, *, html_text: str, size: float) -> None:
         bold = italic = mono = False
         if part.startswith("<strong>"):
             bold = True
-            text = _strip_html(part)
         elif part.startswith("<em>"):
             italic = True
-            text = _strip_html(part)
         elif part.startswith("<code>"):
             mono = True
-            text = _strip_html(part)
-        else:
-            text = _strip_html(part)
+        text = _strip_html_keep_edges(part)
         if not text:
             continue
         r = p.add_run()
@@ -519,12 +527,26 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
         _add_rect(slide, left=0.50, top=hairline_top, width=12.30, height=0.005,
                   fill_rgb=RULE_RGB)
 
+    # Estimate lede vertical room from char count so a long lede doesn't
+    # overflow into the body region (slide 37 "Takeaways" had a 1.5-line
+    # lede that ran into the top-row cards because the slot was a fixed
+    # 0.40in). Cap at 1.0in so a sprawling lede doesn't eat the body.
     if lede and not use_side_by_side:
-        _add_text(slide, lede, left=0.50, top=subtitle_top, width=12.30, height=0.40,
+        est_h = _estimate_paragraph_height(lede, width=12.30, size=13,
+                                           line_spacing=1.30)
+        lede_h = min(1.0, max(0.40, est_h))
+        _add_text(slide, lede, left=0.50, top=subtitle_top, width=12.30,
+                  height=lede_h,
                   size=13, color_rgb=MUTED_RGB, font=branding.SANS_FONT)
+    else:
+        lede_h = 0.40
 
     if title_present:
-        body_top = (hairline_top + 0.20) if use_side_by_side else (subtitle_top + 0.50)
+        if use_side_by_side:
+            body_top = hairline_top + 0.20
+        else:
+            # Push body_top below the dynamically-sized lede slot.
+            body_top = subtitle_top + lede_h + 0.10
     else:
         body_top = 0.40
     body_bottom = 6.85

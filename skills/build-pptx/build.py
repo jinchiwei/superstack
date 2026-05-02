@@ -365,9 +365,12 @@ def add_end_slide(prs, *, message: str = "Thanks", contact: str = ""):
               size=64, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True,
               align=PP_ALIGN.CENTER)
     if contact:
+        # Name in turquoise (the end slide's primary accent — mirrors the
+        # title slide's left double-rail and the section-divider footer
+        # convention where Jin's name always appears in turquoise).
         _add_text(s, contact, left=1.3, top=4.8, width=11.0, height=0.5,
-                  size=14, color_rgb=DIM_RGB, font=branding.MONO_FONT,
-                  align=PP_ALIGN.CENTER)
+                  size=14, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT,
+                  bold=True, align=PP_ALIGN.CENTER)
     return s
 
 
