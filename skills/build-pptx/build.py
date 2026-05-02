@@ -743,14 +743,25 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
             tables.append(parsed)
     rest_no_tables = re.sub(r"<table[^>]*>.*?</table>", "", rest, flags=re.DOTALL)
 
+    # Capture images with alt text + source order for the multi-image
+    # auto-explode path (each image becomes its own slide titled with its alt).
     images: list[Path] = []
-    for img_match in re.finditer(r'<img[^>]+src="([^"]+)"', rest_no_tables):
-        src = img_match.group(1)
+    image_records: list[dict] = []  # {"path": Path, "alt": str, "pos": int}
+    for img_match in re.finditer(r'<img\s+([^>]+)>', rest_no_tables):
+        attrs = img_match.group(1)
+        src_m = re.search(r'src="([^"]+)"', attrs)
+        if not src_m:
+            continue
+        src = src_m.group(1)
+        alt_m = re.search(r'alt="([^"]*)"', attrs)
+        alt = alt_m.group(1) if alt_m else ""
         path = Path(src)
         if not path.is_absolute() and base_dir is not None:
             path = (base_dir / path).resolve()
         if path.exists():
             images.append(path)
+            image_records.append({"path": path, "alt": alt,
+                                  "pos": img_match.start()})
     rest_no_media = re.sub(r"<img[^>]*/?>", "", rest_no_tables)
 
     # H3-led cards (existing behavior)
@@ -780,23 +791,28 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
         auto_cards = _detect_def_cards_from_li_html(li_blocks)
 
     # Body items keep raw HTML so the renderer can preserve inline <strong>/
-    # <em>/<code> spans as actual bold/italic/mono runs in pptx.
+    # <em>/<code> spans as actual bold/italic/mono runs in pptx. We also
+    # track each item's source position so main() can pair images with
+    # their preceding paragraphs when auto-exploding multi-image slides.
     paragraphs: list[dict] = []
     if auto_cards:
         cards = auto_cards
         for m in re.finditer(r"<p[^>]*>(.*?)</p>", body_region, re.DOTALL):
             html = m.group(1).strip()
             if _strip_html(html):
-                paragraphs.append({"kind": "paragraph", "html": html})
+                paragraphs.append({"kind": "paragraph", "html": html,
+                                   "pos": m.start()})
     else:
         for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", body_region, re.DOTALL):
             html = m.group(2).strip()
             if _strip_html(html):
                 kind = "bullet" if m.group(1) == "li" else "paragraph"
-                paragraphs.append({"kind": kind, "html": html})
+                paragraphs.append({"kind": kind, "html": html,
+                                   "pos": m.start()})
 
     return {"title": title, "body": paragraphs, "images": images,
-            "tables": tables, "cards": cards}
+            "tables": tables, "cards": cards,
+            "image_records": image_records}
 
 
 def main() -> int:
@@ -833,11 +849,69 @@ def main() -> int:
         )
 
     def _emit_content(slide_data: dict, slide_title: str) -> None:
-        """Emit a content slide with the section's current accent + deck footer."""
+        """Emit a content slide with the section's current accent + deck footer.
+
+        Auto-explode behavior: when a slide has 2+ images and no cards/tables,
+        each image becomes its own full-bleed slide titled by its alt text,
+        with the immediately preceding paragraph as its lede. Matches Jin's
+        DMG v2 deck where each chart was on its own slide rather than three
+        tiny figures crammed into a row."""
+        image_records = slide_data.get("image_records") or []
+        body_paras = slide_data.get("body", [])
+        if (len(image_records) >= 2
+                and not slide_data.get("cards")
+                and not slide_data.get("tables")):
+            # Walk by source position; pair each image with the most recent
+            # preceding paragraph (consumed once it becomes a lede).
+            text_items = sorted(
+                [p for p in body_paras if p.get("pos") is not None],
+                key=lambda p: p["pos"],
+            )
+            ti = 0
+            consumed = set()
+            for img_rec in image_records:
+                lede_para = None
+                while ti < len(text_items) and text_items[ti]["pos"] < img_rec["pos"]:
+                    if id(text_items[ti]) not in consumed:
+                        lede_para = text_items[ti]
+                    ti += 1
+                if lede_para is not None:
+                    consumed.add(id(lede_para))
+                sub_title = (img_rec["alt"] or slide_title or "").strip() or slide_title
+                sub_body = [lede_para] if lede_para else []
+                add_content_slide(
+                    prs,
+                    title=sub_title,
+                    body_paragraphs=sub_body,
+                    images=[img_rec["path"]],
+                    tables=[],
+                    cards=None,
+                    accent_color_hex=current_accent,
+                    name=deck_name, org=deck_org,
+                    deck_title=deck_title, date=deck_date,
+                )
+            # Trailing paragraphs after the last image — render as a final
+            # text-only slide using the parent title.
+            trailing = [p for p in text_items
+                        if p["pos"] > image_records[-1]["pos"]
+                        and id(p) not in consumed]
+            if trailing:
+                add_content_slide(
+                    prs,
+                    title=slide_title,
+                    body_paragraphs=trailing,
+                    images=[],
+                    tables=[],
+                    cards=None,
+                    accent_color_hex=current_accent,
+                    name=deck_name, org=deck_org,
+                    deck_title=deck_title, date=deck_date,
+                )
+            return
         add_content_slide(
             prs,
             title=slide_title,
-            body_paragraphs=slide_data["body"],
+            body_paragraphs=body_paras,
             images=slide_data["images"],
             tables=slide_data["tables"],
             cards=slide_data.get("cards"),
