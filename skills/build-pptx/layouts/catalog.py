@@ -3,7 +3,7 @@ in here without touching the dispatcher."""
 
 from . import (content_text, content_text_image, content_image_only,
                cards_grid, cards_heterogeneous, three_pillars,
-               stat_callouts_right, bg_flip, timeline)
+               stat_callouts_right, bg_flip, timeline, freeform)
 
 REGISTRY = {
     "content-text":         content_text.render,
@@ -15,6 +15,7 @@ REGISTRY = {
     "stat-callouts-right":  stat_callouts_right.render,
     "bg-flip":              bg_flip.render,
     "timeline":             timeline.render,
+    "freeform":             freeform.render,
 }
 
 
