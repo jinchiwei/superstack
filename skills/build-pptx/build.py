@@ -256,9 +256,26 @@ def _add_runs_from_html(p, *, html_text: str, size: float) -> None:
         r.font.italic = italic
 
 
+def _estimate_paragraph_height(text: str, *, width: float, size: float,
+                               line_spacing: float = 1.35) -> float:
+    """Rough estimate of rendered paragraph height in inches. Used to
+    distribute extra vertical space across paragraphs when content is
+    sparse — avoids the "wall of text bunched at top, empty bottom half"
+    look on text-only content slides."""
+    if not text:
+        return 0.0
+    # Geist/system sans averages ~0.07in/char at the requested pt size.
+    char_w = size * 0.0095  # in inches per char
+    chars_per_line = max(1, int(width / char_w))
+    import math
+    n_lines = max(1, math.ceil(len(text) / chars_per_line))
+    line_h = size * line_spacing / 72.0
+    return n_lines * line_h
+
+
 def _render_paragraph_block(slide, *, items: list, left: float, top: float,
                             width: float, height: float, accent_rgb: RGBColor,
-                            size: float = 14) -> None:
+                            size: float = 14, distribute: bool = False) -> None:
     """Render mixed paragraphs/bullets into one textbox.
 
     Each item is a dict {"kind": "bullet"|"paragraph", "html": "..."} where
@@ -271,6 +288,11 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
 
     Bullets get a ▸ marker in the section's accent color, paragraphs do not.
     Line-spacing 1.35; paragraph spacing 8pt before each item after the first.
+
+    When `distribute=True` and the estimated content height is shorter than
+    `height`, the leftover vertical space is distributed evenly as additional
+    paragraph spacing so paragraphs spread out across the body region rather
+    than clustering at the top.
     """
     if not items:
         return
@@ -280,6 +302,26 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
     tf.word_wrap = True
     tf.margin_left = tf.margin_right = Emu(0)
     tf.margin_top = tf.margin_bottom = Emu(0)
+
+    # Pre-compute extra spacing per gap if requested.
+    extra_pt = 0.0
+    if distribute and len(items) > 1:
+        line_spacing = 1.35
+        total_h = 0.0
+        for it in items:
+            html = it.get("html", "") if isinstance(it, dict) else str(it).lstrip("• ").strip()
+            text = _strip_html(html)
+            total_h += _estimate_paragraph_height(text, width=width,
+                                                  size=size,
+                                                  line_spacing=line_spacing)
+        # Account for default 8pt space_before on each item after the first.
+        total_h += (len(items) - 1) * (8 / 72.0)
+        slack = max(0.0, height - total_h)
+        # Convert slack to pt-per-gap; cap at ~36pt so spacing doesn't get
+        # absurd if content is tiny.
+        if slack > 0:
+            slack_pt = slack * 72.0
+            extra_pt = min(36.0, slack_pt / (len(items) - 1))
 
     first = True
     for item in items:
@@ -295,7 +337,7 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
             first = False
         else:
             p = tf.add_paragraph()
-            p.space_before = Pt(8)
+            p.space_before = Pt(8 + extra_pt)
         p.line_spacing = 1.35
 
         if item["kind"] == "bullet":
@@ -532,9 +574,13 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
                                 width=body_w, height=body_bottom - cursor,
                                 accent=accent)
     elif body:
+        # Text-only content slide. Distribute extra vertical space as
+        # paragraph spacing so 2-3 short paragraphs don't all bunch at
+        # the top with an empty bottom half.
         _render_paragraph_block(s, items=body, left=body_l, top=body_top,
                                 width=body_w, height=body_h,
-                                accent_rgb=accent, size=14)
+                                accent_rgb=accent, size=14,
+                                distribute=True)
 
     # Footer (lower-left): name · org · deck-title · date in 9pt mono MUTED.
     # The textbox spans the full slide width so the date never wraps to a
@@ -719,7 +765,7 @@ def _parse_table(html_table: str) -> list[list[str]]:
     return rows
 
 
-_DEFLIST_LABEL_MAX_LEN = 60  # short bold prefix qualifies as definition label
+_DEFLIST_LABEL_MAX_LEN = 80  # bold prefix qualifies as definition label
 _DEFLIST_BODY_MAX_LEN = 350  # too-long body suggests prose, not a card
 
 
