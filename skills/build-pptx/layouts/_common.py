@@ -548,13 +548,21 @@ def _render_media_block(slide, *, images: list[Path], tables: list[list[list[str
 def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
                 accent: RGBColor,
                 title_present: bool, title_wraps: bool,
-                use_side_by_side: bool) -> tuple[float, float, float, float, float]:
+                use_side_by_side: bool,
+                dark_bg: bool = False) -> tuple[float, float, float, float, float]:
     """Draw the standard content-slide chrome: left bar, title, hairline,
     lede (when not side-by-side), and footer.
+
+    When dark_bg=True the title flips to white and lede/footer flip to a
+    light dim grey for legibility on DARK_BG_RGB backgrounds.
 
     Returns (body_top, body_h, body_l, body_w, body_bottom) geometry tuple
     so each layout can position its body content correctly.
     """
+    title_color   = WHITE_RGB if dark_bg else INK_RGB
+    body_text_dim = _rgb("#94A3B8") if dark_bg else MUTED_RGB
+    rule_color    = _rgb("#1A2D50") if dark_bg else RULE_RGB
+
     # Left accent bar
     _add_rect(slide, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)
 
@@ -564,9 +572,9 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
 
     if title_present:
         _add_text(slide, title, left=0.50, top=0.30, width=12.30, height=title_h,
-                  size=28, color_rgb=INK_RGB, font=branding.MONO_FONT, bold=True)
+                  size=28, color_rgb=title_color, font=branding.MONO_FONT, bold=True)
         _add_rect(slide, left=0.50, top=hairline_top, width=12.30, height=0.005,
-                  fill_rgb=RULE_RGB)
+                  fill_rgb=rule_color)
 
     # Estimate lede vertical room from char count so a long lede doesn't
     # overflow into the body region (slide 37 "Takeaways" had a 1.5-line
@@ -578,7 +586,7 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
         lede_h = min(1.0, max(0.40, est_h))
         _add_text(slide, lede, left=0.50, top=subtitle_top, width=12.30,
                   height=lede_h,
-                  size=13, color_rgb=MUTED_RGB, font=branding.SANS_FONT)
+                  size=13, color_rgb=body_text_dim, font=branding.SANS_FONT)
     else:
         lede_h = 0.40
 
@@ -604,6 +612,6 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
     if footer_parts:
         _add_text(slide, "  ·  ".join(footer_parts),
                   left=0.50, top=7.12, width=12.30, height=0.30,
-                  size=9, color_rgb=MUTED_RGB, font=branding.MONO_FONT)
+                  size=9, color_rgb=body_text_dim, font=branding.MONO_FONT)
 
     return body_top, body_h, body_l, body_w, body_bottom

@@ -49,6 +49,7 @@ from ._common import (
     _set_bg,
     _rgb,
     WHITE_RGB,
+    DARK_BG_RGB,
 )
 
 from .blocks import BLOCKS
@@ -58,11 +59,12 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
            footer_kwargs: dict) -> None:
     title = params.get("title", "")
     lede = params.get("lede", "")
+    dark_bg = bool(params.get("dark_bg", False))
 
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, DARK_BG_RGB if dark_bg else WHITE_RGB)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -73,6 +75,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        dark_bg=dark_bg,
     )
 
     rows = params.get("rows", [])
