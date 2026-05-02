@@ -14,6 +14,9 @@ from ._common import (
     _rgb,
     _set_bg,
     DARK_BG_RGB,
+    DEEPPINK_RGB,
+    AMBER_RGB,
+    BLUEVIOLET_RGB,
     MUTED_RGB,
     RULE_RGB,
     WHITE_RGB,
@@ -84,6 +87,11 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
     body_w = 12.30
 
     # ── Body content ────────────────────────────────────────────────────────────
+    # Bullet markers rotate through the non-turquoise priority colours so
+    # each takeaway point gets a distinct accent (Bug 4 fix).
+    # The slide's main accent (left bar / hairline / heading) stays as
+    # accent_rgb (typically turquoise for takeaway slides).
+    _BULLET_CYCLE = [DEEPPINK_RGB, AMBER_RGB, BLUEVIOLET_RGB]
     if body:
         _render_paragraph_block(
             slide,
@@ -94,6 +102,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
             size=14,
             distribute=True,
             text_color=WHITE_RGB,
+            accent_cycle=_BULLET_CYCLE,
         )
 
     # ── Footer ──────────────────────────────────────────────────────────────────

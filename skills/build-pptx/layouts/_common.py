@@ -348,12 +348,18 @@ def _estimate_paragraph_height(text: str, *, width: float, size: float,
 def _render_paragraph_block(slide, *, items: list, left: float, top: float,
                             width: float, height: float, accent_rgb: RGBColor,
                             size: float = 14, distribute: bool = False,
-                            text_color: RGBColor | None = None) -> None:
+                            text_color: RGBColor | None = None,
+                            accent_cycle: list | None = None) -> None:
     """Render mixed paragraphs/bullets into one textbox.
 
     text_color: override the default INK_RGB for body text runs. Pass e.g.
         WHITE_RGB for dark-background slides. Bullet markers always use
-        accent_rgb.
+        accent_rgb unless accent_cycle is provided.
+
+    accent_cycle: optional list[RGBColor]. When supplied, bullet markers rotate
+        through this list in order (index resets per block). Useful for
+        dark-background slides where bullets should each get a distinct brand
+        accent (e.g. [DEEPPINK_RGB, AMBER_RGB, BLUEVIOLET_RGB]).
     """
     if not items:
         return
@@ -381,6 +387,7 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
             extra_pt = min(24.0, slack_pt / (len(items) - 1))
 
     first = True
+    bullet_idx = 0
     for item in items:
         if isinstance(item, str):
             is_bullet = item.startswith("•  ") or item.startswith("• ")
@@ -397,11 +404,17 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
         p.line_spacing = 1.35
 
         if item["kind"] == "bullet":
+            # Pick marker colour: cycle if accent_cycle provided, else accent_rgb
+            if accent_cycle:
+                marker_rgb = accent_cycle[bullet_idx % len(accent_cycle)]
+            else:
+                marker_rgb = accent_rgb
+            bullet_idx += 1
             r = p.add_run()
             r.text = "▸  "
             r.font.name = branding.MONO_FONT
             r.font.size = Pt(size)
-            r.font.color.rgb = accent_rgb
+            r.font.color.rgb = marker_rgb
             r.font.bold = True
 
         _add_runs_from_html(p, html_text=item["html"], size=size,

@@ -13,6 +13,7 @@ from ._common import (
     _add_chrome,
     _add_rect,
     _add_text,
+    _estimate_paragraph_height,
     _set_bg,
     WHITE_RGB,
     PAPER_RGB,
@@ -60,9 +61,23 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
     p_body = primary.get("body", "")
     p_icon = primary.get("icon")
 
-    _add_rect(slide, left=body_l, top=body_top, width=primary_w, height=body_h,
+    # Measure content height so the card sizes to its text rather than
+    # bloating to fill the full column (Bug 2 fix).
+    _LABEL_H  = 0.50   # label textbox allocation
+    _HEADER   = 0.80   # top stripe + padding above label + label itself
+    _PAD_BOT  = 0.20   # breathing room below body
+    _STRIPE_H = 0.06
+    body_est = _estimate_paragraph_height(p_body, width=primary_w - 0.36,
+                                          size=13, line_spacing=1.35)
+    content_h = _HEADER + max(body_est, 0.30) + _PAD_BOT
+    # Cap at body_h; never smaller than a sensible minimum
+    card_h = min(body_h, max(1.20, content_h))
+    # Vertically centre the card within the column
+    card_top = body_top + (body_h - card_h) / 2.0
+
+    _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=card_h,
               fill_rgb=PAPER_RGB)
-    _add_rect(slide, left=body_l, top=body_top, width=primary_w, height=0.06,
+    _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=_STRIPE_H,
               fill_rgb=accent_rgb)
 
     if p_icon is not None:
@@ -72,7 +87,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
         try:
             slide.shapes.add_picture(
                 str(p_icon),
-                Inches(body_l + 0.18), Inches(body_top + 0.20),
+                Inches(body_l + 0.18), Inches(card_top + 0.20),
                 width=Inches(0.40), height=Inches(0.40),
             )
             label_l = body_l + 0.70
@@ -84,11 +99,11 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
         label_l = body_l + 0.18
         label_w = primary_w - 0.36
 
-    _add_text(slide, p_label, left=label_l, top=body_top + 0.20,
-              width=label_w, height=0.50,
+    _add_text(slide, p_label, left=label_l, top=card_top + 0.20,
+              width=label_w, height=_LABEL_H,
               size=15, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
-    _add_text(slide, p_body, left=body_l + 0.18, top=body_top + 0.80,
-              width=primary_w - 0.36, height=body_h - 0.90,
+    _add_text(slide, p_body, left=body_l + 0.18, top=card_top + 0.80,
+              width=primary_w - 0.36, height=card_h - 0.90,
               size=13, color_rgb=INK_RGB, font=branding.SANS_FONT)
 
     # --- Secondary cards stacked vertically ---

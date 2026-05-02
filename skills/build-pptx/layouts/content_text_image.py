@@ -22,6 +22,23 @@ from ._common import (
 )
 
 
+def _normalize_tables(tables: list) -> list:
+    """Normalize tables to list[list[list[str]]] (list of tables, each a list of rows).
+
+    Sidecars may store a flat 2-D table as list[list[str]] (one table whose
+    rows are the inner lists).  Detect this by checking whether the first
+    element is a list of strings rather than a list of lists, and wrap it.
+    """
+    if not tables:
+        return tables
+    # If first element is a list of strings → flat 2D: wrap into a single table.
+    if tables and isinstance(tables[0], list) and (
+        not tables[0] or isinstance(tables[0][0], str)
+    ):
+        return [tables]
+    return tables
+
+
 def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
     """Render a text+image content slide.
 
@@ -30,15 +47,30 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
         lede        (str)
         body        list[{"kind", "html"}]
         images      list[Path]
-        tables      list[list[list[str]]]
+        tables      list[list[list[str]]]  or list[list[str]] (auto-normalised)
         use_side_by_side  (bool)  — pre-computed by dispatcher
     """
     title = params.get("title", "")
     lede = params.get("lede", "")
     body = list(params.get("body") or [])
     images = list(params.get("images") or [])
-    tables = list(params.get("tables") or [])
+    tables = _normalize_tables(list(params.get("tables") or []))
     use_side_by_side = bool(params.get("use_side_by_side", False))
+
+    # Bug 3 fix: in stacked (non-side-by-side) mode, if lede is empty but body
+    # contains only paragraph items (no bullets), promote the body text to the
+    # lede slot so the caption always appears at a consistent vertical position
+    # (below the hairline, same as slides that have an explicit lede).
+    if not use_side_by_side and not lede and body and (images or tables):
+        all_paragraphs = all(
+            (isinstance(it, dict) and it.get("kind") == "paragraph")
+            for it in body
+        )
+        if all_paragraphs:
+            lede = "  ".join(
+                _strip_html(it.get("html", "")) for it in body
+            ).strip()
+            body = []
 
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
