@@ -124,15 +124,23 @@ def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
     # Bottom amber hairline
     _add_rect(s, left=0, top=7.44, width=13.333, height=0.06, fill_rgb=AMBER_RGB)
 
+    # Auto-shrink title font for long titles so a 3-line wrap doesn't run
+    # into the subtitle. 60+ chars at 48pt regularly wraps to 3 lines.
+    title_size = 48 if len(title) <= 50 else (40 if len(title) <= 80 else 32)
+    title_h = 2.7 if len(title) > 50 else 2.0  # extra room for wraps
+
     if eyebrow:
-        _add_text(s, eyebrow, left=1.3, top=1.5, width=11, height=0.4,
+        _add_text(s, eyebrow, left=1.3, top=1.4, width=11, height=0.4,
                   size=14, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT, bold=True)
-    _add_text(s, title, left=1.3, top=2.0, width=11.0, height=2.0,
-              size=48, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True)
+    _add_text(s, title, left=1.3, top=1.9, width=11.0, height=title_h,
+              size=title_size, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True)
+    subtitle_top = 1.9 + title_h + 0.15
     if subtitle:
-        _add_text(s, subtitle, left=1.3, top=4.1, width=11.0, height=1.0,
+        _add_text(s, subtitle, left=1.3, top=subtitle_top, width=11.0, height=0.7,
                   size=18, color_rgb=_rgb("#E5E5EA"), font=branding.SANS_FONT)
-    cursor_top = 5.4
+        cursor_top = subtitle_top + 0.85
+    else:
+        cursor_top = subtitle_top
     if name:
         _add_text(s, name, left=1.3, top=cursor_top, width=11, height=0.4,
                   size=22, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT, bold=True)
@@ -213,15 +221,56 @@ def _add_card(slide, *, label: str, body: str, left: float, top: float,
               size=12, color_rgb=INK_RGB, font=branding.SANS_FONT)
 
 
-def _render_paragraph_block(slide, *, items: list[str], left: float, top: float,
+def _add_runs_from_html(p, *, html_text: str, size: float) -> None:
+    """Append runs to paragraph p, parsing inline <strong>/<em>/<code> spans
+    as bold/italic/mono. Used for content-slide body so a bullet's bold
+    prefix sentence visually anchors the rest of the body."""
+    # Pre-collapse whitespace in non-tag chunks so soft-wrap newlines don't
+    # leak through, but DO preserve the tags themselves for run splitting.
+    # Split on inline tags we care about; everything else becomes plain runs.
+    parts = re.split(r"(<strong>.*?</strong>|<em>.*?</em>|<code>.*?</code>)",
+                     html_text, flags=re.DOTALL)
+    for part in parts:
+        if not part:
+            continue
+        bold = italic = mono = False
+        if part.startswith("<strong>"):
+            bold = True
+            text = _strip_html(part)
+        elif part.startswith("<em>"):
+            italic = True
+            text = _strip_html(part)
+        elif part.startswith("<code>"):
+            mono = True
+            text = _strip_html(part)
+        else:
+            text = _strip_html(part)
+        if not text:
+            continue
+        r = p.add_run()
+        r.text = text
+        r.font.name = branding.MONO_FONT if mono else branding.SANS_FONT
+        r.font.size = Pt(size)
+        r.font.color.rgb = INK_RGB
+        r.font.bold = bold
+        r.font.italic = italic
+
+
+def _render_paragraph_block(slide, *, items: list, left: float, top: float,
                             width: float, height: float, accent_rgb: RGBColor,
                             size: float = 14) -> None:
     """Render mixed paragraphs/bullets into one textbox.
 
-    Items beginning with the bullet sentinel "•  " (added by _parse_slide_chunk
-    for <li>) render with a colored ▸ prefix in the section accent and the
-    text in INK sans. Plain paragraphs render in INK sans with paragraph
-    spacing. Line-spacing 1.35 throughout for readability.
+    Each item is a dict {"kind": "bullet"|"paragraph", "html": "..."} where
+    html may contain inline <strong>, <em>, <code> spans. The inline tags
+    are preserved as bold/italic/mono runs so the rendered text has visual
+    hierarchy (bold lead sentences pop, code spans look like code).
+
+    For backward compat, plain strings are also accepted: a string starting
+    with "•  " is treated as a bullet, others as paragraphs.
+
+    Bullets get a ▸ marker in the section's accent color, paragraphs do not.
+    Line-spacing 1.35; paragraph spacing 8pt before each item after the first.
     """
     if not items:
         return
@@ -234,6 +283,13 @@ def _render_paragraph_block(slide, *, items: list[str], left: float, top: float,
 
     first = True
     for item in items:
+        if isinstance(item, str):
+            # Legacy: string input. Tagless, can't render inline bold.
+            is_bullet = item.startswith("•  ") or item.startswith("• ")
+            text = item.lstrip("• ").strip()
+            item = {"kind": "bullet" if is_bullet else "paragraph",
+                    "html": text}
+
         if first:
             p = tf.paragraphs[0]
             first = False
@@ -241,26 +297,16 @@ def _render_paragraph_block(slide, *, items: list[str], left: float, top: float,
             p = tf.add_paragraph()
             p.space_before = Pt(8)
         p.line_spacing = 1.35
-        is_bullet = item.startswith("•  ") or item.startswith("• ")
-        if is_bullet:
-            text = item.lstrip("• ").strip()
-            r1 = p.add_run()
-            r1.text = "▸  "
-            r1.font.name = branding.MONO_FONT
-            r1.font.size = Pt(size)
-            r1.font.color.rgb = accent_rgb
-            r1.font.bold = True
-            r2 = p.add_run()
-            r2.text = text
-            r2.font.name = branding.SANS_FONT
-            r2.font.size = Pt(size)
-            r2.font.color.rgb = INK_RGB
-        else:
+
+        if item["kind"] == "bullet":
             r = p.add_run()
-            r.text = item
-            r.font.name = branding.SANS_FONT
+            r.text = "▸  "
+            r.font.name = branding.MONO_FONT
             r.font.size = Pt(size)
-            r.font.color.rgb = INK_RGB
+            r.font.color.rgb = accent_rgb
+            r.font.bold = True
+
+        _add_runs_from_html(p, html_text=item["html"], size=size)
 
 
 def _render_media_block(slide, *, images: list[Path], tables: list[list[list[str]]],
@@ -381,8 +427,15 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
     has_more_below = (len(body) > 1) or has_media or has_cards
     if body and has_more_below:
         first = body[0]
-        if not first.startswith("•") and len(first) <= 220:
-            lede = first
+        # Body items can be dicts (new) or strings (legacy callers)
+        if isinstance(first, dict):
+            is_bullet = first.get("kind") == "bullet"
+            text = _strip_html(first.get("html", ""))
+        else:
+            is_bullet = first.startswith("•")
+            text = first
+        if not is_bullet and len(text) <= 220:
+            lede = text
             body = body[1:]
 
     if lede:
@@ -440,11 +493,14 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
                                 width=body_w, height=body_h,
                                 accent_rgb=accent, size=14)
 
-    # Footer (lower-left): name · org · deck-title · date in 9pt mono MUTED
-    footer_parts = [p for p in (name, org, deck_title, date) if p]
+    # Footer (lower-left): name · org · date in 9pt mono MUTED.
+    # Deck title intentionally OMITTED — including it pushed the footer past
+    # the available width and forced the date onto a second line. The deck
+    # title still appears on the title slide and section dividers.
+    footer_parts = [p for p in (name, org, date) if p]
     if footer_parts:
         _add_text(s, "  ·  ".join(footer_parts),
-                  left=0.50, top=7.12, width=10.00, height=0.30,
+                  left=0.50, top=7.12, width=12.30, height=0.30,
                   size=9, color_rgb=MUTED_RGB, font=branding.MONO_FONT)
 
     return s
@@ -715,23 +771,21 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
     if li_blocks and not cards:
         auto_cards = _detect_def_cards_from_li_html(li_blocks)
 
-    paragraphs: list[str] = []
+    # Body items keep raw HTML so the renderer can preserve inline <strong>/
+    # <em>/<code> spans as actual bold/italic/mono runs in pptx.
+    paragraphs: list[dict] = []
     if auto_cards:
         cards = auto_cards
-        # Capture <p> paragraphs (intro prose before/around the list) but skip the
-        # <li>s since they are now cards.
         for m in re.finditer(r"<p[^>]*>(.*?)</p>", body_region, re.DOTALL):
-            text = _strip_html(m.group(1)).strip()
-            if text:
-                paragraphs.append(text)
+            html = m.group(1).strip()
+            if _strip_html(html):
+                paragraphs.append({"kind": "paragraph", "html": html})
     else:
         for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", body_region, re.DOTALL):
-            text = _strip_html(m.group(2)).strip()
-            if text:
-                if m.group(1) == "li":
-                    paragraphs.append(f"•  {text}")
-                else:
-                    paragraphs.append(text)
+            html = m.group(2).strip()
+            if _strip_html(html):
+                kind = "bullet" if m.group(1) == "li" else "paragraph"
+                paragraphs.append({"kind": kind, "html": html})
 
     return {"title": title, "body": paragraphs, "images": images,
             "tables": tables, "cards": cards}
