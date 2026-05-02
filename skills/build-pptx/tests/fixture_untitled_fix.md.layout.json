@@ -1,0 +1,129 @@
+{
+  "deck_md_hash": "3c4b325a7ce76c7a55b408420863ddf7275c8bb91a28748f1aeccd3a36e4806c",
+  "shake_seed": null,
+  "slides": [
+    {
+      "content_hash": "92740aa03139e8b2490043038ef37dcd31fe5df4bbc08b15705eb821e82edcb0-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#40E0D0",
+        "label": "EXECUTIVE SUMMARY"
+      },
+      "slide_id": "divider-h1-executive-summary"
+    },
+    {
+      "content_hash": "92740aa03139e8b2490043038ef37dcd31fe5df4bbc08b15705eb821e82edcb0",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "This v3 report supersedes v2. The methodology has been audited for leakage and the leak-free numbers are reported here, alongside the original leaky numbers for comparison.",
+            "kind": "paragraph",
+            "pos": 0
+          }
+        ],
+        "lede": "",
+        "section_label": "EXECUTIVE SUMMARY",
+        "title": "EXECUTIVE SUMMARY"
+      },
+      "slide_id": "h1-executive-summary"
+    },
+    {
+      "content_hash": "83e588e7e2928dafa7c2849e7bbeadc7021c69d99f77cdf5948a8e3c7b0d63d7-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#FF1493",
+        "label": "METHODOLOGY OVERVIEW"
+      },
+      "slide_id": "divider-h1-methodology-overview"
+    },
+    {
+      "content_hash": "83e588e7e2928dafa7c2849e7bbeadc7021c69d99f77cdf5948a8e3c7b0d63d7",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Cohorts: UCSF (n ≈ 100, primary) + PNOC (multi-site held-out external, n ≈ 35).",
+            "kind": "bullet",
+            "pos": 5
+          },
+          {
+            "html": "Per-fold MI selection. No baked-in feature lists.",
+            "kind": "bullet",
+            "pos": 94
+          },
+          {
+            "html": "5-seed bootstrap CIs throughout.",
+            "kind": "bullet",
+            "pos": 153
+          }
+        ],
+        "lede": "",
+        "section_label": "METHODOLOGY OVERVIEW",
+        "title": "METHODOLOGY OVERVIEW"
+      },
+      "slide_id": "h1-methodology-overview"
+    },
+    {
+      "content_hash": "2433093262efb306d7bbaf36173ab09484b7755f85a1ecdc2f85bf6b162ebe46-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#F0C840",
+        "label": "Results"
+      },
+      "slide_id": "divider-h1-results"
+    },
+    {
+      "content_hash": "2433093262efb306d7bbaf36173ab09484b7755f85a1ecdc2f85bf6b162ebe46",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "The headline numbers below should each appear on their own slide, with a real title (not “(untitled)”).",
+            "kind": "paragraph",
+            "pos": 0
+          }
+        ],
+        "lede": "",
+        "section_label": "Results",
+        "title": "Results"
+      },
+      "slide_id": "h1-results"
+    },
+    {
+      "content_hash": "07d9908cfe8e0a377998306413c9094b8eab177595a4d3e3fa28920cd1247d51",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "The classifier reaches AUC 0.91 on held-out internal data and 0.85 across both external sites.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Results",
+        "title": "Headline AUC"
+      },
+      "slide_id": "h1-results/h2-headline-auc"
+    },
+    {
+      "content_hash": "3e6170852ea161530291d0dea359bd1cbbf445dc51feb312cdf58b5b48ff4b25",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Numbers reported are from the leak-corrected pipeline. Leak-free per-fold MI selection replaces the original baked-in feature list.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Results",
+        "title": "Methodology footnote"
+      },
+      "slide_id": "h1-results/h2-methodology-footnote"
+    }
+  ],
+  "version": 1
+}

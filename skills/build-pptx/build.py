@@ -374,16 +374,8 @@ def add_end_slide(prs, *, message: str = "Thanks", contact: str = ""):
     return s
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description="markdown → Jin-branded PPTX")
-    ap.add_argument("--input", required=True)
-    ap.add_argument("--output", required=True)
-    ap.add_argument("--no-cover", dest="no_cover", action="store_true",
-                    help="suppress title slide")
-    ap.add_argument("--no-end", dest="no_end", action="store_true",
-                    help="suppress closing 'Thanks' slide")
-    args = ap.parse_args()
-
+def _legacy_main(args) -> int:
+    """The v3 rule-based render path. Preserved as the --no-plan fallback."""
     loaded = load_markdown(args.input)
     meta = loaded["meta"]
     today = dt.date.today().isoformat()
@@ -509,6 +501,223 @@ def main() -> int:
 
     prs.save(args.output)
     print(f"wrote {args.output}")
+    return 0
+
+
+def _infer_default_plan(*, md_text: str, chunks: list[str],
+                        slide_records: list[dict], deck_md_hash: str,
+                        base_dir: Path):
+    """Build a Plan from chunks using the same dispatch logic the legacy
+    renderer uses. Lets the v4 path produce the same output as v3 when no
+    Claude-generated plan exists yet (Task 6 will replace this with real
+    layout-picking via in-session reasoning)."""
+    from plan import Plan, SlideEntry
+
+    slides: list[SlideEntry] = []
+    current_h1: str | None = None
+    for rec, chunk in zip(slide_records, chunks):
+        slide_id = rec["slide_id"]
+        content_hash = rec["content_hash"]
+
+        h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", chunk, re.DOTALL)
+        if h1_match:
+            section_label = _strip_html(h1_match.group(1))
+            current_h1 = section_label
+            accent_hex = branding.match_section_color(section_label)
+            # Emit a section divider entry FIRST
+            slides.append(SlideEntry(
+                slide_id=f"divider-{slide_id}",
+                kind="section-divider",
+                params={"label": section_label, "accent_hex": accent_hex},
+                content_hash=content_hash + "-divider",
+            ))
+            # If the chunk has body content beyond the H1, also emit a content slide
+            remaining = chunk[h1_match.end():].strip()
+            if not remaining:
+                continue
+            sd = _parse_slide_chunk(remaining, base_dir=base_dir)
+            slide_title = sd["title"] or section_label
+        else:
+            sd = _parse_slide_chunk(chunk, base_dir=base_dir)
+            slide_title = sd["title"]
+
+        # Skip empty chunks
+        if not any(sd.get(k) for k in ("title", "body", "images", "tables", "cards")):
+            continue
+
+        # Choose layout kind via the same heuristics as add_content_slide
+        body = list(sd["body"])
+        images = sd["images"]
+        tables = sd["tables"]
+        cards = sd["cards"]
+        image_records = sd.get("image_records", [])
+
+        # Lede extraction (mirrors add_content_slide logic)
+        lede = ""
+        has_more_below = (len(body) > 1) or bool(images) or bool(tables) or bool(cards)
+        if body and has_more_below:
+            first = body[0]
+            text = _strip_html(first.get("html", ""))
+            if first.get("kind") != "bullet" and len(text) <= 350:
+                lede = text
+                body = body[1:]
+
+        # Multi-image auto-explode (mirrors _emit_content logic)
+        if (len(image_records) >= 2 and not cards and not tables):
+            text_items = sorted(
+                [p for p in sd["body"] if p.get("pos") is not None],
+                key=lambda p: p["pos"],
+            )
+            ti = 0
+            consumed = set()
+            for j, img_rec in enumerate(image_records):
+                lede_para = None
+                while ti < len(text_items) and text_items[ti]["pos"] < img_rec["pos"]:
+                    if id(text_items[ti]) not in consumed:
+                        lede_para = text_items[ti]
+                    ti += 1
+                if lede_para is not None:
+                    consumed.add(id(lede_para))
+                sub_lede = _strip_html(lede_para["html"]) if lede_para else ""
+                sub_title = (img_rec["alt"] or slide_title or "").strip() or slide_title
+                params = {
+                    "title": sub_title, "lede": sub_lede,
+                    "body": [],
+                    "images": [str(img_rec["path"])],
+                    "tables": [],
+                    "section_label": current_h1 or "",
+                }
+                slides.append(SlideEntry(
+                    slide_id=f"{slide_id}/img-{j}",
+                    kind="content-image-only",
+                    params=params,
+                    content_hash=f"{content_hash}-img-{j}",
+                ))
+            # Trailing paragraphs after the last image
+            trailing = [p for p in text_items
+                        if p["pos"] > image_records[-1]["pos"]
+                        and id(p) not in consumed]
+            if trailing:
+                params = {
+                    "title": slide_title, "lede": "",
+                    "body": trailing, "section_label": current_h1 or "",
+                }
+                slides.append(SlideEntry(
+                    slide_id=f"{slide_id}/trailing",
+                    kind="content-text",
+                    params=params,
+                    content_hash=f"{content_hash}-trailing",
+                ))
+            continue
+
+        # Choose layout
+        if cards:
+            kind = "cards-grid"
+            params = {"title": slide_title, "lede": lede, "body": body,
+                      "cards": [{"label": c["label"], "body": c["body"],
+                                 "icon": str(c["icon"]) if c.get("icon") else None}
+                                for c in cards],
+                      "section_label": current_h1 or ""}
+        elif images or tables:
+            n_images = len(images)
+            aspect = _get_image_aspect(images[0]) if n_images == 1 else None
+            use_side_by_side = (
+                n_images == 1 and len(tables) == 0 and not cards
+                and aspect is not None and aspect <= 1.3
+                and (bool(body) or bool(lede))
+            )
+            kind = "content-text-image" if (body or lede) else "content-image-only"
+            params = {"title": slide_title, "lede": lede,
+                      "body": body if kind == "content-text-image" else [],
+                      "images": [str(p) for p in images],
+                      "tables": tables,
+                      "use_side_by_side": use_side_by_side,
+                      "section_label": current_h1 or ""}
+        elif body:
+            kind = "content-text"
+            params = {"title": slide_title, "lede": lede, "body": body,
+                      "section_label": current_h1 or ""}
+        else:
+            # Empty chunk — skip
+            continue
+
+        slides.append(SlideEntry(
+            slide_id=slide_id, kind=kind, params=params,
+            content_hash=content_hash,
+        ))
+
+    return Plan(version=1, deck_md_hash=deck_md_hash, slides=slides)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="markdown → Jin-branded PPTX")
+    ap.add_argument("--input", required=True)
+    ap.add_argument("--output", required=True)
+    ap.add_argument("--no-cover", dest="no_cover", action="store_true",
+                    help="suppress title slide")
+    ap.add_argument("--no-end", dest="no_end", action="store_true",
+                    help="suppress closing 'Thanks' slide")
+    ap.add_argument("--shake", action="store_true",
+                    help="regenerate the layout plan from scratch")
+    ap.add_argument("--plan-only", dest="plan_only", action="store_true",
+                    help="emit only the plan JSON; do not render pptx")
+    ap.add_argument("--no-plan", dest="no_plan", action="store_true",
+                    help="bypass v4 plan path; use legacy rule-based renderer")
+    args = ap.parse_args()
+
+    if args.no_plan:
+        # Legacy path — current main() behavior
+        return _legacy_main(args)
+
+    # Plan path
+    from plan import (
+        Plan, SlideEntry, build_slide_records, derive_slide_ids_from_chunks,
+        merge_with_existing, hash_text, assemble_plan_prompt,
+    )
+
+    md_path = Path(args.input).resolve()
+    output_path = Path(args.output).resolve()
+    sidecar_path = md_path.with_suffix(md_path.suffix + ".layout.json")
+
+    md_text = md_path.read_text(encoding="utf-8")
+    loaded = load_markdown(str(md_path))
+    chunks = _split_slides(loaded["body_html"])
+    slide_ids = derive_slide_ids_from_chunks(chunks)
+    slide_records = build_slide_records(chunks=chunks, slide_ids=slide_ids)
+    deck_md_hash = hash_text(md_text)
+
+    # Read existing sidecar if present and not shaking
+    existing_plan = None
+    if sidecar_path.exists() and not args.shake:
+        try:
+            existing_plan = Plan.from_json(sidecar_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"warning: could not parse existing sidecar: {e}", file=sys.stderr)
+            existing_plan = None
+
+    # Build a default plan (rule-based layout choice from chunk content)
+    default_plan = _infer_default_plan(
+        md_text=md_text, chunks=chunks, slide_records=slide_records,
+        deck_md_hash=deck_md_hash, base_dir=md_path.parent,
+    )
+
+    # Merge with existing
+    final_plan = merge_with_existing(default_plan, existing_plan)
+
+    # Persist sidecar
+    sidecar_path.write_text(final_plan.to_json(), encoding="utf-8")
+    print(f"wrote plan: {sidecar_path}")
+
+    if args.plan_only:
+        return 0
+
+    # Render
+    from render import render_from_plan
+    render_from_plan(
+        md_path=md_path, plan=final_plan, output_path=output_path,
+        no_cover=args.no_cover, no_end=args.no_end,
+    )
+    print(f"wrote {output_path}")
     return 0
 
 

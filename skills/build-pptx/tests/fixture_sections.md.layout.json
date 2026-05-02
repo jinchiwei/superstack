@@ -1,0 +1,137 @@
+{
+  "deck_md_hash": "ab15f5ef5842236f49ebb8e6cea8cdc40e8989ddc96f36b43e1cf166baf76641",
+  "shake_seed": null,
+  "slides": [
+    {
+      "content_hash": "28395391a8ae10db36d317a4157a69a916ba02c4899cb66cae293ffd5f76d294-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#40E0D0",
+        "label": "Background"
+      },
+      "slide_id": "divider-h1-background"
+    },
+    {
+      "content_hash": "c3377360fe7d72adf5277a276e50e7d098ffecc4aec17259ef71eba787a181b5",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Body text here.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Background",
+        "title": "Motivation slide"
+      },
+      "slide_id": "h1-background/h2-motivation-slide"
+    },
+    {
+      "content_hash": "6d31f4e259270667e8ee574d6c4e5e648f02fa4a9874453f92bbc9ac7bcdf10b-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#FF1493",
+        "label": "Methods"
+      },
+      "slide_id": "divider-h1-methods"
+    },
+    {
+      "content_hash": "43f55fcaf37f903bf15c23a9b3a9b3d71012742bb0b5a16d5edcb060317efa8d",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Body text here.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Methods",
+        "title": "Pipeline overview"
+      },
+      "slide_id": "h1-methods/h2-pipeline-overview"
+    },
+    {
+      "content_hash": "9d386fbbaab59eb494f4c12cf1b23fd4b5c5347b03eb22c1c97fb04f41376eef-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#F0C840",
+        "label": "Results"
+      },
+      "slide_id": "divider-h1-results"
+    },
+    {
+      "content_hash": "f44242682f284fde10dcd36662552ad1f3d27591bca97a4136bb30dd3d10f4e8",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Body text here.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Results",
+        "title": "Headline numbers"
+      },
+      "slide_id": "h1-results/h2-headline-numbers"
+    },
+    {
+      "content_hash": "f6914bfeb6106e98e93a35e7608ea98a1fdf54dc959574d90d6d896538d19012-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#8A2BE2",
+        "label": "Limitations"
+      },
+      "slide_id": "divider-h1-limitations"
+    },
+    {
+      "content_hash": "400f6bed7b73f69286349ef0af3a55641c18418200f9404727f2a5f6316a3f57",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Body text here.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Limitations",
+        "title": "What we couldn’t measure"
+      },
+      "slide_id": "h1-limitations/h2-what-we-couldn-t-measure"
+    },
+    {
+      "content_hash": "23f4ecd8e9d2743bee5484da8a3bae93aed0f6385ea4c65cc5e0651a005a98b9-divider",
+      "kind": "section-divider",
+      "params": {
+        "accent_hex": "#40E0D0",
+        "label": "Conclusions"
+      },
+      "slide_id": "divider-h1-conclusions"
+    },
+    {
+      "content_hash": "b8032ab5ecfc7d08f2531d25c3798535481080710654de611f78441b9f7edb34",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Body text here.",
+            "kind": "paragraph",
+            "pos": 1
+          }
+        ],
+        "lede": "",
+        "section_label": "Conclusions",
+        "title": "Next steps"
+      },
+      "slide_id": "h1-conclusions/h2-next-steps"
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,73 @@
+{
+  "deck_md_hash": "2e0c14c7d792992f80d6fb6044082439dbea361894af2b222e67dd8aba3bb6de",
+  "shake_seed": null,
+  "slides": [
+    {
+      "content_hash": "ce9917e7abc853d68a3eed0dd531aa8d81a7dcf6329474d093d708469ef2fc6f",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Point one",
+            "kind": "bullet",
+            "pos": 58
+          },
+          {
+            "html": "Point two",
+            "kind": "bullet",
+            "pos": 77
+          }
+        ],
+        "lede": "The first content slide. Some bullet points:",
+        "section_label": "",
+        "title": "Background"
+      },
+      "slide_id": "h2-background"
+    },
+    {
+      "content_hash": "216a46dd4aa5a72671c9ba0aad58e16b2b8c801a7156725c8cea8b22e78b817e",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "Bullet a",
+            "kind": "bullet",
+            "pos": 37
+          },
+          {
+            "html": "Bullet b",
+            "kind": "bullet",
+            "pos": 55
+          },
+          {
+            "html": "Bullet c",
+            "kind": "bullet",
+            "pos": 73
+          }
+        ],
+        "lede": "A second content slide.",
+        "section_label": "",
+        "title": "Methods"
+      },
+      "slide_id": "h2-methods"
+    },
+    {
+      "content_hash": "3d9a9ed11e7614175b17204028f33b4bbbf632a9e0f67053c43ed31dd3f567a1",
+      "kind": "content-text",
+      "params": {
+        "body": [
+          {
+            "html": "This is the body.",
+            "kind": "paragraph",
+            "pos": 54
+          }
+        ],
+        "lede": "Third content slide. Plain prose, no bullets.",
+        "section_label": "",
+        "title": "Results"
+      },
+      "slide_id": "h2-results"
+    }
+  ],
+  "version": 1
+}
