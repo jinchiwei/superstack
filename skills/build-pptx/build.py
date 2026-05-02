@@ -493,11 +493,11 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
                                 width=body_w, height=body_h,
                                 accent_rgb=accent, size=14)
 
-    # Footer (lower-left): name · org · date in 9pt mono MUTED.
-    # Deck title intentionally OMITTED — including it pushed the footer past
-    # the available width and forced the date onto a second line. The deck
-    # title still appears on the title slide and section dividers.
-    footer_parts = [p for p in (name, org, date) if p]
+    # Footer (lower-left): name · org · deck-title · date in 9pt mono MUTED.
+    # The textbox spans the full slide width so the date never wraps to a
+    # second line; the previous 10in box ended before the right edge and
+    # forced wrap on long deck titles even when the text would have fit.
+    footer_parts = [p for p in (name, org, deck_title, date) if p]
     if footer_parts:
         _add_text(s, "  ·  ".join(footer_parts),
                   left=0.50, top=7.12, width=12.30, height=0.30,
