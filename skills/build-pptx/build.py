@@ -510,12 +510,32 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
             lede = text
             body = body[1:]
 
-    if lede:
+    # Decide whether to use side-by-side layout: 1 squarish image + any text
+    # (lede or body items). Squarish images at full body width get shrunk to
+    # fit body height and waste horizontal space; side-by-side gives both
+    # text and image more room.
+    n_images_for_layout = len(images)
+    aspect_for_layout = (_get_image_aspect(images[0])
+                        if n_images_for_layout == 1 else None)
+    use_side_by_side = (
+        n_images_for_layout == 1
+        and len(tables) == 0
+        and not has_cards
+        and aspect_for_layout is not None
+        and aspect_for_layout <= 1.7
+        and (bool(body) or bool(lede))
+    )
+
+    if lede and not use_side_by_side:
         _add_text(s, lede, left=0.50, top=subtitle_top, width=12.30, height=0.40,
                   size=13, color_rgb=MUTED_RGB, font=branding.SANS_FONT)
 
-    # Body region — top moves up if no title (handles former "(untitled)" case)
-    body_top = (subtitle_top + 0.50) if title_present else 0.40
+    # Body region — when side-by-side, use the full vertical room (no
+    # subtitle slot taking space) so text and image both get the full height.
+    if title_present:
+        body_top = (hairline_top + 0.20) if use_side_by_side else (subtitle_top + 0.50)
+    else:
+        body_top = 0.40
     body_bottom = 6.85
     body_h = body_bottom - body_top
     body_l = 0.50
@@ -544,24 +564,22 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
                       left=cx, top=cy, width=card_w, height=card_h,
                       accent_rgb=accent)
     elif has_media:
-        # Side-by-side ONLY makes sense for 1 squarish image with text — wide
-        # images (aspect > 1.7) and tables both want full body width and look
-        # squished otherwise. In every other case, stack: a compressed text
-        # caption above + full-width media below, so the figure can breathe.
-        n_images = len(images)
-        n_tables = len(tables)
-        wide_or_unknown = (
-            n_images != 1
-            or n_tables > 0
-            or (n_images == 1 and _get_image_aspect(images[0]) > 1.7)
-        )
-        if body and not wide_or_unknown:
+        # Side-by-side fires for 1 squarish image with text content (lede or
+        # body). Wide images (aspect > 1.7) and tables both want full body
+        # width and look squished otherwise. When use_side_by_side is true,
+        # the lede was intentionally NOT rendered in the subtitle slot so we
+        # could promote it into the side text panel here.
+        if use_side_by_side:
+            side_items = list(body)
+            if lede:
+                side_items.insert(0, {"kind": "paragraph", "html": lede})
             text_w = 5.60
             media_l = body_l + text_w + 0.40
             media_w = body_w - text_w - 0.40
-            _render_paragraph_block(s, items=body, left=body_l, top=body_top,
-                                    width=text_w, height=body_h,
-                                    accent_rgb=accent, size=13)
+            _render_paragraph_block(s, items=side_items, left=body_l,
+                                    top=body_top, width=text_w, height=body_h,
+                                    accent_rgb=accent, size=13,
+                                    distribute=True)
             _render_media_block(s, images=images, tables=tables,
                                 left=media_l, top=body_top,
                                 width=media_w, height=body_h,
