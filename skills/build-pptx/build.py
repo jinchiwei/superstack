@@ -309,6 +309,19 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
         _add_runs_from_html(p, html_text=item["html"], size=size)
 
 
+def _get_image_aspect(path: Path) -> float:
+    """Return image aspect ratio (width/height). Defaults to 1.0 if unreadable.
+    Used to decide whether a single image + text slide should be stacked
+    (wide images get full body width below caption) or side-by-side
+    (squarer images sit nicely beside the text)."""
+    try:
+        from PIL import Image
+        with Image.open(str(path)) as im:
+            return im.width / im.height if im.height else 1.0
+    except Exception:
+        return 1.0
+
+
 def _render_media_block(slide, *, images: list[Path], tables: list[list[list[str]]],
                         left: float, top: float, width: float, height: float,
                         accent: RGBColor) -> None:
@@ -429,8 +442,11 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
     has_media = bool(images) or bool(tables)
     body = list(body_paragraphs or [])
 
-    # Promote first paragraph to subtitle/lede if it is short, prose (not a
-    # bullet), and there is more content below it on the slide.
+    # Promote first paragraph to subtitle/lede if it is prose (not a bullet)
+    # and there is more content below it on the slide. Threshold raised to
+    # 350 chars so a 2-line opening paragraph still goes to the subtitle slot
+    # — keeps the body region clear for the figure rather than eating
+    # vertical space with a separate caption block.
     lede = ""
     has_more_below = (len(body) > 1) or has_media or has_cards
     if body and has_more_below:
@@ -442,7 +458,7 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
         else:
             is_bullet = first.startswith("•")
             text = first
-        if not is_bullet and len(text) <= 220:
+        if not is_bullet and len(text) <= 350:
             lede = text
             body = body[1:]
 
@@ -479,23 +495,42 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
             _add_card(s, label=card["label"], body=card["body"],
                       left=cx, top=cy, width=card_w, height=card_h,
                       accent_rgb=accent)
-    elif has_media and body:
-        # Side-by-side: text 5.6in left, gutter, media right
-        text_w = 5.60
-        media_l = body_l + text_w + 0.40
-        media_w = body_w - text_w - 0.40
-        _render_paragraph_block(s, items=body, left=body_l, top=body_top,
-                                width=text_w, height=body_h,
-                                accent_rgb=accent, size=13)
-        _render_media_block(s, images=images, tables=tables,
-                            left=media_l, top=body_top,
-                            width=media_w, height=body_h,
-                            accent=accent)
     elif has_media:
-        _render_media_block(s, images=images, tables=tables,
-                            left=body_l, top=body_top,
-                            width=body_w, height=body_h,
-                            accent=accent)
+        # Side-by-side ONLY makes sense for 1 squarish image with text — wide
+        # images (aspect > 1.7) and tables both want full body width and look
+        # squished otherwise. In every other case, stack: a compressed text
+        # caption above + full-width media below, so the figure can breathe.
+        n_images = len(images)
+        n_tables = len(tables)
+        wide_or_unknown = (
+            n_images != 1
+            or n_tables > 0
+            or (n_images == 1 and _get_image_aspect(images[0]) > 1.7)
+        )
+        if body and not wide_or_unknown:
+            text_w = 5.60
+            media_l = body_l + text_w + 0.40
+            media_w = body_w - text_w - 0.40
+            _render_paragraph_block(s, items=body, left=body_l, top=body_top,
+                                    width=text_w, height=body_h,
+                                    accent_rgb=accent, size=13)
+            _render_media_block(s, images=images, tables=tables,
+                                left=media_l, top=body_top,
+                                width=media_w, height=body_h,
+                                accent=accent)
+        else:
+            cursor = body_top
+            if body:
+                # Compressed caption above the image, full body width.
+                cap_h = min(1.4, body_h * 0.28)
+                _render_paragraph_block(s, items=body, left=body_l, top=cursor,
+                                        width=body_w, height=cap_h,
+                                        accent_rgb=accent, size=13)
+                cursor += cap_h + 0.15
+            _render_media_block(s, images=images, tables=tables,
+                                left=body_l, top=cursor,
+                                width=body_w, height=body_bottom - cursor,
+                                accent=accent)
     elif body:
         _render_paragraph_block(s, items=body, left=body_l, top=body_top,
                                 width=body_w, height=body_h,
