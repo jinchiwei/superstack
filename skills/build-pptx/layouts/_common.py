@@ -282,12 +282,17 @@ def _strip_html_keep_edges(text: str) -> str:
     return _WS_RUN_RE.sub(" ", _HTML_TAG_RE.sub("", text))
 
 
-def _add_runs_from_html(p, *, html_text: str, size: float) -> None:
+def _add_runs_from_html(p, *, html_text: str, size: float,
+                        text_color: RGBColor | None = None) -> None:
     """Append runs to paragraph p parsing inline <strong>/<em>/<code> spans.
 
     Edge whitespace between runs is preserved (we use _strip_html_keep_edges
     instead of _strip_html) so spaces around inline tags survive — without
-    this, 'run <code>foo</code> on' renders as 'runfooon'."""
+    this, 'run <code>foo</code> on' renders as 'runfooon'.
+
+    text_color: optional override for run colour; defaults to INK_RGB.
+    """
+    run_color = text_color if text_color is not None else INK_RGB
     parts = re.split(r"(<strong>.*?</strong>|<em>.*?</em>|<code>.*?</code>)",
                      html_text, flags=re.DOTALL)
     for part in parts:
@@ -307,7 +312,7 @@ def _add_runs_from_html(p, *, html_text: str, size: float) -> None:
         r.text = text
         r.font.name = branding.MONO_FONT if mono else branding.SANS_FONT
         r.font.size = Pt(size)
-        r.font.color.rgb = INK_RGB
+        r.font.color.rgb = run_color
         r.font.bold = bold
         r.font.italic = italic
 
@@ -326,8 +331,14 @@ def _estimate_paragraph_height(text: str, *, width: float, size: float,
 
 def _render_paragraph_block(slide, *, items: list, left: float, top: float,
                             width: float, height: float, accent_rgb: RGBColor,
-                            size: float = 14, distribute: bool = False) -> None:
-    """Render mixed paragraphs/bullets into one textbox."""
+                            size: float = 14, distribute: bool = False,
+                            text_color: RGBColor | None = None) -> None:
+    """Render mixed paragraphs/bullets into one textbox.
+
+    text_color: override the default INK_RGB for body text runs. Pass e.g.
+        WHITE_RGB for dark-background slides. Bullet markers always use
+        accent_rgb.
+    """
     if not items:
         return
     tb = slide.shapes.add_textbox(Inches(left), Inches(top),
@@ -377,7 +388,8 @@ def _render_paragraph_block(slide, *, items: list, left: float, top: float,
             r.font.color.rgb = accent_rgb
             r.font.bold = True
 
-        _add_runs_from_html(p, html_text=item["html"], size=size)
+        _add_runs_from_html(p, html_text=item["html"], size=size,
+                            text_color=text_color)
 
 
 def _get_image_aspect(path: Path) -> float:
