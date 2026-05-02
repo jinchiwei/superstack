@@ -124,3 +124,58 @@ def test_section_color_cascade(tmp_path):
             except Exception:
                 pass
         assert found, f"slide {slide_idx} missing expected brand color #{hex_color}"
+
+
+def test_h1_with_body_does_not_produce_untitled_slide(tmp_path):
+    """Regression: when an H1 chunk has body content but no H2, the content
+    slide must use the H1 verbatim as its title — not '(untitled)'.
+    Source bug: DMG_radiogenomics_v3 deck had every section follow this
+    pattern and produced 17 '(untitled)' slides."""
+    fixture = SKILL_DIR / "tests" / "fixture_untitled_fix.md"
+    out = tmp_path / "untitled-fix.pptx"
+    cmd = [sys.executable, str(BUILD_PY),
+           "--input", str(fixture),
+           "--output", str(out)]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+    from pptx import Presentation
+    prs = Presentation(str(out))
+    titles = []
+    for slide in prs.slides:
+        for shp in slide.shapes:
+            if shp.has_text_frame:
+                t = shp.text_frame.text.strip()
+                if t:
+                    titles.append(t)
+                    break
+    assert not any("(untitled)" in t for t in titles), \
+        f"untitled slide found in titles: {titles}"
+    # Verify the H1-verbatim titles are present
+    joined = "\n".join(titles)
+    assert "EXECUTIVE SUMMARY" in joined
+    assert "METHODOLOGY OVERVIEW" in joined
+
+
+def test_content_slide_has_footer_with_deck_metadata(tmp_path):
+    """Content slides should carry a footer with name/org/deck/date."""
+    fixture = SKILL_DIR / "tests" / "fixture_realistic.md"
+    out = tmp_path / "realistic.pptx"
+    cmd = [sys.executable, str(BUILD_PY),
+           "--input", str(fixture),
+           "--output", str(out)]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+    from pptx import Presentation
+    prs = Presentation(str(out))
+    # Pick a content slide (slide 3 in realistic fixture: "Why this matters")
+    slide = prs.slides[2]
+    found_footer = False
+    for shp in slide.shapes:
+        if shp.has_text_frame:
+            t = shp.text_frame.text
+            if "Jinchi Wei" in t and "·" in t:
+                found_footer = True
+                break
+    assert found_footer, "content slide is missing the footer with name + separators"

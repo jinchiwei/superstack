@@ -201,31 +201,156 @@ def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
 def _add_card(slide, *, label: str, body: str, left: float, top: float,
               width: float, height: float, accent_rgb: RGBColor) -> None:
     """A bordered tile (paper bg + thin accent top stripe) with label + body."""
-    # Paper background fill
     _add_rect(slide, left=left, top=top, width=width, height=height,
               fill_rgb=PAPER_RGB)
-    # Accent top stripe
     _add_rect(slide, left=left, top=top, width=width, height=0.06,
               fill_rgb=accent_rgb)
-    # Label in accent color, mono bold
     _add_text(slide, label, left=left + 0.18, top=top + 0.18,
               width=width - 0.36, height=0.4,
               size=13, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
-    # Body in INK, sans
     _add_text(slide, body, left=left + 0.18, top=top + 0.65,
               width=width - 0.36, height=height - 0.75,
               size=12, color_rgb=INK_RGB, font=branding.SANS_FONT)
+
+
+def _render_paragraph_block(slide, *, items: list[str], left: float, top: float,
+                            width: float, height: float, accent_rgb: RGBColor,
+                            size: float = 14) -> None:
+    """Render mixed paragraphs/bullets into one textbox.
+
+    Items beginning with the bullet sentinel "•  " (added by _parse_slide_chunk
+    for <li>) render with a colored ▸ prefix in the section accent and the
+    text in INK sans. Plain paragraphs render in INK sans with paragraph
+    spacing. Line-spacing 1.35 throughout for readability.
+    """
+    if not items:
+        return
+    tb = slide.shapes.add_textbox(Inches(left), Inches(top),
+                                  Inches(width), Inches(height))
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = Emu(0)
+    tf.margin_top = tf.margin_bottom = Emu(0)
+
+    first = True
+    for item in items:
+        if first:
+            p = tf.paragraphs[0]
+            first = False
+        else:
+            p = tf.add_paragraph()
+            p.space_before = Pt(8)
+        p.line_spacing = 1.35
+        is_bullet = item.startswith("•  ") or item.startswith("• ")
+        if is_bullet:
+            text = item.lstrip("• ").strip()
+            r1 = p.add_run()
+            r1.text = "▸  "
+            r1.font.name = branding.MONO_FONT
+            r1.font.size = Pt(size)
+            r1.font.color.rgb = accent_rgb
+            r1.font.bold = True
+            r2 = p.add_run()
+            r2.text = text
+            r2.font.name = branding.SANS_FONT
+            r2.font.size = Pt(size)
+            r2.font.color.rgb = INK_RGB
+        else:
+            r = p.add_run()
+            r.text = item
+            r.font.name = branding.SANS_FONT
+            r.font.size = Pt(size)
+            r.font.color.rgb = INK_RGB
+
+
+def _render_media_block(slide, *, images: list[Path], tables: list[list[list[str]]],
+                        left: float, top: float, width: float, height: float,
+                        accent: RGBColor) -> None:
+    """Render any tables (first carries accent header, rest drop to INK) and
+    images (single = full bleed; multi = grid). Aspect-correct image fit with
+    floor of 0.5in to avoid python-pptx errors on extreme overflow."""
+    cursor = top
+    for ti, tbl in enumerate(tables):
+        header = accent if ti == 0 else INK_RGB
+        max_h = min(2.5, (height / max(len(tables), 1)))
+        cursor = _add_table(slide, rows=tbl, left=left, top=cursor,
+                            width=width, max_height=max_h,
+                            header_rgb=header)
+        cursor += 0.2
+
+    if not images:
+        return
+    remaining = (top + height) - cursor
+    if remaining < 0.5:
+        return
+
+    n = len(images)
+    if n == 1:
+        try:
+            pic = slide.shapes.add_picture(str(images[0]),
+                                           Inches(left), Inches(cursor),
+                                           width=Inches(width))
+            pw = pic.width / 914400
+            ph = pic.height / 914400
+            if ph > remaining:
+                new_h = max(0.5, remaining)
+                new_w = max(0.5, width * (new_h / ph))
+                pic.width = Inches(new_w)
+                pic.height = Inches(new_h)
+                pic.left = Inches(left + (width - new_w) / 2)
+        except Exception as e:
+            _add_text(slide, f"[image error: {Path(str(images[0])).name}: {e}]",
+                      left=left, top=cursor, width=width, height=0.4,
+                      size=10, color_rgb=DIM_RGB, font=branding.MONO_FONT)
+    else:
+        cols = 2 if n <= 4 else 3
+        rows = (n + cols - 1) // cols
+        gutter = 0.15
+        sub_w = (width - gutter * (cols - 1)) / cols
+        sub_h = (remaining - gutter * (rows - 1)) / rows
+        sub_h = max(sub_h, 0.5)
+        for i, img in enumerate(images):
+            r, c = divmod(i, cols)
+            x = left + c * (sub_w + gutter)
+            y = cursor + r * (sub_h + gutter)
+            try:
+                pic = slide.shapes.add_picture(str(img),
+                                               Inches(x), Inches(y),
+                                               width=Inches(sub_w))
+                pw = pic.width / 914400
+                ph = pic.height / 914400
+                if ph > sub_h:
+                    new_h = max(0.5, sub_h)
+                    new_w = max(0.5, sub_w * (new_h / ph))
+                    pic.width = Inches(new_w)
+                    pic.height = Inches(new_h)
+                    pic.left = Inches(x + (sub_w - new_w) / 2)
+            except Exception as e:
+                _add_text(slide, f"[image error: {img.name}: {e}]",
+                          left=x, top=y, width=sub_w, height=0.4,
+                          size=9, color_rgb=DIM_RGB, font=branding.MONO_FONT)
 
 
 def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
                       accent_color_hex: str | None = None,
                       images: list[Path] | None = None,
                       tables: list[list[list[str]]] | None = None,
-                      cards: list[dict] | None = None):
-    """Content slide: white bg + thin left vertical bar in section's accent color.
+                      cards: list[dict] | None = None,
+                      name: str = "", org: str = "", deck_title: str = "",
+                      date: str = ""):
+    """Content slide. Geometry derived from funding_report + DMG canonical.
 
-    Title, hairline, table header, and any future brand-color elements all
-    inherit the same accent color so the whole slide reads as one identity.
+    Layout (16:9, 13.33×7.50):
+      L=0      T=0    W=0.22 H=7.50  left accent bar (section color)
+      L=0.50   T=0.30 W=12.30 H=0.55 title (28pt mono INK bold) — omitted if no title
+      L=0.50   T=0.95 W=12.30 H=0.005 hairline rule (RULE color)
+      L=0.50   T=1.05 W=12.30 H=0.40 subtitle (13pt sans MUTED) — first short paragraph
+      L=0.50   T=1.55 W=12.30 H=5.30 body region — cards/media/text by content type
+      L=0.50   T=7.12 W=10.00 H=0.30 footer (9pt mono MUTED): name · org · deck · date
+
+    Title is INK (not accent) — accent color shows on the left bar, table
+    headers, bullet markers, card stripes. The whole slide reads as one
+    identity through those shared accent points.
     """
     accent_hex = accent_color_hex or branding.TURQUOISE
     accent = _rgb(accent_hex)
@@ -235,88 +360,93 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
     s = _blank(prs)
     _set_bg(s, WHITE_RGB)
 
-    # Thin vertical accent bar on left (funding_report style, full height)
+    # Left accent bar — funding_report cohesion
     _add_rect(s, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)
 
-    # Slide title in section's accent color
-    _add_text(s, title, left=0.6, top=0.4, width=12.5, height=0.8,
-              size=32, color_rgb=accent, font=branding.MONO_FONT, bold=True)
-
-    # Hairline rule under title in same accent
-    _add_rect(s, left=0.6, top=1.25, width=12.0, height=0.005, fill_rgb=accent)
+    # Title at top — INK 28pt mono bold (not accent)
+    title_present = bool(title)
+    if title_present:
+        _add_text(s, title, left=0.50, top=0.30, width=12.30, height=0.55,
+                  size=28, color_rgb=INK_RGB, font=branding.MONO_FONT, bold=True)
+        _add_rect(s, left=0.50, top=0.95, width=12.30, height=0.005,
+                  fill_rgb=RULE_RGB)
 
     has_cards = bool(cards)
-    has_text = bool(body_paragraphs)
     has_media = bool(images) or bool(tables)
+    body = list(body_paragraphs or [])
 
-    # Cards take over the slide (no media side-by-side). Body text shrinks to
-    # an intro paragraph above the card grid.
+    # Promote first paragraph to subtitle/lede if it is short, prose (not a
+    # bullet), and there is more content below it on the slide.
+    lede = ""
+    has_more_below = (len(body) > 1) or has_media or has_cards
+    if body and has_more_below:
+        first = body[0]
+        if not first.startswith("•") and len(first) <= 220:
+            lede = first
+            body = body[1:]
+
+    if lede:
+        _add_text(s, lede, left=0.50, top=1.05, width=12.30, height=0.40,
+                  size=13, color_rgb=MUTED_RGB, font=branding.SANS_FONT)
+
+    # Body region — top moves up if no title (handles former "(untitled)" case)
+    body_top = 1.55 if title_present else 0.40
+    body_bottom = 6.85
+    body_h = body_bottom - body_top
+    body_l = 0.50
+    body_w = 12.30
+
     if has_cards:
-        if has_text:
-            body_text = "\n".join(body_paragraphs)
-            _add_text(s, body_text, left=0.6, top=1.5, width=12.5, height=1.2,
-                      size=16, color_rgb=MUTED_RGB, font=branding.SANS_FONT)
-            grid_top = 2.85
+        if body:
+            _render_paragraph_block(s, items=body, left=body_l, top=body_top,
+                                    width=body_w, height=1.0,
+                                    accent_rgb=accent, size=13)
+            grid_top = body_top + 1.10
         else:
-            grid_top = 1.55
+            grid_top = body_top
         n = len(cards)
         cols = 3 if n >= 3 else max(n, 1)
         rows = (n + cols - 1) // cols
-        gutter = 0.25
-        avail_w = 12.5
-        card_w = (avail_w - gutter * (cols - 1)) / cols
-        avail_h = 7.0 - grid_top
+        gutter = 0.20
+        card_w = (body_w - gutter * (cols - 1)) / cols
+        avail_h = body_bottom - grid_top
         card_h = (avail_h - gutter * (rows - 1)) / rows
         for i, card in enumerate(cards):
             r, c = divmod(i, cols)
-            cx = 0.6 + c * (card_w + gutter)
+            cx = body_l + c * (card_w + gutter)
             cy = grid_top + r * (card_h + gutter)
             _add_card(s, label=card["label"], body=card["body"],
                       left=cx, top=cy, width=card_w, height=card_h,
                       accent_rgb=accent)
-        return s
+    elif has_media and body:
+        # Side-by-side: text 5.6in left, gutter, media right
+        text_w = 5.60
+        media_l = body_l + text_w + 0.40
+        media_w = body_w - text_w - 0.40
+        _render_paragraph_block(s, items=body, left=body_l, top=body_top,
+                                width=text_w, height=body_h,
+                                accent_rgb=accent, size=13)
+        _render_media_block(s, images=images, tables=tables,
+                            left=media_l, top=body_top,
+                            width=media_w, height=body_h,
+                            accent=accent)
+    elif has_media:
+        _render_media_block(s, images=images, tables=tables,
+                            left=body_l, top=body_top,
+                            width=body_w, height=body_h,
+                            accent=accent)
+    elif body:
+        _render_paragraph_block(s, items=body, left=body_l, top=body_top,
+                                width=body_w, height=body_h,
+                                accent_rgb=accent, size=14)
 
-    media_top = 1.5
+    # Footer (lower-left): name · org · deck-title · date in 9pt mono MUTED
+    footer_parts = [p for p in (name, org, deck_title, date) if p]
+    if footer_parts:
+        _add_text(s, "  ·  ".join(footer_parts),
+                  left=0.50, top=7.12, width=10.00, height=0.30,
+                  size=9, color_rgb=MUTED_RGB, font=branding.MONO_FONT)
 
-    if has_text:
-        text_width = 6.0 if has_media else 12.5
-        body_text = "\n".join(body_paragraphs)
-        _add_text(s, body_text, left=0.6, top=1.5, width=text_width, height=5.5,
-                  size=18, color_rgb=INK_RGB, font=branding.SANS_FONT)
-
-    if has_media:
-        media_left = 7.0 if has_text else 0.6
-        media_width = 6.0 if has_text else 12.5
-        cursor = media_top
-        for ti, tbl in enumerate(tables):
-            # First table on the slide carries the accent (ties to slide identity);
-            # subsequent tables drop to INK so they read as supporting data.
-            header = accent if ti == 0 else INK_RGB
-            cursor = _add_table(s, rows=tbl, left=media_left, top=cursor,
-                                width=media_width, max_height=2.5,
-                                header_rgb=header)
-            cursor += 0.2
-        for img_path in images:
-            try:
-                pic = s.shapes.add_picture(
-                    str(img_path),
-                    Inches(media_left), Inches(cursor),
-                    width=Inches(media_width),
-                )
-                pic_h = pic.height / 914400
-                if cursor + pic_h > 7.0:
-                    overflow = (cursor + pic_h) - 7.0
-                    new_h = pic_h - overflow
-                    new_w = media_width * (new_h / pic_h)
-                    pic.height = Inches(new_h)
-                    pic.width = Inches(new_w)
-                    pic_h = new_h
-                cursor += pic_h + 0.2
-            except Exception as e:
-                _add_text(s, f"[image error: {img_path.name}: {e}]",
-                          left=media_left, top=cursor, width=media_width, height=0.4,
-                          size=11, color_rgb=DIM_RGB, font=branding.MONO_FONT)
-                cursor += 0.5
     return s
 
 
@@ -557,6 +687,7 @@ def main() -> int:
     deck_title = extract_title(loaded) or Path(args.input).stem
     deck_name = str(meta.get("name", ""))
     deck_org = str(meta.get("org", ""))
+    deck_date = str(meta.get("date") or today)
     md_dir = Path(args.input).resolve().parent
 
     prs = new_presentation()
@@ -569,19 +700,31 @@ def main() -> int:
             subtitle=str(meta.get("subtitle", "")),
             name=deck_name,
             org=deck_org,
-            date=str(meta.get("date") or today),
+            date=deck_date,
+        )
+
+    def _emit_content(slide_data: dict, slide_title: str) -> None:
+        """Emit a content slide with the section's current accent + deck footer."""
+        add_content_slide(
+            prs,
+            title=slide_title,
+            body_paragraphs=slide_data["body"],
+            images=slide_data["images"],
+            tables=slide_data["tables"],
+            cards=slide_data.get("cards"),
+            accent_color_hex=current_accent,
+            name=deck_name, org=deck_org,
+            deck_title=deck_title, date=deck_date,
         )
 
     # Walk slide chunks; track current section accent.
-    # When a chunk's title is from an H1, treat that H1 as a section divider:
-    #   - emit a section_divider slide
-    #   - update current accent
-    # When a chunk's title is from an H2, emit a content slide using current accent.
+    # When a chunk starts with H1, emit a section divider AND, if the chunk has
+    # body content but no H2 (Jin's common pattern), use the H1 verbatim as the
+    # title for the content slide that follows. Avoids "(untitled)" slides.
     chunks = _split_slides(loaded["body_html"])
-    current_accent = branding.TURQUOISE  # default if first slide is H2
+    current_accent = branding.TURQUOISE
 
     for chunk in chunks:
-        # Detect whether the first heading in the chunk is H1 or H2
         h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", chunk)
         if h1_match:
             section_label = _strip_html(h1_match.group(1))
@@ -590,28 +733,20 @@ def main() -> int:
                                 accent_color_hex=current_accent,
                                 name=deck_name, org=deck_org,
                                 deck_title=deck_title)
-            # Strip the H1 from the chunk so its body (if any) becomes a content slide
             remaining = chunk[h1_match.end():].strip()
             if remaining:
                 slide = _parse_slide_chunk(remaining, base_dir=md_dir)
                 if any(slide.get(k) for k in ("title", "body", "images", "tables", "cards")):
-                    add_content_slide(prs,
-                                      title=slide["title"] or "(untitled)",
-                                      body_paragraphs=slide["body"],
-                                      images=slide["images"],
-                                      tables=slide["tables"],
-                                      cards=slide.get("cards"),
-                                      accent_color_hex=current_accent)
+                    # If chunk has body but no H2 title of its own, use the H1
+                    # text verbatim — author intent is "this section's content
+                    # is THIS slide", not "this is an unrelated untitled slide".
+                    slide_title = slide["title"] or section_label
+                    _emit_content(slide, slide_title)
         else:
             slide = _parse_slide_chunk(chunk, base_dir=md_dir)
             if any(slide.get(k) for k in ("title", "body", "images", "tables", "cards")):
-                add_content_slide(prs,
-                                  title=slide["title"] or "(untitled)",
-                                  body_paragraphs=slide["body"],
-                                  images=slide["images"],
-                                  tables=slide["tables"],
-                                  cards=slide.get("cards"),
-                                  accent_color_hex=current_accent)
+                # Empty title is OK — add_content_slide renders without title region.
+                _emit_content(slide, slide["title"])
 
     if not args.no_end:
         add_end_slide(prs, message="Thanks",

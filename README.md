@@ -156,14 +156,30 @@ from the same source markdown look like they came from the same pen.
   and cascades through every brand-color element on the section's slides — left
   accent bar, slide title, hairlines, first-table header, callout cards.
 - **Frontmatter (optional):** `title`, `eyebrow`, `subtitle`, `name`, `org`, `date`.
+- **Content slide layout** (matches funding_report + DMG canonical):
+    - 0.22in left accent bar in the section's accent color (full height)
+    - **Title** in 28pt Geist Mono bold INK (not accent — the bar carries the
+      accent identity), with a hairline rule below
+    - **Subtitle/lede** in 13pt Geist Sans MUTED — auto-extracted from the first
+      paragraph after the H2 if it's short prose (≤220 chars) and there's more
+      content below it on the slide
+    - **Body region** routes by content type: cards (3-col grid), image-only
+      (full-bleed), text+media (5.6/6.1 split with text left, media right),
+      table-only (full-width), text-only (paragraph block with `▸` accent
+      bullets in section color, sans 14pt INK, line-spacing 1.35)
+    - **Footer** in 9pt Geist Mono MUTED: `name · org · deck title · date`
 - **Special markdown for build-pptx:**
     - `---` separates slides
     - `# H1` starts a new section (emits a navy section-divider slide with a left
       colorblock, top-aligned eyebrow + accent bar, big title, low hairline rule,
       and a footer with name · org · deck title — geometry matched to DMG)
+    - If `# H1` is followed by body content (no `## H2` separating them), the H1
+      text is reused as the content slide title — avoids "(untitled)" slides
+      when an author writes a section header directly above its content
     - `## H2` is a content slide title
     - `### H3` blocks under an H2 render as a card grid (paper tiles with accent
       top stripe, mono labels, sans body) — good for boxed-summary slides
+    - markdown lists (`- foo`) render as accent-colored `▸` bullets
     - markdown tables render with the slide's accent color in row 1; if a slide
       carries 2+ tables, subsequent tables drop to INK so the second reads as
       supporting/legend data
