@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "deck_md_hash": "fixture-named-v7",
+  "shake_seed": null,
+  "slides": [
+    {
+      "slide_id": "h2-key-performance-metrics",
+      "kind": "stats-with-takeaway",
+      "params": {
+        "title": "Key Performance Metrics",
+        "lede": "Three AUC values across validation cohorts.",
+        "section_label": "",
+        "stats": [
+          {"value": "0.91", "label": "Internal AUC", "sub": "5-seed mean"},
+          {"value": "0.85", "label": "External AUC", "sub": "site-mixed"},
+          {"value": "88%",  "label": "Sensitivity",  "sub": "@0.5 threshold"}
+        ],
+        "callout": {
+          "text": "Model exceeds clinical decision threshold on all held-out cohorts.",
+          "tone": "dark"
+        }
+      },
+      "content_hash": "fixture-named-v7-stats"
+    },
+    {
+      "slide_id": "h2-system-architecture",
+      "kind": "figure-with-aside",
+      "params": {
+        "title": "System Architecture",
+        "lede": "Radiogenomics multi-modal fusion pipeline.",
+        "section_label": "",
+        "image": "",
+        "alt": "Architecture diagram placeholder",
+        "aside": {
+          "label": "Why multi-modal?",
+          "body": "Combining MRI texture with genomic co-variates reduces label noise and improves calibration.",
+          "icon": "FaLightbulb"
+        }
+      },
+      "content_hash": "fixture-named-v7-figure"
+    },
+    {
+      "slide_id": "h2-pipeline-components",
+      "kind": "cards-with-takeaway",
+      "params": {
+        "title": "Pipeline Components",
+        "lede": "Three independent modules compose the ensemble.",
+        "section_label": "",
+        "cards": [
+          {"label": "Feature Extractor", "body": "ResNet50 backbone; patch-level embeddings at 4 scales.", "icon": null},
+          {"label": "Aggregator",        "body": "Attention-weighted pooling across patches.", "icon": null},
+          {"label": "Classifier",        "body": "Logistic regression head; calibrated with Platt scaling.", "icon": null}
+        ],
+        "callout": {
+          "text": "All three modules trained jointly end-to-end; each independently validated.",
+          "tone": "dark"
+        }
+      },
+      "content_hash": "fixture-named-v7-cards"
+    },
+    {
+      "slide_id": "h2-cohort-summary",
+      "kind": "table-with-takeaway",
+      "params": {
+        "title": "Cohort Summary",
+        "lede": "Training and external validation cohorts.",
+        "section_label": "",
+        "rows": [
+          ["Cohort",         "N",   "IDH+", "IDH-", "Grade III+"],
+          ["UCSF (train)",   "120", "65",   "55",   "82"],
+          ["PNOC (ext.)",    "48",  "22",   "26",   "31"],
+          ["Combined",       "168", "87",   "81",   "113"]
+        ],
+        "callout": {
+          "text": "Balanced class distribution across both sites; no site-effect confound detected.",
+          "tone": "dark"
+        }
+      },
+      "content_hash": "fixture-named-v7-table"
+    }
+  ]
+}

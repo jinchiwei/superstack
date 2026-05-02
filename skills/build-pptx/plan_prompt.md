@@ -17,7 +17,12 @@ For each slide, pick exactly one `kind` from this catalog and fill in the matchi
 | `stat-callouts-right` | chart + 2-4 headline numbers |
 | `bg-flip` | key takeaway / section-pivot emphasis slide |
 | `timeline` | chronological phases or milestones |
-| `freeform` | bespoke layout — Claude writes the python directly |
+| `stats-with-takeaway` | 2-5 big-number stat tiles + dark accent-callout footer |
+| `figure-with-aside` | figure left (weight 2) + commentary card right (weight 1) |
+| `cards-with-takeaway` | N cards in a row + dark accent-callout footer |
+| `table-with-takeaway` | full-width data table + dark accent-callout footer |
+| `composition` | 2+ structurally-distinct chunks no named layout captures (fallback) |
+| `freeform` | genuinely bespoke geometry — last resort only |
 
 ### content-text
 Plain prose / bulleted body. Use when the slide is text-only without a clear "compare these N things" structure.
@@ -77,6 +82,92 @@ Horizontal axis with milestone markers. Use for chronological sequences (rollout
 ```json
 {"title": "...", "lede": "...", "milestones": [{"date": "2026-Q1", "label": "Pilot", "body": "..."}, ...]}
 ```
+
+### stats-with-takeaway
+2-5 big-number stat tiles across the top, dark accent-callout footer. Use when the slide is a compact metrics snapshot (e.g., 3 headline AUC/sensitivity/specificity numbers) that ends with a strong one-sentence summary.
+```json
+{
+  "title": "...",
+  "lede": "...",
+  "section_label": "...",
+  "stats": [
+    {"value": "0.91", "label": "Internal AUC", "sub": "5-seed mean"},
+    {"value": "0.85", "label": "External AUC", "sub": "site-mixed"},
+    {"value": "88%",  "label": "Sensitivity"}
+  ],
+  "callout": {"text": "key takeaway sentence", "tone": "dark"}
+}
+```
+- `stats`: 2–5 entries. Each has `value` (string), `label`, and optional `sub`.
+- `stats[].icon`: optional FA icon name; icon-homogeneity rule applies — if all stats carry the same icon name, icons are dropped automatically.
+- `callout.tone`: `"dark"` (navy bg, white italic text) or `"accent"` (accent-color bg, ink text).
+
+### figure-with-aside
+Figure on the left (weight 2), commentary card on the right (weight 1). Use when a chart or diagram needs a supporting insight panel beside it — not a caption, but a structured label + body explanation.
+```json
+{
+  "title": "...",
+  "lede": "...",
+  "section_label": "...",
+  "image": "path/to/fig.png",
+  "alt": "...",
+  "aside": {"label": "Why X wins", "body": "...", "icon": "FaLightbulb"}
+}
+```
+- `image`: path to the figure file. If missing or not found, a placeholder is rendered.
+- `aside.icon`: optional FA icon name for the commentary card.
+
+### cards-with-takeaway
+N cards in a uniform row (2/3 of body height) + dark accent-callout footer (1/3). Use when a cards slide needs a strong bottom-line sentence after the cards.
+```json
+{
+  "title": "...",
+  "lede": "...",
+  "section_label": "...",
+  "cards": [{"label": "...", "body": "...", "icon": null}, ...],
+  "callout": {"text": "...", "tone": "dark"}
+}
+```
+- Icon-homogeneity rule applies (same as `cards-grid`).
+
+### table-with-takeaway
+Full-width data table (3/4 of body height) + dark accent-callout footer (1/4). Use when a table slide needs a single interpretive sentence after the data.
+```json
+{
+  "title": "...",
+  "lede": "...",
+  "section_label": "...",
+  "rows": [["Col A", "Col B", "Col C"], ["data", "data", "data"], ...],
+  "callout": {"text": "...", "tone": "dark"}
+}
+```
+- First row is the header (rendered with accent-color fill).
+
+### composition
+Weight-based row × column block grid. Use ONLY when a slide has 2+ structurally distinct content chunks (e.g., a figure + a stat row + a callout) that no single named layout captures. Each row has blocks; each block has a kind from the block primitives (`paragraph`, `figure`, `card-row`, `stat-tile`, `accent-callout`, `table`, `quote`, `left-accent-card`).
+```json
+{
+  "title": "...",
+  "lede": "...",
+  "section_label": "...",
+  "rows": [
+    {
+      "weight": 2,
+      "blocks": [
+        {"kind": "stat-tile", "weight": 1, "params": {"value": "0.91", "label": "AUC"}},
+        {"kind": "figure",    "weight": 2, "params": {"image_path": "...", "alt": "..."}}
+      ]
+    },
+    {
+      "weight": 1,
+      "blocks": [
+        {"kind": "accent-callout", "weight": 1, "params": {"text": "Takeaway.", "tone": "dark"}}
+      ]
+    }
+  ]
+}
+```
+- `composition` is a **fallback**, not a first choice. If a named layout fits, use it.
 
 ### freeform
 
@@ -253,7 +344,15 @@ embedded `\n`.
 
 ## Decision rubric
 
-When picking a layout for a slide, prefer in this order:
+**Layout selection priority (apply in order):**
+
+1. **Named layouts first.** Try the 13 named layouts (`content-text`, `content-text-image`, `content-image-only`, `cards-grid`, `cards-heterogeneous`, `three-pillars`, `stat-callouts-right`, `bg-flip`, `timeline`, `stats-with-takeaway`, `figure-with-aside`, `cards-with-takeaway`, `table-with-takeaway`). These are deterministic, brand-locked, and consistent across decks.
+2. **`composition` is a fallback** — only when the slide has 2+ structurally distinct chunks (e.g., a figure + a paragraph + a stat row + a callout) that no single named layout captures. Composition gives you arbitrary rows × blocks but trades determinism for flexibility.
+3. **`freeform` is the last resort** — only for genuinely bespoke geometry (custom arrows, unusual stat arrangements) that no named layout AND no reasonable composition can express.
+
+A deck where every complex slide reaches for `composition` or `freeform` is a deck that's drifting away from brand. Stick to named layouts unless a slide really doesn't fit one.
+
+When picking a named layout for a slide, prefer in this order:
 
 1. **Explicit structural patterns** beat heuristics. If the markdown has 3+ `### H3` blocks under one `## H2`, that's a `cards-grid`. If H3 blocks come in pairs of "primary + secondary" sizes (one with a long body, others short), that's `cards-heterogeneous`.
 
@@ -261,14 +360,18 @@ When picking a layout for a slide, prefer in this order:
    - Title contains "Key", "Takeaway", "Critical", "Bottom line" → `bg-flip`
    - Title or body has 3 explicit comparisons (e.g., "Trial · Real-world · Practice") → `three-pillars`
    - Body has chart + ≥2 numeric headlines → `stat-callouts-right`
+   - Body has 2-5 standalone metric numbers + one summary sentence → `stats-with-takeaway`
+   - Body has a chart/figure + a supporting insight commentary → `figure-with-aside`
+   - Body has N parallel cards + a strong bottom-line sentence → `cards-with-takeaway`
+   - Body has a data table + a single interpretive sentence → `table-with-takeaway`
    - Body has dates/phases in chronological order → `timeline`
    - Default: `content-text` (no media), `content-text-image` (1 image + text), or `content-image-only` (image is the whole point)
 
-3. **Don't over-creative.** Most slides should be the boring 4 (content-text, content-text-image, content-image-only, cards-grid). Save creative layouts for slides where they actually fit. A 30-slide deck with all 9 layouts firing once is better than a deck where every slide tries something different.
+3. **Don't over-creative.** Most slides should be the boring 4 (content-text, content-text-image, content-image-only, cards-grid). Save creative layouts for slides where they actually fit. A 30-slide deck with all 13 named layouts firing is better than a deck where every slide reaches for composition/freeform.
 
 4. **Per-slide accent color** is auto-inferred from the parent H1 by the renderer; you don't pick it. If you want to override (rare), set `params.accent_override` to one of `"turquoise"|"deeppink"|"amber"|"blueviolet"`.
 
-5. **Reach for `freeform` only when no named layout fits** — most slides should use a named layout for consistency. A deck where every complex slide reaches for `freeform` is harder to maintain than one that uses the named templates; only use `freeform` for genuinely bespoke geometry, connector/arrow needs, or custom stat arrangements that no named layout can express.
+5. **Reach for `freeform` only when no named layout fits and composition is insufficient** — most slides should use a named layout for consistency. A deck where every complex slide reaches for `freeform` is harder to maintain than one that uses the named templates; only use `freeform` for genuinely bespoke geometry, connector/arrow needs, or custom stat arrangements that no named layout can express.
 
 ## Output schema
 

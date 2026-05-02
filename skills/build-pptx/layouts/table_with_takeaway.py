@@ -1,0 +1,92 @@
+"""table-with-takeaway layout — full-width data table + accent-callout footer.
+
+Sidecar entry shape:
+{
+  "kind": "table-with-takeaway",
+  "params": {
+    "title": "...",
+    "lede": "...",
+    "section_label": "...",
+    "rows": [
+      ["Col A", "Col B", "Col C"],
+      ["data",  "data",  "data"],
+      ...
+    ],
+    "callout": {"text": "...", "tone": "dark"}
+  }
+}
+
+Geometry:
+  - Table block: 3/4 of body height (or as much as needed, floored at callout)
+  - Accent callout: 1/4 of body height
+  - Gutter between: 0.20in
+"""
+
+from __future__ import annotations
+
+import branding
+from pptx.dml.color import RGBColor
+
+from ._common import (
+    _add_chrome,
+    _set_bg,
+    WHITE_RGB,
+)
+from .blocks.table import render as _table
+from .blocks.accent_callout import render as _accent_callout
+
+
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+    """Render a table-with-takeaway slide.
+
+    params keys:
+        title       str
+        lede        str
+        section_label str
+        rows        list[list[str]]  — first row is the header
+        callout     {"text": str, "tone": "dark"|"accent"}
+    """
+    title = params.get("title", "")
+    lede = params.get("lede", "")
+    rows = list(params.get("rows") or [])
+    callout = params.get("callout") or {}
+
+    title_present = bool(title)
+    title_wraps = len(title) > 30 if title_present else False
+
+    _set_bg(slide, WHITE_RGB)
+
+    body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
+        slide,
+        title=title,
+        lede=lede,
+        footer_kwargs=footer_kwargs,
+        accent=accent_rgb,
+        title_present=title_present,
+        title_wraps=title_wraps,
+        use_side_by_side=False,
+    )
+
+    gutter = 0.20
+    callout_h = max(0.55, body_h / 4)
+    table_h = max(0.50, body_h - callout_h - gutter)
+
+    # ── Table ─────────────────────────────────────────────────────────────────
+    if rows:
+        _table(
+            slide,
+            left=body_l, top=body_top,
+            width=body_w, height=table_h,
+            params={"rows": rows},
+            accent_rgb=accent_rgb,
+        )
+
+    # ── Accent callout ────────────────────────────────────────────────────────
+    callout_top = body_top + table_h + gutter
+    _accent_callout(
+        slide,
+        left=body_l, top=callout_top,
+        width=body_w, height=callout_h,
+        params=callout,
+        accent_rgb=accent_rgb,
+    )

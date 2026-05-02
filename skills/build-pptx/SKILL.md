@@ -20,6 +20,7 @@ User asks to make slides from markdown for a research talk, lab meeting, confere
 
 - `--no-cover` — suppress title slide
 - `--no-end` — suppress closing "Thanks" slide
+- `--use-blocks=auto|never|always` — control when `composition`/`freeform` layouts are admissible (default: `auto`)
 
 ## Markdown format
 
@@ -49,6 +50,10 @@ User asks to make slides from markdown for a research talk, lab meeting, confere
 
 - **`--no-plan`:** bypass the v4 plan path entirely; use the legacy rule-based renderer. Useful when you want a fast deterministic render without writing a sidecar (e.g., one-off kb-learning decks).
 
+- **`--use-blocks=auto`** (default): planner may pick `composition` or `freeform` when the decision rubric says appropriate.
+- **`--use-blocks=never`**: forbid `composition` and `freeform` entirely; if a sidecar contains them the build aborts with a clear error. Use to enforce named-layout-only decks. To fix: delete the sidecar (or run `--shake`) and rerun, or pass `--use-blocks=auto`.
+- **`--use-blocks=always`**: signal that the agent should prefer composition (useful for explicit experiments; does not force-rewrite an existing sidecar — only informs inline plan generation when no sidecar exists).
+
 ### Sidecar location
 
 The sidecar lives at `<input>.layout.json` next to the source markdown — e.g., `talk.md` → `talk.md.layout.json`. Commit it alongside the markdown so the deck is reproducible across machines and across time.
@@ -68,6 +73,11 @@ The renderer dispatches to one of these layouts per slide based on the plan entr
 | `stat-callouts-right` | chart left + stat tiles right (funding-report style) |
 | `bg-flip` | dark navy bg + white text — emphasis through inversion |
 | `timeline` | horizontal timeline with milestones |
+| `stats-with-takeaway` | 2-5 big-number stat tiles + dark accent-callout footer |
+| `figure-with-aside` | figure left (weight 2) + commentary card right (weight 1) |
+| `cards-with-takeaway` | N cards in a row + dark accent-callout footer |
+| `table-with-takeaway` | full-width data table + dark accent-callout footer |
+| `composition` | arbitrary rows × blocks (fallback when no named layout fits) |
 | `section-divider` | navy section break (auto-emitted on H1) |
 
 See `plan_prompt.md` for the full param schemas and decision rubric.
@@ -97,11 +107,13 @@ Run these in order whenever you need to (re)generate the sidecar:
    - Compute `content_hash = plan.hash_text(chunk_html)`
    - Note H1 (carries forward) and H2 (per-slide)
 4. **Decide a layout `kind` per slide.** Most slides should be one of
-   the named kinds (`content-text`, `cards-grid`, `content-text-image`,
+   the 13 named kinds (`content-text`, `cards-grid`, `content-text-image`,
    `content-image-only`, `cards-heterogeneous`, `three-pillars`,
-   `stat-callouts-right`, `bg-flip`, `timeline`). Reach for `freeform`
-   ONLY when no named layout fits — see the "When to use freeform"
-   section in `plan_prompt.md`.
+   `stat-callouts-right`, `bg-flip`, `timeline`, `stats-with-takeaway`,
+   `figure-with-aside`, `cards-with-takeaway`, `table-with-takeaway`).
+   Reach for `composition` only when 2+ structurally distinct chunks can't
+   fit one named layout. Reach for `freeform` ONLY when no named layout
+   AND no composition fits — see the decision rubric in `plan_prompt.md`.
 5. **For `freeform` slides, write the python snippet.** Use ONLY the
    sandbox API documented in `plan_prompt.md`. Important constraints:
    - No `import`, no dunder access, no `try`/`with`, no
@@ -137,6 +149,15 @@ Run these in order whenever you need to (re)generate the sidecar:
    `python build.py --input <input.md> --output <output.pptx>`
    The renderer reads the sidecar you just wrote and renders.
 
+### Layout selection priority
+
+Apply in this order:
+1. **Named layouts first** (all 13 of them — see catalog above). Deterministic, brand-locked, consistent.
+2. **`composition` as fallback** — only when the slide has 2+ structurally distinct content chunks that no single named layout captures.
+3. **`freeform` as last resort** — only for genuinely bespoke geometry (custom arrows, unusual stat arrangements) that no named layout and no reasonable composition can express.
+
+A deck that reaches for `composition` or `freeform` on most slides is drifting from brand. Stick to named layouts.
+
 ### When to use `freeform` vs named layouts
 
 Default to named layouts. Reach for `freeform` only for slides where:
@@ -148,8 +169,9 @@ Default to named layouts. Reach for `freeform` only for slides where:
   named template
 
 Skip `freeform` for slides that fit `content-text` / `cards-grid` /
-`content-text-image` — determinism and consistency are easier with
-named layouts.
+`content-text-image` / `stats-with-takeaway` / `cards-with-takeaway` /
+`table-with-takeaway` / `figure-with-aside` — determinism and consistency
+are easier with named layouts.
 
 ### When validation fails
 

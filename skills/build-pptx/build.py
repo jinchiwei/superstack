@@ -663,6 +663,22 @@ def main() -> int:
                     help="emit only the plan JSON; do not render pptx")
     ap.add_argument("--no-plan", dest="no_plan", action="store_true",
                     help="bypass v4 plan path; use legacy rule-based renderer")
+    ap.add_argument(
+        "--use-blocks",
+        dest="use_blocks",
+        choices=["auto", "never", "always"],
+        default="auto",
+        help=(
+            "Control when composition/freeform layouts are admissible. "
+            "'auto' (default): planner may pick composition/freeform when the "
+            "decision rubric says appropriate. "
+            "'never': forbid composition and freeform entirely; if a sidecar "
+            "contains them the build is aborted with a clear error message. "
+            "'always': signal that the agent should prefer composition/freeform "
+            "(useful for explicit experiments; does not force-rewrite an existing "
+            "sidecar, but informs inline plan generation when no sidecar exists)."
+        ),
+    )
     args = ap.parse_args()
 
     if args.no_plan:
@@ -703,6 +719,25 @@ def main() -> int:
 
     # Merge with existing
     final_plan = merge_with_existing(default_plan, existing_plan)
+
+    # --use-blocks enforcement
+    _BLOCK_KINDS = {"composition", "freeform"}
+    use_blocks = getattr(args, "use_blocks", "auto")
+    if use_blocks == "never":
+        forbidden = [
+            s.slide_id
+            for s in final_plan.slides
+            if s.kind in _BLOCK_KINDS
+        ]
+        if forbidden:
+            print(
+                f"error: --use-blocks=never rejects composition/freeform slides: "
+                f"{', '.join(forbidden)}\n"
+                f"Regenerate the sidecar (delete it or run with --shake) or pass "
+                f"--use-blocks=auto to allow them.",
+                file=sys.stderr,
+            )
+            return 1
 
     # Persist sidecar
     sidecar_path.write_text(final_plan.to_json(), encoding="utf-8")
