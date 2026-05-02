@@ -207,14 +207,34 @@ def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
 
 
 def _add_card(slide, *, label: str, body: str, left: float, top: float,
-              width: float, height: float, accent_rgb: RGBColor) -> None:
-    """A bordered tile (paper bg + thin accent top stripe) with label + body."""
+              width: float, height: float, accent_rgb: RGBColor,
+              icon_path: Path | None = None) -> None:
+    """A bordered tile (paper bg + thin accent top stripe) with label + body.
+
+    If `icon_path` is provided, a small ~0.32in icon renders top-left and
+    the label shifts right to make room. Used for CPH-style cards where
+    each tile has a glyph indicating its category."""
     _add_rect(slide, left=left, top=top, width=width, height=height,
               fill_rgb=PAPER_RGB)
     _add_rect(slide, left=left, top=top, width=width, height=0.06,
               fill_rgb=accent_rgb)
-    _add_text(slide, label, left=left + 0.18, top=top + 0.18,
-              width=width - 0.36, height=0.4,
+    if icon_path is not None and icon_path.exists():
+        try:
+            slide.shapes.add_picture(
+                str(icon_path),
+                Inches(left + 0.15), Inches(top + 0.18),
+                width=Inches(0.32), height=Inches(0.32),
+            )
+            label_left = left + 0.58
+            label_w = width - 0.76
+        except Exception:
+            label_left = left + 0.18
+            label_w = width - 0.36
+    else:
+        label_left = left + 0.18
+        label_w = width - 0.36
+    _add_text(slide, label, left=label_left, top=top + 0.18,
+              width=label_w, height=0.4,
               size=13, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
     _add_text(slide, body, left=left + 0.18, top=top + 0.65,
               width=width - 0.36, height=height - 0.75,
@@ -562,7 +582,8 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
             cy = grid_top + r * (card_h + gutter)
             _add_card(s, label=card["label"], body=card["body"],
                       left=cx, top=cy, width=card_w, height=card_h,
-                      accent_rgb=accent)
+                      accent_rgb=accent,
+                      icon_path=card.get("icon"))
     elif has_media:
         # Side-by-side fires for 1 squarish image with text content (lede or
         # body). Wide images (aspect > 1.7) and tables both want full body
@@ -881,19 +902,46 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
                                   "pos": img_match.start()})
     rest_no_media = re.sub(r"<img[^>]*/?>", "", rest_no_tables)
 
-    # H3-led cards (existing behavior)
+    # H3-led cards. Icon support: an inline `![](path)` at the start of the
+    # H3 line becomes the card's top-left icon; markdown like
+    #   ### ![](icons/dna.png) APOE ε4 Genotype
+    # produces a card titled "APOE ε4 Genotype" with the dna.png glyph
+    # rendered in the corner. Mirrors CPH proposal slide 3's per-card icons.
+    # Parsing has to happen against rest_BEFORE_image_strip since
+    # rest_no_media already had <img> tags removed; we use the raw
+    # rest_no_tables for h3 detection here.
     cards: list[dict] = []
-    h3_positions = [(m.start(), m.end(), _strip_html(m.group(1)))
-                    for m in re.finditer(r"<h3[^>]*>(.*?)</h3>", rest_no_media)]
-    for i, (start, end, label) in enumerate(h3_positions):
-        next_start = h3_positions[i + 1][0] if i + 1 < len(h3_positions) else len(rest_no_media)
-        block = rest_no_media[end:next_start]
+    h3_pattern = re.compile(r"<h3[^>]*>(.*?)</h3>", re.DOTALL)
+    h3_positions = [(m.start(), m.end(), m.group(1))
+                    for m in h3_pattern.finditer(rest_no_tables)]
+    for i, (start, end, h3_inner) in enumerate(h3_positions):
+        # Pull icon (first <img>) out of the h3 inner content if present
+        icon_path = None
+        img_m = re.search(r'<img[^>]+src="([^"]+)"', h3_inner)
+        if img_m:
+            src = img_m.group(1)
+            p = Path(src)
+            if not p.is_absolute() and base_dir is not None:
+                p = (base_dir / p).resolve()
+            if p.exists():
+                icon_path = p
+            h3_inner_no_img = re.sub(r'<img[^>]*/?>', '', h3_inner)
+        else:
+            h3_inner_no_img = h3_inner
+        label = _strip_html(h3_inner_no_img)
+
+        next_start = h3_positions[i + 1][0] if i + 1 < len(h3_positions) else len(rest_no_tables)
+        block = rest_no_tables[end:next_start]
+        # Strip <img> in the body (don't double-render the icon if author
+        # repeats it, and skip body images that aren't icons).
+        block_no_img = re.sub(r'<img[^>]*/?>', '', block)
         body_lines = []
-        for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", block, re.DOTALL):
+        for m in re.finditer(r"<(p|li)[^>]*>(.*?)</\1>", block_no_img, re.DOTALL):
             text = _strip_html(m.group(2)).strip()
             if text:
                 body_lines.append(text)
-        cards.append({"label": label, "body": " ".join(body_lines)})
+        cards.append({"label": label, "body": " ".join(body_lines),
+                      "icon": icon_path})
 
     # Body region (before first h3, or all of rest if no h3)
     body_region = rest_no_media[:h3_positions[0][0]] if h3_positions else rest_no_media
