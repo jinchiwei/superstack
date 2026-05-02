@@ -409,12 +409,20 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
     # Left accent bar — funding_report cohesion
     _add_rect(s, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)
 
-    # Title at top — INK 28pt mono bold (not accent)
+    # Title at top — INK 28pt mono bold (not accent). Reserve enough vertical
+    # room for a 2-line wrap when the title is long enough to risk it (over
+    # ~30 chars, since Geist Mono "→" and similar wide glyphs push some short
+    # titles past the soft wrap point). Hairline + subtitle + body slide down
+    # together so a wrapped title never overlaps the content below.
     title_present = bool(title)
+    title_wraps = len(title) > 30 if title_present else False
+    title_h = 1.05 if title_wraps else 0.55
+    hairline_top = 0.30 + title_h + 0.10
+    subtitle_top = hairline_top + 0.10
     if title_present:
-        _add_text(s, title, left=0.50, top=0.30, width=12.30, height=0.55,
+        _add_text(s, title, left=0.50, top=0.30, width=12.30, height=title_h,
                   size=28, color_rgb=INK_RGB, font=branding.MONO_FONT, bold=True)
-        _add_rect(s, left=0.50, top=0.95, width=12.30, height=0.005,
+        _add_rect(s, left=0.50, top=hairline_top, width=12.30, height=0.005,
                   fill_rgb=RULE_RGB)
 
     has_cards = bool(cards)
@@ -439,11 +447,11 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
             body = body[1:]
 
     if lede:
-        _add_text(s, lede, left=0.50, top=1.05, width=12.30, height=0.40,
+        _add_text(s, lede, left=0.50, top=subtitle_top, width=12.30, height=0.40,
                   size=13, color_rgb=MUTED_RGB, font=branding.SANS_FONT)
 
     # Body region — top moves up if no title (handles former "(untitled)" case)
-    body_top = 1.55 if title_present else 0.40
+    body_top = (subtitle_top + 0.50) if title_present else 0.40
     body_bottom = 6.85
     body_h = body_bottom - body_top
     body_l = 0.50
