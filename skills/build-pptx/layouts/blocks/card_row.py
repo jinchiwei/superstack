@@ -30,6 +30,7 @@ def render(slide, *, left: float, top: float, width: float, height: float,
     if not cards:
         return
 
+    dark_bg = bool(params.get("dark_bg", False))
     n = len(cards)
     gutter = 0.15
     card_w = (width - gutter * (n - 1)) / n
@@ -58,4 +59,5 @@ def render(slide, *, left: float, top: float, width: float, height: float,
             width=card_w, height=height,
             accent_rgb=card_accent_rgb,
             icon_path=icon_path,
+            dark_bg=dark_bg,
         )

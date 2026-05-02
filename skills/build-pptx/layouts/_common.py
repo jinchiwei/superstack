@@ -261,10 +261,18 @@ def _blank(prs):
 
 def _add_card(slide, *, label: str, body: str, left: float, top: float,
               width: float, height: float, accent_rgb: RGBColor,
-              icon_path: Path | None = None) -> None:
-    """A bordered tile (paper bg + thin accent top stripe) with label + body."""
+              icon_path: Path | None = None,
+              dark_bg: bool = False) -> None:
+    """A bordered tile (paper bg + thin accent top stripe) with label + body.
+
+    On dark_bg, fill flips to a dark navy (#1A2D50, slightly lighter than
+    DARK_BG_RGB so the card reads as raised) and body text flips to white.
+    The accent stripe + label color stay the brand accent for vivid contrast.
+    """
+    card_fill = _rgb("#1A2D50") if dark_bg else PAPER_RGB
+    body_text_color = WHITE_RGB if dark_bg else INK_RGB
     _add_rect(slide, left=left, top=top, width=width, height=height,
-              fill_rgb=PAPER_RGB)
+              fill_rgb=card_fill)
     _add_rect(slide, left=left, top=top, width=width, height=0.06,
               fill_rgb=accent_rgb)
     if icon_path is not None and icon_path.exists():
@@ -287,7 +295,7 @@ def _add_card(slide, *, label: str, body: str, left: float, top: float,
               size=13, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
     _add_text(slide, body, left=left + 0.18, top=top + 0.65,
               width=width - 0.36, height=height - 0.75,
-              size=12, color_rgb=INK_RGB, font=branding.SANS_FONT)
+              size=12, color_rgb=body_text_color, font=branding.SANS_FONT)
 
 
 def _strip_html_keep_edges(text: str) -> str:

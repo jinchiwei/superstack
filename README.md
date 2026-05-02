@@ -151,11 +151,23 @@ from the same source markdown look like they came from the same pen.
   chains include Helvetica, system fonts, and CJK.
 - **Palette:** turquoise (#40E0D0), deeppink (#FF1493), amber (#F0C840), blueviolet
   (#8A2BE2). Name renders turquoise, organization deeppink everywhere.
-- **build-pptx layout plan (v4):** by default, the renderer writes a
+- **build-pptx layout plan (v7):** by default, the renderer writes a
   `<input>.md.layout.json` sidecar with per-slide layout choices and replays it
-  on subsequent runs (deterministic). Use `--shake` to regenerate the plan,
-  `--plan-only` to inspect without rendering, or `--no-plan` to fall back to
-  the v3 rule-based path.
+  on subsequent runs (deterministic). 13 named layouts cover most slides:
+  `content-text`, `content-text-image`, `content-image-only`, `cards-grid`,
+  `cards-heterogeneous`, `three-pillars`, `stat-callouts-right`, `bg-flip`,
+  `timeline`, plus `stats-with-takeaway`, `figure-with-aside`,
+  `cards-with-takeaway`, `table-with-takeaway`. The `composition` layout
+  (rows × weight-allocated blocks, 8 block primitives, ~40 FA glyph icons via
+  cairosvg) is a fallback when no named layout fits, and `freeform` lets
+  Claude write raw python in a sandboxed namespace as a last resort. Use
+  `--shake` to regenerate the plan, `--plan-only` to inspect without
+  rendering, `--no-plan` to fall back to the v3 rule-based path, and
+  `--use-blocks=auto|never|always` to control composition/freeform admission.
+- **Closing-slide variety:** `composition` accepts `dark_bg: true` for navy-bg
+  takeaways/conclusions, with each `card-row` card optionally carrying its own
+  `accent_hex` to rotate through the brand palette. Card fills auto-darken to
+  `#1A2D50` and body text flips to white when the slide bg is dark.
 - **build-pptx color cohesion:** each section's accent color is auto-inferred from
   the H1 name (background/methods/results/limitations → turquoise/deeppink/amber/blueviolet)
   and cascades through every brand-color element on the section's slides — left

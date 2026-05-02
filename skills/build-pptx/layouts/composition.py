@@ -82,11 +82,13 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
     if not rows:
         return
 
-    _layout_rows(slide, rows, body_top, body_l, body_w, body_h, accent_rgb)
+    _layout_rows(slide, rows, body_top, body_l, body_w, body_h, accent_rgb,
+                 dark_bg=dark_bg)
 
 
 def _layout_rows(slide, rows: list, body_top: float, body_l: float,
-                 body_w: float, body_h: float, accent_rgb: RGBColor) -> None:
+                 body_w: float, body_h: float, accent_rgb: RGBColor,
+                 dark_bg: bool = False) -> None:
     """Allocate vertical space, then dispatch each row's blocks."""
     n_rows = len(rows)
     gutter = 0.20
@@ -120,14 +122,16 @@ def _layout_rows(slide, rows: list, body_top: float, body_l: float,
             _layout_row_blocks(slide, blocks,
                                left=body_l, top=y,
                                width=body_w, height=h,
-                               accent_rgb=row_accent)
+                               accent_rgb=row_accent,
+                               dark_bg=dark_bg)
 
         y += h + gutter
 
 
 def _layout_row_blocks(slide, blocks: list, *, left: float, top: float,
                        width: float, height: float,
-                       accent_rgb: RGBColor) -> None:
+                       accent_rgb: RGBColor,
+                       dark_bg: bool = False) -> None:
     """Allocate horizontal space for blocks in a row, then render each."""
     n_blocks = len(blocks)
     gutter = 0.20
@@ -144,10 +148,15 @@ def _layout_row_blocks(slide, blocks: list, *, left: float, top: float,
         renderer = BLOCKS.get(kind)
         if renderer is not None:
             try:
+                # Propagate dark_bg into block params so block-level
+                # renderers (card-row, etc.) can flip card fill + text.
+                bparams_eff = dict(bparams) if dark_bg else bparams
+                if dark_bg and "dark_bg" not in bparams_eff:
+                    bparams_eff["dark_bg"] = True
                 renderer(slide,
                          left=x, top=top,
                          width=bw, height=height,
-                         params=bparams,
+                         params=bparams_eff,
                          accent_rgb=accent_rgb)
             except Exception as exc:
                 # Graceful degradation: render an error placeholder
