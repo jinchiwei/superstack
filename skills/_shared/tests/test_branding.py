@@ -26,6 +26,10 @@ def test_neutrals():
     assert branding.RULE == "#DDDDDD"
 
 
+def test_dark_bg():
+    assert branding.DARK_BG == "#0E1A35"
+
+
 def test_semantic_role_aliases_match():
     """Semantic aliases (HEADING_1, METRIC, etc.) must point to canonical colors."""
     assert branding.HEADING_1 == branding.TURQUOISE
@@ -81,3 +85,39 @@ def test_plain_font_names_for_pptx_docx():
     """python-pptx and python-docx want a single font name, not a CSS chain."""
     assert branding.SANS_FONT == "Geist"
     assert branding.MONO_FONT == "Geist Mono"
+
+
+def test_match_section_color_methods():
+    assert branding.match_section_color("Methods") == branding.DEEPPINK
+    assert branding.match_section_color("Methodology") == branding.DEEPPINK
+    assert branding.match_section_color("approach and design") == branding.DEEPPINK
+
+
+def test_match_section_color_results():
+    assert branding.match_section_color("Results") == branding.AMBER
+    assert branding.match_section_color("Findings") == branding.AMBER
+    assert branding.match_section_color("Headline Performance") == branding.AMBER
+
+
+def test_match_section_color_big_picture():
+    assert branding.match_section_color("Background") == branding.TURQUOISE
+    assert branding.match_section_color("Motivation") == branding.TURQUOISE
+    assert branding.match_section_color("Conclusions") == branding.TURQUOISE
+    assert branding.match_section_color("Next Steps") == branding.TURQUOISE
+
+
+def test_match_section_color_validation():
+    assert branding.match_section_color("Validation") == branding.BLUEVIOLET
+    assert branding.match_section_color("Limitations") == branding.BLUEVIOLET
+    assert branding.match_section_color("External Replication") == branding.BLUEVIOLET
+    assert branding.match_section_color("Discussion") == branding.BLUEVIOLET
+
+
+def test_match_section_color_unknown_falls_back_to_turquoise():
+    assert branding.match_section_color("Random Title") == branding.TURQUOISE
+    assert branding.match_section_color("") == branding.TURQUOISE
+
+
+def test_match_section_color_case_insensitive():
+    assert branding.match_section_color("METHODS") == branding.DEEPPINK
+    assert branding.match_section_color("results") == branding.AMBER

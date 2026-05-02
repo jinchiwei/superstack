@@ -106,3 +106,72 @@ def test_full_deck_renders_to_file(tmp_path):
     from pptx import Presentation
     reopened = Presentation(str(out))
     assert len(reopened.slides) == 7
+
+
+def test_add_content_slide_accepts_accent_color():
+    """add_content_slide takes accent_color_hex; defaults to turquoise."""
+    import branding as b
+    prs = new_presentation()
+    add_content_slide(prs, title="Section", body_paragraphs=["body"],
+                      accent_color_hex=b.DEEPPINK)
+    assert len(prs.slides) == 1
+    # Find a deeppink-fill rect on the slide (the left bar)
+    found_deeppink = False
+    s = prs.slides[0]
+    for shp in s.shapes:
+        try:
+            if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "FF1493":
+                found_deeppink = True
+                break
+        except Exception:
+            pass
+    assert found_deeppink, "left bar in deeppink not found"
+
+
+def test_add_section_divider_accepts_accent_color_override():
+    """add_section_divider takes accent_color_hex overriding the index cycle."""
+    import branding as b
+    prs = new_presentation()
+    add_section_divider(prs, label="Custom", accent_color_hex=b.AMBER)
+    s = prs.slides[0]
+    found_amber = False
+    for shp in s.shapes:
+        try:
+            if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "F0C840":
+                found_amber = True
+                break
+        except Exception:
+            pass
+    assert found_amber, "amber colorblock not found in section divider"
+
+
+def test_title_slide_has_amber_bottom_hairline():
+    """Title slide includes a thin amber bar at the bottom."""
+    prs = new_presentation()
+    add_title_slide(prs, eyebrow="X", title="T", date="2026-05-01")
+    s = prs.slides[0]
+    # Find any rect filled with amber #F0C840
+    found_amber = False
+    for shp in s.shapes:
+        try:
+            if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "F0C840":
+                found_amber = True
+                break
+        except Exception:
+            pass
+    assert found_amber, "amber bottom hairline missing"
+
+
+def test_end_slide_mirrors_title_amber_hairline():
+    prs = new_presentation()
+    add_end_slide(prs, message="Thanks", contact="me")
+    s = prs.slides[0]
+    found_amber = False
+    for shp in s.shapes:
+        try:
+            if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "F0C840":
+                found_amber = True
+                break
+        except Exception:
+            pass
+    assert found_amber, "amber bottom hairline missing on end slide"

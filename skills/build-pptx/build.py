@@ -112,62 +112,103 @@ def new_presentation() -> "Presentation":
 
 def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
                     name: str = "", org: str = "", date: str = ""):
-    """Dark #14141C background. Eyebrow turquoise mono, title white mono,
-    subtitle off-white sans, name turquoise mono, org deeppink mono, date dim mono."""
+    """Title slide: navy bg, left double-rail (turquoise + deeppink), bottom amber hairline.
+    Eyebrow turquoise, title white, name turquoise, org deeppink, date dim, all Geist Mono."""
     s = _blank(prs)
     _set_bg(s, DARK_BG_RGB)
 
+    # Left double-rail
+    _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
+    _add_rect(s, left=0.8, top=0, width=0.25, height=7.5, fill_rgb=DEEPPINK_RGB)
+
+    # Bottom amber hairline
+    _add_rect(s, left=0, top=7.44, width=13.333, height=0.06, fill_rgb=AMBER_RGB)
+
     if eyebrow:
-        _add_text(s, eyebrow, left=1.0, top=1.5, width=11, height=0.4,
+        _add_text(s, eyebrow, left=1.3, top=1.5, width=11, height=0.4,
                   size=14, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT, bold=True)
-    _add_text(s, title, left=1.0, top=2.0, width=11.3, height=2.0,
+    _add_text(s, title, left=1.3, top=2.0, width=11.0, height=2.0,
               size=48, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True)
     if subtitle:
-        _add_text(s, subtitle, left=1.0, top=4.1, width=11.3, height=1.0,
+        _add_text(s, subtitle, left=1.3, top=4.1, width=11.0, height=1.0,
                   size=18, color_rgb=_rgb("#E5E5EA"), font=branding.SANS_FONT)
     cursor_top = 5.4
     if name:
-        _add_text(s, name, left=1.0, top=cursor_top, width=11, height=0.4,
+        _add_text(s, name, left=1.3, top=cursor_top, width=11, height=0.4,
                   size=22, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT, bold=True)
         cursor_top += 0.5
     if org:
-        _add_text(s, org, left=1.0, top=cursor_top, width=11, height=0.35,
+        _add_text(s, org, left=1.3, top=cursor_top, width=11, height=0.35,
                   size=16, color_rgb=DEEPPINK_RGB, font=branding.MONO_FONT, bold=True)
         cursor_top += 0.45
 
-    # Hairline rule
-    _add_rect(s, left=1.0, top=cursor_top + 0.1, width=4.0, height=0.005, fill_rgb=RULE_RGB)
+    # Hairline rule (white at low opacity — approximate as RULE_RGB)
+    _add_rect(s, left=1.3, top=cursor_top + 0.1, width=4.0, height=0.005, fill_rgb=RULE_RGB)
     if date:
-        _add_text(s, date, left=1.0, top=cursor_top + 0.25, width=11, height=0.3,
+        _add_text(s, date, left=1.3, top=cursor_top + 0.25, width=11, height=0.3,
                   size=12, color_rgb=DIM_RGB, font=branding.MONO_FONT)
     return s
 
 
-def add_content_slide(prs, *, title: str, body_paragraphs: list[str]):
-    """White background. Title turquoise mono top-left, body Geist sans."""
+def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
+                      accent_color_hex: str | None = None):
+    """Content slide: white bg + thin left vertical bar in section's accent color.
+
+    Title and any future brand-color elements (table headers, callout chips)
+    inherit the same accent color so the whole slide reads as one identity.
+    """
+    accent_hex = accent_color_hex or branding.TURQUOISE
+    accent = _rgb(accent_hex)
     s = _blank(prs)
     _set_bg(s, WHITE_RGB)
+
+    # Thin vertical accent bar on left (funding_report style, full height)
+    _add_rect(s, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)
+
+    # Slide title in section's accent color
     _add_text(s, title, left=0.6, top=0.4, width=12.5, height=0.8,
-              size=32, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT, bold=True)
-    # Hairline rule under title
-    _add_rect(s, left=0.6, top=1.25, width=12.0, height=0.005, fill_rgb=RULE_RGB)
+              size=32, color_rgb=accent, font=branding.MONO_FONT, bold=True)
+
+    # Hairline rule under title in same accent
+    _add_rect(s, left=0.6, top=1.25, width=12.0, height=0.005, fill_rgb=accent)
+
+    # Body
     body_text = "\n".join(body_paragraphs)
     _add_text(s, body_text, left=0.6, top=1.5, width=12.5, height=5.5,
               size=22, color_rgb=INK_RGB, font=branding.SANS_FONT)
     return s
 
 
-def add_section_divider(prs, *, label: str, index: int = 0):
-    """Full-bleed brand color. Cycles through canonical priority order."""
-    bg_hex = branding.pick_section_color(index)
-    text_hex = branding.section_text_color(bg_hex)
+def add_section_divider(prs, *, label: str, index: int = 0,
+                        accent_color_hex: str | None = None):
+    """Section divider: navy bg + full-height left colorblock + DMG-style accents.
+
+    Color comes from `accent_color_hex` if provided, else from
+    branding.pick_section_color(index) cycling.
+    """
+    bg_hex = accent_color_hex or branding.pick_section_color(index)
+    accent = _rgb(bg_hex)
     s = _blank(prs)
-    _set_bg(s, _rgb(bg_hex))
-    _add_text(s, label.upper(), left=1.0, top=3.2, width=11.5, height=1.6,
-              size=44, color_rgb=_rgb(text_hex), font=branding.MONO_FONT, bold=True)
-    # Subtle dash
-    _add_text(s, "—", left=1.0, top=4.6, width=2, height=0.5,
-              size=28, color_rgb=_rgb(text_hex), font=branding.MONO_FONT)
+    _set_bg(s, DARK_BG_RGB)
+
+    # Big results_overview-style left colorblock (full height)
+    _add_rect(s, left=0, top=0, width=0.6, height=7.5, fill_rgb=accent)
+
+    # Small DMG-style accent bar — sits to the right of the colorblock,
+    # at the eyebrow's vertical position (visual punctuation next to eyebrow)
+    _add_rect(s, left=0.85, top=2.6, width=0.18, height=0.45, fill_rgb=accent)
+
+    # Eyebrow ("PART I" — uppercase label) in brand color
+    _add_text(s, label.upper(), left=1.15, top=2.6, width=11.0, height=0.45,
+              size=14, color_rgb=accent, font=branding.MONO_FONT, bold=True)
+
+    # Big section title (taking the label as the visible title)
+    _add_text(s, label, left=0.85, top=3.15, width=11.5, height=1.6,
+              size=44, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True)
+
+    # Horizontal hairline rule below title in brand color
+    _add_rect(s, left=0.85, top=4.85, width=2.0, height=0.02, fill_rgb=accent)
+
     return s
 
 
@@ -227,14 +268,23 @@ def add_quote_slide(prs, *, quote: str, attribution: str = ""):
 
 
 def add_end_slide(prs, *, message: str = "Thanks", contact: str = ""):
-    """Dark #14141C background. Bookend match for title slide."""
+    """End slide: mirror title slide. Navy bg, left double-rail, bottom amber hairline.
+    Big white "Thanks" centered, contact in dim mono below."""
     s = _blank(prs)
     _set_bg(s, DARK_BG_RGB)
-    _add_text(s, message, left=1.0, top=2.7, width=11.3, height=2.0,
+
+    # Left double-rail (mirror of title)
+    _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
+    _add_rect(s, left=0.8, top=0, width=0.25, height=7.5, fill_rgb=DEEPPINK_RGB)
+
+    # Bottom amber hairline (mirror of title)
+    _add_rect(s, left=0, top=7.44, width=13.333, height=0.06, fill_rgb=AMBER_RGB)
+
+    _add_text(s, message, left=1.3, top=2.7, width=11.0, height=2.0,
               size=64, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True,
               align=PP_ALIGN.CENTER)
     if contact:
-        _add_text(s, contact, left=1.0, top=4.8, width=11.3, height=0.5,
+        _add_text(s, contact, left=1.3, top=4.8, width=11.0, height=0.5,
                   size=14, color_rgb=DIM_RGB, font=branding.MONO_FONT,
                   align=PP_ALIGN.CENTER)
     return s
@@ -278,7 +328,7 @@ def main() -> int:
     ap.add_argument("--input", required=True)
     ap.add_argument("--output", required=True)
     ap.add_argument("--no-cover", dest="no_cover", action="store_true",
-                    help="suppress title slide (start with first content slide)")
+                    help="suppress title slide")
     ap.add_argument("--no-end", dest="no_end", action="store_true",
                     help="suppress closing 'Thanks' slide")
     args = ap.parse_args()
@@ -289,7 +339,6 @@ def main() -> int:
 
     prs = new_presentation()
 
-    # Title slide
     if not args.no_cover:
         add_title_slide(
             prs,
@@ -301,15 +350,39 @@ def main() -> int:
             date=str(meta.get("date") or today),
         )
 
-    # Content slides
+    # Walk slide chunks; track current section accent.
+    # When a chunk's title is from an H1, treat that H1 as a section divider:
+    #   - emit a section_divider slide
+    #   - update current accent
+    # When a chunk's title is from an H2, emit a content slide using current accent.
     chunks = _split_slides(loaded["body_html"])
-    for chunk in chunks:
-        slide = _parse_slide_chunk(chunk)
-        if slide["title"] or slide["body"]:
-            add_content_slide(prs, title=slide["title"] or "(untitled)",
-                              body_paragraphs=slide["body"])
+    current_accent = branding.TURQUOISE  # default if first slide is H2
 
-    # End slide
+    for chunk in chunks:
+        # Detect whether the first heading in the chunk is H1 or H2
+        h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", chunk)
+        if h1_match:
+            section_label = _strip_html(h1_match.group(1))
+            current_accent = branding.match_section_color(section_label)
+            add_section_divider(prs, label=section_label,
+                                accent_color_hex=current_accent)
+            # Strip the H1 from the chunk so its body (if any) becomes a content slide
+            remaining = chunk[h1_match.end():].strip()
+            if remaining:
+                slide = _parse_slide_chunk(remaining)
+                if slide["title"] or slide["body"]:
+                    add_content_slide(prs,
+                                      title=slide["title"] or "(untitled)",
+                                      body_paragraphs=slide["body"],
+                                      accent_color_hex=current_accent)
+        else:
+            slide = _parse_slide_chunk(chunk)
+            if slide["title"] or slide["body"]:
+                add_content_slide(prs,
+                                  title=slide["title"] or "(untitled)",
+                                  body_paragraphs=slide["body"],
+                                  accent_color_hex=current_accent)
+
     if not args.no_end:
         add_end_slide(prs, message="Thanks",
                       contact=str(meta.get("name") or ""))

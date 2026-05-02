@@ -24,7 +24,7 @@ RULE   = "#DDDDDD"   # hairline rule color
 
 
 # === Dark slide background (PPTX title + closing) ===
-DARK_BG = "#14141C"
+DARK_BG = "#0E1A35"
 
 
 # === Semantic role aliases ===
@@ -72,3 +72,31 @@ MONO_FONT_STACK = (
 # === Plain font names (for python-pptx, python-docx -- they want a single name not a chain) ===
 SANS_FONT = "Geist"
 MONO_FONT = "Geist Mono"
+
+
+# === Section→color auto-inference ===
+_SECTION_KEYWORDS = (
+    (("background", "motivation", "introduction", "intro", "context", "conclusion",
+      "next", "future", "overview", "direction"), TURQUOISE),
+    (("method", "methodology", "approach", "design", "framework", "cohort",
+      "pipeline", "architecture", "model"), DEEPPINK),
+    (("result", "finding", "performance", "outcome", "metric", "headline"), AMBER),
+    (("validation", "limitation", "caveat", "robust", "external", "sensitivity",
+      "discussion", "replication", "ablation"), BLUEVIOLET),
+)
+
+
+def match_section_color(name: str) -> str:
+    """Infer the section's accent color from its name via keyword matching.
+
+    Returns one of TURQUOISE / DEEPPINK / AMBER / BLUEVIOLET. Falls back to
+    TURQUOISE if no keyword matches.
+    """
+    if not name:
+        return TURQUOISE
+    needle = name.lower()
+    for keywords, color in _SECTION_KEYWORDS:
+        for kw in keywords:
+            if kw in needle:
+                return color
+    return TURQUOISE
