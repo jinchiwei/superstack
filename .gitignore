@@ -1,2 +1,6 @@
 .upstream/
 skills/build-pptx/icons/cache/
+
+# python bytecode (added 2026-05-02 — was tracked before this)
+__pycache__/
+*.pyc
