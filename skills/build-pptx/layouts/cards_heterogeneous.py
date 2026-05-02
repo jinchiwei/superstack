@@ -1,4 +1,9 @@
-"""cards-heterogeneous layout: one large primary card left + 2-3 secondary cards stacked right."""
+"""cards-heterogeneous layout: one large primary card left + 2-3 secondary cards stacked right.
+
+Count-gated behavior:
+  n_total ≤ 3 (1 primary + ≤2 secondaries): full-width stacked rows, vertically centered.
+  n_total ≥ 4 (1 primary + ≥3 secondaries): primary on left 60%, secondaries tiled on right.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +25,107 @@ from ._common import (
     INK_RGB,
 )
 
+# Stripe heights: primary card gets a thicker accent stripe to differentiate it.
+_STRIPE_PRIMARY = 0.10   # primary card top accent stripe (stacked path)
+_STRIPE_STD     = 0.06   # standard card top accent stripe
+
+
+def _render_stacked_rows(
+    slide, *,
+    primary: dict,
+    secondary_cards: list,
+    body_top: float,
+    body_h: float,
+    body_l: float,
+    body_w: float,
+    accent_rgb: RGBColor,
+) -> None:
+    """Render primary + secondaries as full-width stacked rows, vertically centered."""
+    cards = [primary] + list(secondary_cards)
+    n = len(cards)
+
+    # --- Estimate each card's natural height ---
+    _HEADER_PRIMARY = _STRIPE_PRIMARY + 0.14 + 0.50   # stripe + gap + label
+    _HEADER_STD     = _STRIPE_STD     + 0.14 + 0.40
+    _PAD_BOT        = 0.20
+    _PAD_BODY_TOP_PRIMARY = _STRIPE_PRIMARY + 0.14 + 0.50   # same as header
+    _PAD_BODY_TOP_STD     = _STRIPE_STD     + 0.14 + 0.40
+
+    heights = []
+    for idx, card in enumerate(cards):
+        body_text = card.get("body", "")
+        header = _HEADER_PRIMARY if idx == 0 else _HEADER_STD
+        body_est = _estimate_paragraph_height(body_text, width=body_w - 0.36,
+                                              size=13 if idx == 0 else 12,
+                                              line_spacing=1.35)
+        h = header + max(body_est, 0.30) + _PAD_BOT
+        h = max(1.10, h)
+        heights.append(h)
+
+    gutter = 0.20
+    total_h = sum(heights) + gutter * (n - 1)
+
+    # Vertically center the stack if it fits; otherwise start at body_top.
+    if total_h < body_h:
+        cur_top = body_top + (body_h - total_h) / 2.0
+    else:
+        cur_top = body_top
+
+    for idx, card in enumerate(cards):
+        c_label = card.get("label", "")
+        c_body  = card.get("body", "")
+        c_icon  = card.get("icon")
+        c_h     = heights[idx]
+        is_primary = idx == 0
+
+        stripe_h = _STRIPE_PRIMARY if is_primary else _STRIPE_STD
+
+        # Card background + accent stripe
+        _add_rect(slide, left=body_l, top=cur_top,
+                  width=body_w, height=c_h, fill_rgb=PAPER_RGB)
+        _add_rect(slide, left=body_l, top=cur_top,
+                  width=body_w, height=stripe_h, fill_rgb=accent_rgb)
+
+        # Icon (optional)
+        if c_icon is not None:
+            c_icon = Path(c_icon) if not isinstance(c_icon, Path) else c_icon
+
+        label_size = 16 if is_primary else 13
+        body_size  = 13 if is_primary else 12
+        label_top_offset = stripe_h + 0.14
+
+        if c_icon is not None and c_icon.exists():
+            try:
+                slide.shapes.add_picture(
+                    str(c_icon),
+                    Inches(body_l + 0.18), Inches(cur_top + label_top_offset),
+                    width=Inches(0.40 if is_primary else 0.32),
+                    height=Inches(0.40 if is_primary else 0.32),
+                )
+                label_l = body_l + (0.70 if is_primary else 0.58)
+                label_w = body_w - (0.88 if is_primary else 0.76)
+            except Exception:
+                label_l = body_l + 0.18
+                label_w = body_w - 0.36
+        else:
+            label_l = body_l + 0.18
+            label_w = body_w - 0.36
+
+        label_h_alloc = 0.50 if is_primary else 0.40
+        body_top_offset = stripe_h + 0.14 + label_h_alloc
+
+        _add_text(slide, c_label,
+                  left=label_l, top=cur_top + label_top_offset,
+                  width=label_w, height=label_h_alloc,
+                  size=label_size, color_rgb=accent_rgb,
+                  font=branding.MONO_FONT, bold=True)
+        _add_text(slide, c_body,
+                  left=body_l + 0.18, top=cur_top + body_top_offset,
+                  width=body_w - 0.36, height=c_h - body_top_offset - _PAD_BOT,
+                  size=body_size, color_rgb=INK_RGB, font=branding.SANS_FONT)
+
+        cur_top += c_h + gutter
+
 
 def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
     """Render a heterogeneous-cards slide.
@@ -29,11 +135,18 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
         lede            (str)
         primary_card    {"label": str, "body": str, "icon": Path | None}
         secondary_cards list[{"label": str, "body": str, "icon": Path | None}]  — 2-3 items
+
+    Layout is count-gated:
+      n_total ≤ 3 → stacked full-width rows (primary on top, primary differentiated by
+                    thicker stripe and larger label font).
+      n_total ≥ 4 → original tile layout (primary on left 60%, secondaries tiled right).
     """
     title = params.get("title", "")
     lede = params.get("lede", "")
     primary = params.get("primary_card") or {}
     secondary_cards = list(params.get("secondary_cards") or [])
+
+    n_total = 1 + len(secondary_cards)
 
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
@@ -51,6 +164,21 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
         use_side_by_side=False,
     )
 
+    # --- Count gate ---
+    if n_total <= 3:
+        _render_stacked_rows(
+            slide,
+            primary=primary,
+            secondary_cards=secondary_cards,
+            body_top=body_top,
+            body_h=body_h,
+            body_l=body_l,
+            body_w=body_w,
+            accent_rgb=accent_rgb,
+        )
+        return
+
+    # --- n_total ≥ 4: original tile layout ---
     primary_w = body_w * 0.60
     right_gap = 0.20
     right_l = body_l + primary_w + right_gap
@@ -66,7 +194,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
     _LABEL_H  = 0.50   # label textbox allocation
     _HEADER   = 0.80   # top stripe + padding above label + label itself
     _PAD_BOT  = 0.20   # breathing room below body
-    _STRIPE_H = 0.06
     body_est = _estimate_paragraph_height(p_body, width=primary_w - 0.36,
                                           size=13, line_spacing=1.35)
     content_h = _HEADER + max(body_est, 0.30) + _PAD_BOT
@@ -77,7 +204,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
 
     _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=card_h,
               fill_rgb=PAPER_RGB)
-    _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=_STRIPE_H,
+    _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=_STRIPE_STD,
               fill_rgb=accent_rgb)
 
     if p_icon is not None:

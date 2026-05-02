@@ -50,6 +50,10 @@ Plain prose / bulleted body. Use when the slide is text-only without a clear "co
 {"title": "...", "lede": "...", "primary_card": {"label": "Headline", "body": "...", "icon": null}, "secondary_cards": [{"label": "...", "body": "...", "icon": null}, ...]}
 ```
 
+**Icon homogeneity rule.** When all cards in a `cards-grid` or `cards-heterogeneous` row (or all stat-tiles in a `stat-callouts-right` row) belong to the same semantic category — all genes, all sites, all metrics, all phases — use **one shared icon OR no icon at all**. Distinct icons should signal distinct categories. For homogeneous rows, default to **no icon**: the labels already do the work, and assigning icons like `FaDna` to one gene and `FaFlask` to another is arbitrary and noisy.
+
+Use distinct icons only when items meaningfully differ in kind (e.g., a stat-tile row with one cohort metric, one model metric, one validation metric — three different things, three different icons OK).
+
 ### three-pillars
 Three vertical columns with arrows between them. Use for explicit comparisons of 3 things (timeline phases, before/middle/after, controls/intervention/outcome).
 ```json
@@ -195,6 +199,8 @@ stats = [('0.91', 'Internal AUC'),
          ('0.85', 'External'),
          ('0.88', 'Sens@0.5'),
          ('0.84', 'Spec@0.5')]
+# No icons — all four are model-performance metrics (homogeneous category).
+# Labels already do the work; assigning distinct icons would be arbitrary.
 stat_l = body_l + chart_w + 0.30
 stat_w = body_w - chart_w - 0.30
 stat_h = (body_h - 0.45) / 4
