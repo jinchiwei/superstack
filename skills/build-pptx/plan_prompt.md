@@ -116,6 +116,7 @@ Drawing primitives:
 - `_add_card(slide, *, label, body, left, top, width, height, accent_rgb, icon_path=None)` — paper-bg tile with accent top stripe
 - `_add_table(slide, *, rows, left, top, width, max_height, header_rgb)` — accent-headered table
 - `_render_paragraph_block(slide, *, items, left, top, width, height, accent_rgb, size=14, distribute=False)` — bullet/paragraph block
+- `_add_flat_shape(slide, shape_type, *, left, top, width, height, fill_rgb)` — autoshape (arrow, oval, triangle, etc.) with **flat brand-color** fill, no gradient, no outline, no shadow. Use this for any non-rectangle shape — never call `slide.shapes.add_shape` directly, or you'll inherit the Office theme's blue gradient + drop shadow.
 - `_rgb(hex_str)` — convert "#xxxxxx" to RGBColor
 
 Geometry helpers:
@@ -129,10 +130,13 @@ Shape kinds + alignment enums:
 - `MSO_ANCHOR.TOP, MSO_ANCHOR.MIDDLE, MSO_ANCHOR.BOTTOM`
 
 Lower-level access (use sparingly):
-- `slide.shapes.add_shape(MSO_SHAPE.X, Inches(left), Inches(top), Inches(width), Inches(height))`
-  — the underlying Auto-Shape add. Use for arrows, ovals, etc.
 - `slide.shapes.add_picture(str(path), Inches(left), Inches(top), width=Inches(w))`
   — embed an image at the given size.
+
+**Avoid `slide.shapes.add_shape(...)` directly.** The raw call inherits the
+Office theme's blue gradient and drop shadow, which clashes with the flat
+brand aesthetic. Always use `_add_flat_shape` instead so the result is a
+single solid brand color with no outline and no shadow.
 
 Pure builtins available: `abs, min, max, sum, len, range, enumerate, zip,
 map, filter, sorted, reversed, str, int, float, bool, list, tuple, dict,
@@ -223,9 +227,10 @@ for i, (label, body_text, color) in enumerate(pillars):
               size=13, color_rgb=INK_RGB, font=SANS_FONT)
     if i < n - 1:
         arrow_x = x + col_w + gutter / 2 - 0.15
-        slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW,
-                               Inches(arrow_x), Inches(body_top + body_h / 2 - 0.15),
-                               Inches(0.30), Inches(0.30))
+        _add_flat_shape(slide, MSO_SHAPE.RIGHT_ARROW,
+                        left=arrow_x, top=body_top + body_h / 2 - 0.15,
+                        width=0.30, height=0.30,
+                        fill_rgb=color)
 ```
 
 #### How to embed code in JSON

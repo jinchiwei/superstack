@@ -216,6 +216,22 @@ def _add_rect(slide, *, left, top, width, height,
     shp.line.fill.background()
 
 
+def _add_flat_shape(slide, shape_type, *, left, top, width, height,
+                    fill_rgb: RGBColor):
+    """Add an autoshape with flat brand-color styling — no gradient, no
+    outline, no shadow.  Use this for arrows, ovals, triangles, etc., to
+    avoid inheriting the Office theme's blue gradient + drop shadow.
+    Returns the shape so callers can attach text or further tweak."""
+    shp = slide.shapes.add_shape(shape_type,
+                                 Inches(left), Inches(top),
+                                 Inches(width), Inches(height))
+    shp.shadow.inherit = False
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = fill_rgb
+    shp.line.fill.background()
+    return shp
+
+
 def _add_text(slide, text, *, left, top, width, height, size=18,
               color_rgb: RGBColor = INK_RGB, font: str = branding.SANS_FONT,
               bold=False, italic=False, align=PP_ALIGN.LEFT,
