@@ -337,22 +337,24 @@ def add_section_divider(prs, *, label: str, index: int = 0,
     # Full-height left colorblock (results_overview style)
     _add_rect(s, left=0, top=0, width=0.6, height=7.5, fill_rgb=accent)
 
-    # Small DMG-style accent bar — top of the slide, just right of the colorblock
-    _add_rect(s, left=0.95, top=0.7, width=0.18, height=0.45, fill_rgb=accent)
+    # Small DMG-style accent bar at the top, just right of the colorblock.
+    # DMG uses L=0.70 (no colorblock); we push to L=0.85 to clear the 0.6in colorblock.
+    _add_rect(s, left=0.85, top=0.7, width=0.18, height=0.45, fill_rgb=accent)
 
-    # Eyebrow uppercase label, brand color, sits next to the small accent bar
-    _add_text(s, label.upper(), left=1.25, top=0.7, width=11.0, height=0.45,
+    # Eyebrow uppercase label, brand color (DMG: L=1.00, T=0.70, 14pt)
+    _add_text(s, label.upper(), left=1.15, top=0.7, width=11.0, height=0.4,
               size=14, color_rgb=accent, font=branding.MONO_FONT, bold=True)
 
-    # Big section title — sits high, plenty of breathing room below the eyebrow
-    _add_text(s, label, left=0.95, top=1.45, width=11.5, height=1.6,
+    # Big section title — DMG places this at T=2.40 with a tall H=3.00 box (slack
+    # for multi-line section titles), top-anchored, 44pt
+    _add_text(s, label, left=0.85, top=2.4, width=12.0, height=3.0,
               size=44, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True)
 
-    # Generous gap before the hairline rule below the title
-    _add_rect(s, left=0.95, top=3.4, width=2.0, height=0.02, fill_rgb=accent)
+    # Hairline rule sits LOW — matches DMG T=5.60
+    _add_rect(s, left=0.85, top=5.6, width=2.0, height=0.02, fill_rgb=accent)
 
-    # Bottom footer — name turquoise · org deeppink · deck muted, all mono
-    footer_top = 6.85
+    # Bottom footer — DMG places this at T=6.70
+    footer_top = 6.7
     cursor_left = 0.95
     if name:
         _add_text(s, name, left=cursor_left, top=footer_top, width=4.0, height=0.35,
@@ -602,12 +604,13 @@ def main() -> int:
                                       accent_color_hex=current_accent)
         else:
             slide = _parse_slide_chunk(chunk, base_dir=md_dir)
-            if slide["title"] or slide["body"] or slide["images"] or slide["tables"]:
+            if any(slide.get(k) for k in ("title", "body", "images", "tables", "cards")):
                 add_content_slide(prs,
                                   title=slide["title"] or "(untitled)",
                                   body_paragraphs=slide["body"],
                                   images=slide["images"],
                                   tables=slide["tables"],
+                                  cards=slide.get("cards"),
                                   accent_color_hex=current_accent)
 
     if not args.no_end:
