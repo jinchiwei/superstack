@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "deck_md_hash": "test-composition-fixture",
+  "shake_seed": null,
+  "slides": [
+    {
+      "slide_id": "intro",
+      "kind": "content-text",
+      "params": {
+        "title": "Introduction",
+        "lede": "Plain text slide used as preamble.",
+        "body": [],
+        "section_label": ""
+      },
+      "content_hash": "hash-intro"
+    },
+    {
+      "slide_id": "results-overview",
+      "kind": "composition",
+      "params": {
+        "title": "Results Overview",
+        "lede": "Multi-block composition layout smoke test.",
+        "section_label": "",
+        "rows": [
+          {
+            "weight": 1,
+            "blocks": [
+              {
+                "kind": "stat-tile",
+                "weight": 1,
+                "params": {
+                  "value": "0.91",
+                  "label": "Internal AUC",
+                  "sub": "5-seed mean"
+                }
+              },
+              {
+                "kind": "stat-tile",
+                "weight": 1,
+                "params": {
+                  "value": "120",
+                  "label": "Training n",
+                  "sub": "multi-site"
+                }
+              },
+              {
+                "kind": "stat-tile",
+                "weight": 1,
+                "params": {
+                  "value": "0.87",
+                  "label": "External AUC",
+                  "sub": "3-site holdout"
+                }
+              }
+            ]
+          },
+          {
+            "weight": 2,
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "weight": 1,
+                "params": {
+                  "items": [
+                    "The model achieved strong internal validation performance.",
+                    "External validation confirmed generalizability across sites."
+                  ],
+                  "size": 14,
+                  "bullets": false
+                }
+              }
+            ]
+          },
+          {
+            "weight": 1,
+            "blocks": [
+              {
+                "kind": "accent-callout",
+                "weight": 1,
+                "params": {
+                  "text": "Causal grounding remains an open question.",
+                  "tone": "dark"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "content_hash": "hash-composition"
+    },
+    {
+      "slide_id": "methods-table",
+      "kind": "composition",
+      "params": {
+        "title": "Site Breakdown",
+        "lede": "",
+        "section_label": "",
+        "rows": [
+          {
+            "weight": 2,
+            "blocks": [
+              {
+                "kind": "table",
+                "weight": 1,
+                "params": {
+                  "rows": [
+                    ["Site", "n", "AUC"],
+                    ["UCSF", "120", "0.91"],
+                    ["Stanford", "84", "0.87"],
+                    ["Mayo", "55", "0.89"]
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "weight": 1,
+            "blocks": [
+              {
+                "kind": "card-row",
+                "weight": 1,
+                "params": {
+                  "cards": [
+                    {"label": "UCSF", "body": "n=120, multi-MR"},
+                    {"label": "Stanford", "body": "n=84, single MR"},
+                    {"label": "Mayo", "body": "n=55, 1.5T only"}
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "content_hash": "hash-table"
+    },
+    {
+      "slide_id": "qualitative",
+      "kind": "composition",
+      "params": {
+        "title": "Expert Perspectives",
+        "lede": "",
+        "section_label": "",
+        "rows": [
+          {
+            "weight": 1,
+            "blocks": [
+              {
+                "kind": "quote",
+                "weight": 1,
+                "params": {
+                  "text": "The model's predictions aligned well with clinical intuition in most cases.",
+                  "attribution": "Dr. Smith, UCSF Radiology"
+                }
+              }
+            ]
+          },
+          {
+            "weight": 1,
+            "accent_hex": "#FF1493",
+            "blocks": [
+              {
+                "kind": "left-accent-card",
+                "weight": 1,
+                "params": {
+                  "label": "Key Finding",
+                  "body": "Radiologist agreement improved from 0.71 to 0.84 with AI assist."
+                }
+              },
+              {
+                "kind": "left-accent-card",
+                "weight": 1,
+                "params": {
+                  "label": "Limitation",
+                  "body": "Performance degrades on 1.5T acquisitions from older scanners."
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "content_hash": "hash-qualitative"
+    }
+  ]
+}
