@@ -151,6 +151,11 @@ from the same source markdown look like they came from the same pen.
   chains include Helvetica, system fonts, and CJK.
 - **Palette:** turquoise (#40E0D0), deeppink (#FF1493), amber (#F0C840), blueviolet
   (#8A2BE2). Name renders turquoise, organization deeppink everywhere.
+- **build-pptx layout plan (v4):** by default, the renderer writes a
+  `<input>.md.layout.json` sidecar with per-slide layout choices and replays it
+  on subsequent runs (deterministic). Use `--shake` to regenerate the plan,
+  `--plan-only` to inspect without rendering, or `--no-plan` to fall back to
+  the v3 rule-based path.
 - **build-pptx color cohesion:** each section's accent color is auto-inferred from
   the H1 name (background/methods/results/limitations → turquoise/deeppink/amber/blueviolet)
   and cascades through every brand-color element on the section's slides — left

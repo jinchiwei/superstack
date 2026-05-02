@@ -86,6 +86,78 @@ def test_shake_regenerates_sidecar(tmp_path):
     assert len(plan["slides"]) > 0
 
 
+def test_smoke_realistic_fixture_in_each_mode(tmp_path):
+    """Run the realistic fixture through default, --shake, --plan-only, --no-plan
+    and assert each produces sane output."""
+    src = SKILL_DIR / "tests" / "fixture_realistic.md"
+    md = tmp_path / "deck.md"
+    md.write_text(src.read_text())
+    sidecar = md.with_suffix(md.suffix + ".layout.json")
+
+    # Default mode — sidecar absent
+    out_default = tmp_path / "default.pptx"
+    proc = subprocess.run(
+        [sys.executable, str(BUILD_PY),
+         "--input", str(md), "--output", str(out_default)],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert out_default.exists() and out_default.stat().st_size > 50_000
+    assert sidecar.exists()
+
+    # Default mode again — should hit cache (sidecar exists)
+    out_cached = tmp_path / "cached.pptx"
+    proc = subprocess.run(
+        [sys.executable, str(BUILD_PY),
+         "--input", str(md), "--output", str(out_cached)],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert out_cached.exists()
+
+    # --shake — regenerates the plan
+    sidecar_before = sidecar.read_text()
+    out_shaken = tmp_path / "shaken.pptx"
+    proc = subprocess.run(
+        [sys.executable, str(BUILD_PY),
+         "--input", str(md), "--output", str(out_shaken),
+         "--shake"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert out_shaken.exists()
+    # Sidecar still exists; deck_md_hash should still match (markdown unchanged)
+    sidecar_after = sidecar.read_text()
+    import json
+    assert json.loads(sidecar_after)["deck_md_hash"] == json.loads(sidecar_before)["deck_md_hash"]
+
+    # --plan-only — emits JSON, no pptx
+    out_plan_only = tmp_path / "plan_only.pptx"
+    sidecar.unlink()  # remove sidecar to force fresh write
+    proc = subprocess.run(
+        [sys.executable, str(BUILD_PY),
+         "--input", str(md), "--output", str(out_plan_only),
+         "--plan-only"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert sidecar.exists()
+    assert not out_plan_only.exists()
+
+    # --no-plan — legacy path, no sidecar written
+    sidecar.unlink()
+    out_legacy = tmp_path / "legacy.pptx"
+    proc = subprocess.run(
+        [sys.executable, str(BUILD_PY),
+         "--input", str(md), "--output", str(out_legacy),
+         "--no-plan"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert out_legacy.exists()
+    assert not sidecar.exists()
+
+
 def test_render_is_deterministic(tmp_path):
     """Same plan → same pptx bytes (modulo timestamp metadata in pptx)."""
     md = tmp_path / "deck.md"
