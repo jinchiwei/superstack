@@ -530,10 +530,11 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
             lede = text
             body = body[1:]
 
-    # Decide whether to use side-by-side layout: 1 squarish image + any text
-    # (lede or body items). Squarish images at full body width get shrunk to
-    # fit body height and waste horizontal space; side-by-side gives both
-    # text and image more room.
+    # Decide whether to use side-by-side layout. Only truly square images
+    # (aspect ≤ 1.3) win from text-on-the-side; "flat" images like heatmaps
+    # (aspect 1.3-1.7) and wide ones (>1.7) both want full body width with
+    # text stacked above/below — splitting them in half makes the cells /
+    # axis labels too small to read.
     n_images_for_layout = len(images)
     aspect_for_layout = (_get_image_aspect(images[0])
                         if n_images_for_layout == 1 else None)
@@ -542,7 +543,7 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
         and len(tables) == 0
         and not has_cards
         and aspect_for_layout is not None
-        and aspect_for_layout <= 1.7
+        and aspect_for_layout <= 1.3
         and (bool(body) or bool(lede))
     )
 
