@@ -80,11 +80,20 @@ def _render_stacked_rows(
 
         stripe_h = _STRIPE_PRIMARY if is_primary else _STRIPE_STD
 
-        # Card background + accent stripe
+        # Card background
         _add_rect(slide, left=body_l, top=cur_top,
                   width=body_w, height=c_h, fill_rgb=PAPER_RGB)
-        _add_rect(slide, left=body_l, top=cur_top,
-                  width=body_w, height=stripe_h, fill_rgb=accent_rgb)
+
+        if is_primary:
+            # Primary card: full-width top stripe — the dominant accent element.
+            _add_rect(slide, left=body_l, top=cur_top,
+                      width=body_w, height=stripe_h, fill_rgb=accent_rgb)
+        else:
+            # Secondary cards: top-left partial stripe (1.0 in wide × 0.06 in
+            # tall), flush with card top-left corner.  Signals association with
+            # the primary accent without competing full-width stripes.
+            _add_rect(slide, left=body_l, top=cur_top,
+                      width=1.0, height=stripe_h, fill_rgb=accent_rgb)
 
         # Icon (optional)
         if c_icon is not None:
