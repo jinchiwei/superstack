@@ -151,9 +151,9 @@ def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
 
 
 def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
-               width: float, max_height: float, accent_rgb: RGBColor) -> float:
-    """Draw an accent-headered table. Header row filled with accent + white mono text;
-    body rows white with INK sans, zebra paper alternation. Returns bottom y-coord."""
+               width: float, max_height: float, header_rgb: RGBColor) -> float:
+    """Draw a table with a colored header row. Header filled with header_rgb +
+    white mono text; body rows white/paper zebra with INK sans. Returns bottom y."""
     if not rows:
         return top
     n_rows = len(rows)
@@ -170,7 +170,7 @@ def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
             text = row[j] if j < len(row) else ""
             cell.fill.solid()
             if i == 0:
-                cell.fill.fore_color.rgb = accent_rgb
+                cell.fill.fore_color.rgb = header_rgb
                 color = WHITE_RGB
                 font_name = branding.MONO_FONT
                 bold = True
@@ -288,10 +288,13 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
         media_left = 7.0 if has_text else 0.6
         media_width = 6.0 if has_text else 12.5
         cursor = media_top
-        for tbl in tables:
+        for ti, tbl in enumerate(tables):
+            # First table on the slide carries the accent (ties to slide identity);
+            # subsequent tables drop to INK so they read as supporting data.
+            header = accent if ti == 0 else INK_RGB
             cursor = _add_table(s, rows=tbl, left=media_left, top=cursor,
                                 width=media_width, max_height=2.5,
-                                accent_rgb=accent)
+                                header_rgb=header)
             cursor += 0.2
         for img_path in images:
             try:

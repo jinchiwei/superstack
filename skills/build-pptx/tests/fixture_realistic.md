@@ -78,13 +78,19 @@ Feature-importance ranks transfer cleanly from internal to CHOP. The model is no
 
 ## Performance breakdown
 
-A more granular look — per-cohort AUC, sensitivity, and specificity at the prespecified threshold.
+Headline numbers per cohort (top), with column definitions below.
 
 | Cohort | AUC | Sens@0.5 | Spec@0.5 |
 |---|---|---|---|
 | Internal val | 0.91 | 0.88 | 0.84 |
 | External A | 0.87 | 0.83 | 0.81 |
 | External B | 0.85 | 0.80 | 0.79 |
+
+| Variable | Definition |
+|---|---|
+| AUC | Area under the ROC curve, full operating range |
+| Sens@0.5 | Sensitivity at threshold 0.5 |
+| Spec@0.5 | Specificity at threshold 0.5 |
 
 ---
 
