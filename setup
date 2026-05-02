@@ -10,7 +10,7 @@ UPSTREAM_DIR="$REPO_DIR/.upstream"
 SUPERPOWERS_SKILLS="subagent-driven-development test-driven-development verification-before-completion writing-plans"
 
 # Custom skills owned by this repo
-CUSTOM_SKILLS="pipeline pipeline-update autoresearch"
+CUSTOM_SKILLS="pipeline pipeline-update autoresearch _shared build-docx build-pdf build-pptx"
 
 echo "=== superstack setup ==="
 
