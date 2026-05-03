@@ -6,13 +6,12 @@ Reads:
 Writes (default):
   results/<date>_<scope>/scorecard_<date>.xlsx
 
-Generates up to 6 sheets (gracefully skipped when state data is absent):
-  Sheet 1 — Matrix:            iteration grid with axes-as-sections + winners
+Generates up to 5 sheets (gracefully skipped when state data is absent):
+  Sheet 1 — Axis Matrix:       hyperparameter scorecard, params × gene
   Sheet 2 — Per-task headline: best config + key metrics per task/target
   Sheet 3 — HPO detail:        hyperparameter sweep results table
   Sheet 4 — Future directions: deferred / next-iteration items
-  Sheet 5 — Legend:            color & status glyph reference
-  Sheet 6 — Axis Matrix:       axes-as-columns scorecard view (CurieDx style)
+  Sheet 5 — Legend:            color & status reference
 
 Brand palette from skills/_shared/branding.py:
   header bg:  INK   #141414, white text, bold
@@ -227,123 +226,6 @@ def _humanize(slug: str) -> str:
 # ---------------------------------------------------------------------------
 # Sheet builders
 # ---------------------------------------------------------------------------
-
-def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
-    """Sheet 1 — Matrix: experiment grid with axes × experiment families."""
-    scope_slug = state.get("scope_slug", "")
-    axes: dict = state.get("axes", {})
-    results_history: list[dict] = state.get("results_history", [])
-    current_best: dict | None = state.get("current_best")
-
-    ws = wb.create_sheet("Matrix")
-    _set_tab_color(ws)
-
-    axis_names = list(axes.keys()) if axes else []
-
-    exp_families: list[str] = []
-    seen: set[str] = set()
-    for r in results_history:
-        r_axes: dict = r.get("axes", {})
-        fam = "_".join(str(v) for v in list(r_axes.values())[:2]) if r_axes else r.get("id", "")
-        if fam and fam not in seen:
-            exp_families.append(fam)
-            seen.add(fam)
-
-    n_families = max(len(exp_families), 1)
-    n_cols = 2 + n_families
-
-    title_text = f"{_humanize(scope_slug)} Experiment Matrix — {date_str}"
-    c = ws.cell(row=1, column=1, value=title_text)
-    c.fill = _fill(_INK)
-    c.font = _font(_WHITE, bold=True, size=12)
-    c.alignment = _align()
-    for col in range(2, n_cols + 1):
-        ws.cell(row=1, column=col).fill = _fill(_INK)
-
-    sub = state.get("scope", "") or _humanize(scope_slug)
-    _write_subheader_row(ws, 2, sub, n_cols)
-
-    for col in range(1, n_cols + 1):
-        ws.cell(row=3, column=col).fill = _fill("FFFFFF")
-
-    headers = ["#", "Item"] + [_humanize(f) for f in exp_families]
-    _write_header_row(ws, 4, headers)
-
-    winner_row_vals = ["★", "Per-experiment winner"]
-    best_axes: dict = (current_best.get("axes") or {}) if current_best else {}
-    for fam in exp_families:
-        fam_results = [r for r in results_history
-                       if "_".join(str(v) for v in list(r.get("axes", {}).values())[:2]) == fam]
-        best_in_fam = next(
-            (r for r in sorted(fam_results,
-                                key=lambda x: x.get("metric_value") or 0,
-                                reverse=True)
-             if r.get("status") == "complete"),
-            None,
-        )
-        if best_in_fam:
-            mv = best_in_fam.get("metric_value", "")
-            winner_row_vals.append(f"WON  {mv}" if mv else "WON")
-        else:
-            winner_row_vals.append("—")
-
-    for i, val in enumerate(winner_row_vals):
-        c = ws.cell(row=5, column=i + 1, value=val)
-        c.fill = _fill(_DEEPPINK)
-        c.font = _font(_WHITE, bold=True)
-        c.alignment = _align()
-
-    current_row = 6
-    idx = 1
-    for ax_name, ax_values in axes.items():
-        _write_section_row(ws, current_row, _humanize(ax_name), n_cols)
-        current_row += 1
-
-        for val in (ax_values if isinstance(ax_values, list) else [ax_values]):
-            val_str = str(val)
-            matching = [
-                r for r in results_history
-                if r.get("axes", {}).get(ax_name) == val
-            ]
-            best_match = next(
-                (r for r in sorted(matching,
-                                   key=lambda x: x.get("metric_value") or 0,
-                                   reverse=True)
-                 if r.get("status") == "complete"),
-                None,
-            )
-            is_winner = (
-                best_axes.get(ax_name) == val
-                if best_axes else False
-            )
-            fam_cells = []
-            for fam in exp_families:
-                fam_match = next(
-                    (r for r in matching
-                     if "_".join(str(v) for v in list(r.get("axes", {}).values())[:2]) == fam),
-                    None,
-                )
-                if fam_match:
-                    mv = fam_match.get("metric_value", "")
-                    status = fam_match.get("status", "")
-                    fam_cells.append(f"{status}  {mv}" if mv else status or "—")
-                else:
-                    fam_cells.append("")
-
-            row_vals = [str(idx), val_str] + fam_cells
-            if is_winner:
-                _write_winner_row(ws, current_row, row_vals)
-            else:
-                _write_body_row(ws, current_row, row_vals)
-
-            current_row += 1
-            idx += 1
-
-    col_widths = [4, 30] + [20] * n_families
-    _set_col_widths(ws, col_widths)
-
-    ws.freeze_panes = "A5"
-
 
 def _build_per_task(wb: Workbook, state: dict) -> None:
     """Sheet 2 — Per-task headline: best config + metrics per task/target."""
@@ -876,12 +758,11 @@ def main() -> None:
     if "Sheet" in wb.sheetnames:
         del wb["Sheet"]
 
-    _build_matrix(wb, state, args.date)
+    _build_axis_matrix(wb, state, args.date)
     _build_per_task(wb, state)
     _build_hpo_detail(wb, state)
     _build_future_directions(wb, state)
     _build_legend(wb)
-    _build_axis_matrix(wb, state, args.date)
 
     wb.save(out)
     print(f"wrote {out}")
