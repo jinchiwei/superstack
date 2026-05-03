@@ -114,6 +114,15 @@ html, body {{
   font-size: 12pt; font-weight: 700; color: {branding.NAME_COLOR};
   margin: 0 0 2pt 0;
 }}
+.cover .co-author {{
+  font-family: {branding.MONO_FONT_STACK};
+  font-size: 12pt; font-weight: 700; color: {branding.INK};
+  margin: 0 0 2pt 0;
+}}
+.cover .co-author .sep {{ color: {branding.MUTED}; font-weight: 400; }}
+.cover .co-author .name {{
+  display: inline; color: {branding.NAME_COLOR}; margin: 0;
+}}
 .cover .org {{
   font-family: {branding.MONO_FONT_STACK};
   font-size: 10pt; font-weight: 700; color: {branding.ORG_COLOR};
@@ -229,7 +238,18 @@ def _render_cover(meta: dict, default_date: str) -> str:
     parts.append(f'<h1 class="title">{html_mod.escape(str(title))}</h1>')
     if meta.get("subtitle"):
         parts.append(f'<p class="subtitle">{html_mod.escape(str(meta["subtitle"]))}</p>')
-    if meta.get("name"):
+    if meta.get("co_author") and meta.get("name"):
+        # Two-author cover: co_author renders in INK, name renders in turquoise,
+        # joined by a muted middle-dot. Used for annotated/derivative editions
+        # (e.g. translator + original author).
+        co_html = html_mod.escape(str(meta["co_author"]))
+        name_html = html_mod.escape(str(meta["name"]))
+        parts.append(
+            f'<p class="co-author">{co_html}'
+            f'<span class="sep"> · </span>'
+            f'<span class="name">{name_html}</span></p>'
+        )
+    elif meta.get("name"):
         parts.append(f'<p class="name">{html_mod.escape(str(meta["name"]))}</p>')
     if meta.get("org"):
         parts.append(f'<p class="org">{html_mod.escape(str(meta["org"]))}</p>')
