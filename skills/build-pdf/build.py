@@ -161,6 +161,12 @@ p, li {{
 ul, ol {{ padding-left: 1.4em; }}
 li {{ margin: 2pt 0; }}
 
+/* Hyperlinks in turquoise — brand accent for clickable URLs in body text. */
+a, a:link, a:visited {{
+  color: {branding.TURQUOISE};
+  text-decoration: underline;
+}}
+
 code {{
   font-family: {branding.MONO_FONT_STACK};
   font-size: 9.5pt; color: {branding.INK};
