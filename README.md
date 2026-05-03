@@ -60,7 +60,7 @@ Or from Claude Code:
 |--------|--------|
 | **gstack** | browse, qa, ship, design-\*, plan-\*, review, office-hours, and [more](https://github.com/garrytan/gstack) |
 | **superpowers** | subagent-driven-development, test-driven-development, verification-before-completion, writing-plans |
-| **this repo** | pipeline, pipeline-update, autoresearch, build-pdf, build-pptx, build-docx |
+| **this repo** | pipeline, pipeline-update, autoresearch, build-pdf, build-pptx, build-docx, build-xlsx |
 | **this repo, Codex only** | claude second-opinion skill |
 
 ## The pipeline
@@ -134,17 +134,28 @@ See `skills/autoresearch/USAGE.md` for full invocation, halt, and inspection pat
 and `skills/autoresearch/DESIGN.md` for the architecture (locked decisions D1-D4 on
 stash discipline, iteration error wrapping, schema migration, and infra halt gating).
 
-## /build-pdf, /build-pptx, /build-docx
+## /build-pdf, /build-pptx, /build-docx, /build-xlsx
 
-Three general-purpose markdown → branded document builders. They share one palette
-and font system (`skills/_shared/branding.py`) so a PDF, deck, and Word doc generated
-from the same source markdown look like they came from the same pen.
+Four general-purpose markdown → branded document builders. They share one palette
+and font system (`skills/_shared/branding.py`) so a PDF, deck, Word doc, and
+spreadsheet generated from the same source markdown look like they came from the
+same pen.
 
 ```
-/build-pdf  notes.md             # branded PDF with cover, bookmarks, page numbers
-/build-pptx talk.md              # 16:9 deck, navy title + section dividers, color cohesion
-/build-docx draft.md             # Geist-styled Word doc via pandoc + reference.docx
+/build-pdf   notes.md            # branded PDF with cover, bookmarks, page numbers
+/build-pptx  talk.md             # 16:9 deck, navy title + section dividers, color cohesion
+/build-docx  draft.md            # Geist-styled Word doc via pandoc + reference.docx
+/build-xlsx  data.md             # brand-styled xlsx: H1 per sheet, ink headers, marker rows
 ```
+
+- **build-xlsx:** Each `# H1` → one sheet. Plain tables get default brand styling
+  (ink header, paper alternating rows, frozen pane, auto column widths). Optional
+  bracket-prefix markers apply semantic fills and embed FA glyph icons:
+  `[winner]` → turquoise + FaTrophy, `[deferred]` → grey + FaForward,
+  `[warning]` → amber + FaTriangleExclamation, `[headline]` → deeppink + FaStar.
+  Shared styling module: `skills/_shared/branding_xlsx.py`. FA icons from
+  `skills/_shared/icons/`. autoresearch's scorecard builder imports from the same
+  shared module so the brand styling pipeline is unified.
 
 - **Identity:** Geist Mono for structural elements (eyebrow, title, headings, code,
   metric values, page numbers); Geist Sans for body prose. Cross-platform fallback

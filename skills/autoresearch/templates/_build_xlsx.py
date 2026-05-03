@@ -59,10 +59,9 @@ except ImportError:
     )
 
 # ---------------------------------------------------------------------------
-# Brand palette — pull from _shared/branding.py constants.
+# Import shared styling primitives from skills/_shared/branding_xlsx.py.
 # We resolve the path relative to this file so the script works regardless of
-# cwd.  Fall back to inline hex literals if the module isn't importable (e.g.
-# during isolated unit testing with a minimal fixture).
+# cwd.
 # ---------------------------------------------------------------------------
 
 _HERE = Path(__file__).resolve()
@@ -70,80 +69,109 @@ _SHARED = _HERE.parents[2] / "_shared"
 sys.path.insert(0, str(_SHARED))
 
 try:
-    import branding  # type: ignore
-
-    _TURQUOISE  = branding.TURQUOISE.lstrip("#")   # "40E0D0"
-    _DEEPPINK   = branding.DEEPPINK.lstrip("#")    # "FF1493"
-    _AMBER      = branding.AMBER.lstrip("#")       # "F0C840"
-    _BLUEVIOLET = branding.BLUEVIOLET.lstrip("#")  # "8A2BE2"
-    _INK        = branding.INK.lstrip("#")         # "14141C"
-    _PAPER      = branding.PAPER.lstrip("#")       # "FAFAFC"
-    _WHITE      = branding.WHITE.lstrip("#")       # "FFFFFF"
-    _MUTED      = branding.MUTED.lstrip("#")       # "555560"
+    from branding_xlsx import (  # type: ignore
+        TURQUOISE as _TURQUOISE,
+        DEEPPINK  as _DEEPPINK,
+        AMBER     as _AMBER,
+        BLUEVIOLET as _BLUEVIOLET,
+        INK       as _INK,
+        PAPER     as _PAPER,
+        WHITE     as _WHITE,
+        MUTED     as _MUTED,
+        DEFERRED_GREY as _DEFERRED_GREY,
+        DARK_SUBHEADER as _DARK_SUBHEADER,
+        LIGHT_GREY_TXT as _LIGHT_GREY_TXT,
+        RAN_LIGHT as _RAN_LIGHT,
+        _fill,
+        _font,
+        _align,
+        _write_header_row,
+        _write_body_row,
+        _write_winner_row,
+        _write_deferred_row,
+        _write_warning_row,
+        _set_tab_color,
+        _set_col_widths,
+        _freeze_header as _freeze,
+    )
 except ImportError:
-    _TURQUOISE  = "40E0D0"
-    _DEEPPINK   = "FF1493"
-    _AMBER      = "F0C840"
-    _BLUEVIOLET = "8A2BE2"
-    _INK        = "14141C"
-    _PAPER      = "FAFAFC"
-    _WHITE      = "FFFFFF"
-    _MUTED      = "555560"
+    # Fallback: inline definitions so autoresearch keeps working even if
+    # the shared module is unavailable (e.g. isolated testing environments).
+    from branding import (  # type: ignore
+        TURQUOISE, DEEPPINK, AMBER, BLUEVIOLET, INK, PAPER, WHITE, MUTED
+    )
+    _TURQUOISE  = TURQUOISE.lstrip("#")
+    _DEEPPINK   = DEEPPINK.lstrip("#")
+    _AMBER      = AMBER.lstrip("#")
+    _BLUEVIOLET = BLUEVIOLET.lstrip("#")
+    _INK        = INK.lstrip("#")
+    _PAPER      = PAPER.lstrip("#")
+    _WHITE      = WHITE.lstrip("#")
+    _MUTED      = MUTED.lstrip("#")
+    _DEFERRED_GREY  = "E8E8E8"
+    _DARK_SUBHEADER = "222222"
+    _LIGHT_GREY_TXT = "CCCCCC"
+    _RAN_LIGHT      = "CDEFEB"
+    _SOLID = "solid"
 
-# Extra neutrals used in the reference scorecard
-_DARK_SUBHEADER = "222222"   # row-2 subtitle bg
-_DEFERRED_GREY  = "E8E8E8"   # deferred row bg
-_LIGHT_GREY_TXT = "CCCCCC"   # sub-header text on dark bg
-_RAN_LIGHT      = "CDEFEB"   # "ran, not winner" light teal
+    def _fill(hex_color):
+        return PatternFill(fill_type=_SOLID, fgColor=hex_color)
 
-# openpyxl fill/font type abbrevs
-_SOLID = "solid"
+    def _font(hex_color=_INK, *, bold=False, italic=False, size=10, name="Geist"):
+        return Font(color=hex_color, bold=bold, italic=italic, size=size, name=name)
+
+    def _align(horizontal="left", vertical="center", wrap=False):
+        return Alignment(horizontal=horizontal, vertical=vertical, wrap_text=wrap)
+
+    def _write_header_row(ws, row_num, values, *, col_offset=1):
+        for i, val in enumerate(values):
+            c = ws.cell(row=row_num, column=col_offset + i, value=val)
+            c.fill = _fill(_INK)
+            c.font = _font(_WHITE, bold=True)
+            c.alignment = _align()
+
+    def _write_body_row(ws, row_num, values, *, col_offset=1, alt=False):
+        for i, val in enumerate(values):
+            c = ws.cell(row=row_num, column=col_offset + i, value=val)
+            c.fill = _fill(_PAPER)
+            c.font = _font(_INK)
+            c.alignment = _align(wrap=True)
+
+    def _write_winner_row(ws, row_num, values, *, col_offset=1):
+        for i, val in enumerate(values):
+            c = ws.cell(row=row_num, column=col_offset + i, value=val)
+            c.fill = _fill(_TURQUOISE)
+            c.font = _font(_INK, bold=True)
+            c.alignment = _align()
+
+    def _write_deferred_row(ws, row_num, values, *, col_offset=1):
+        for i, val in enumerate(values):
+            c = ws.cell(row=row_num, column=col_offset + i, value=val)
+            c.fill = _fill(_DEFERRED_GREY)
+            c.font = _font(_INK)
+            c.alignment = _align(wrap=True)
+
+    def _write_warning_row(ws, row_num, values, *, col_offset=1):
+        for i, val in enumerate(values):
+            c = ws.cell(row=row_num, column=col_offset + i, value=val)
+            c.fill = _fill(_AMBER)
+            c.font = _font(_INK, bold=True)
+            c.alignment = _align(wrap=True)
+
+    def _set_tab_color(ws, color_hex=_TURQUOISE):
+        ws.sheet_properties.tabColor = color_hex
+
+    def _set_col_widths(ws, widths):
+        for i, w in enumerate(widths, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+
+    def _freeze(ws, cell="A2"):
+        ws.freeze_panes = cell
 
 
 # ---------------------------------------------------------------------------
-# Fill / font helpers
+# Scorecard-specific helpers not in the shared module
 # ---------------------------------------------------------------------------
-
-def _fill(hex_color: str) -> PatternFill:
-    return PatternFill(fill_type=_SOLID, fgColor=hex_color)
-
-
-def _font(
-    hex_color: str = _INK,
-    *,
-    bold: bool = False,
-    italic: bool = False,
-    size: int = 10,
-    name: str = "Geist",
-) -> Font:
-    return Font(color=hex_color, bold=bold, italic=italic, size=size, name=name)
-
-
-def _align(
-    horizontal: str = "left",
-    vertical: str = "center",
-    wrap: bool = False,
-) -> Alignment:
-    return Alignment(horizontal=horizontal, vertical=vertical, wrap_text=wrap)
-
-
-def _thin_border() -> Border:
-    thin = Side(style="thin", color="DDDDDD")
-    return Border(bottom=thin)
-
-
-# ---------------------------------------------------------------------------
-# Row-writing helpers
-# ---------------------------------------------------------------------------
-
-def _write_header_row(ws, row_num: int, values: list[str], *, col_offset: int = 1) -> None:
-    """Dark ink header row (H1-style): ink bg, white bold text."""
-    for i, val in enumerate(values):
-        c = ws.cell(row=row_num, column=col_offset + i, value=val)
-        c.fill = _fill(_INK)
-        c.font = _font(_WHITE, bold=True)
-        c.alignment = _align()
-
 
 def _write_subheader_row(ws, row_num: int, value: str, n_cols: int) -> None:
     """Dark #222 sub-header row spanning n_cols, light-grey text."""
@@ -151,7 +179,6 @@ def _write_subheader_row(ws, row_num: int, value: str, n_cols: int) -> None:
     c.fill = _fill(_DARK_SUBHEADER)
     c.font = _font(_LIGHT_GREY_TXT, size=9)
     c.alignment = _align()
-    # Clear the rest of the row
     for col in range(2, n_cols + 1):
         ws.cell(row=row_num, column=col).fill = _fill(_DARK_SUBHEADER)
 
@@ -166,67 +193,12 @@ def _write_section_row(ws, row_num: int, value: str, n_cols: int) -> None:
         ws.cell(row=row_num, column=col).fill = _fill(_TURQUOISE)
 
 
-def _write_winner_row(ws, row_num: int, values: list[str], *, col_offset: int = 1) -> None:
-    """Turquoise winner row: turquoise bg, ink text, bold, 🏆 prepended."""
-    for i, val in enumerate(values):
-        display = val
-        if i == 0 and val and not val.startswith("🏆"):
-            display = f"🏆 {val}"
-        c = ws.cell(row=row_num, column=col_offset + i, value=display)
-        c.fill = _fill(_TURQUOISE)
-        c.font = _font(_INK, bold=True)
-        c.alignment = _align()
-
-
-def _write_deferred_row(ws, row_num: int, values: list[str], *, col_offset: int = 1) -> None:
-    """Light-grey deferred row with ⏭ marker."""
-    for i, val in enumerate(values):
-        display = val
-        if i == 0 and val and not val.startswith("⏭"):
-            display = f"⏭ {val}"
-        c = ws.cell(row=row_num, column=col_offset + i, value=display)
-        c.fill = _fill(_DEFERRED_GREY)
-        c.font = _font(_INK)
-        c.alignment = _align(wrap=True)
-
-
-def _write_warning_row(ws, row_num: int, values: list[str], *, col_offset: int = 1) -> None:
-    """Amber warning row."""
-    for i, val in enumerate(values):
-        c = ws.cell(row=row_num, column=col_offset + i, value=val)
-        c.fill = _fill(_AMBER)
-        c.font = _font(_INK, bold=True)
-        c.alignment = _align(wrap=True)
-
-
-def _write_body_row(ws, row_num: int, values: list[str], *, col_offset: int = 1) -> None:
-    """Standard paper-colored body row."""
-    for i, val in enumerate(values):
-        c = ws.cell(row=row_num, column=col_offset + i, value=val)
-        c.fill = _fill(_PAPER)
-        c.font = _font(_INK)
-        c.alignment = _align(wrap=True)
-
-
 def _write_metric_cell(ws, row_num: int, col_num: int, value: str) -> None:
     """Blueviolet metric value cell."""
     c = ws.cell(row=row_num, column=col_num, value=value)
     c.fill = _fill(_PAPER)
     c.font = _font(_BLUEVIOLET, bold=True, name="Geist Mono")
     c.alignment = _align(horizontal="center")
-
-
-def _set_tab_color(ws) -> None:
-    ws.sheet_properties.tabColor = _TURQUOISE
-
-
-def _set_col_widths(ws, widths: list[float]) -> None:
-    for i, w in enumerate(widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
-
-
-def _freeze(ws, cell: str = "A2") -> None:
-    ws.freeze_panes = cell
 
 
 # ---------------------------------------------------------------------------
@@ -264,26 +236,20 @@ def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     ws = wb.create_sheet("Matrix")
     _set_tab_color(ws)
 
-    # Experiment families: derived from axes keys (or from candidate IDs)
-    # We use axes keys as the "dimension" rows and the unique axis values as
-    # per-family columns.  For simplicity each axis key = one row group.
     axis_names = list(axes.keys()) if axes else []
 
-    # Collect experiment family names from results_history candidate IDs
     exp_families: list[str] = []
     seen: set[str] = set()
     for r in results_history:
         r_axes: dict = r.get("axes", {})
-        # Family = first axis value combo as a short label
         fam = "_".join(str(v) for v in list(r_axes.values())[:2]) if r_axes else r.get("id", "")
         if fam and fam not in seen:
             exp_families.append(fam)
             seen.add(fam)
 
     n_families = max(len(exp_families), 1)
-    n_cols = 2 + n_families   # col A = #/idx, col B = Item, col C..N = families
+    n_cols = 2 + n_families
 
-    # Row 1 — title
     title_text = f"{_humanize(scope_slug)} Experiment Matrix — {date_str}"
     c = ws.cell(row=1, column=1, value=title_text)
     c.fill = _fill(_INK)
@@ -292,23 +258,18 @@ def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     for col in range(2, n_cols + 1):
         ws.cell(row=1, column=col).fill = _fill(_INK)
 
-    # Row 2 — sub-header: scope text
     sub = state.get("scope", "") or _humanize(scope_slug)
     _write_subheader_row(ws, 2, sub, n_cols)
 
-    # Row 3 — blank spacer
     for col in range(1, n_cols + 1):
         ws.cell(row=3, column=col).fill = _fill("FFFFFF")
 
-    # Row 4 — column headers: #, Item, then one col per experiment family
     headers = ["#", "Item"] + [_humanize(f) for f in exp_families]
     _write_header_row(ws, 4, headers)
 
-    # Row 5 — winner summary row (deeppink bg, per-experiment winner)
     winner_row_vals = ["★", "Per-experiment winner"]
     best_axes: dict = (current_best.get("axes") or {}) if current_best else {}
     for fam in exp_families:
-        # Find best result in this family
         fam_results = [r for r in results_history
                        if "_".join(str(v) for v in list(r.get("axes", {}).values())[:2]) == fam]
         best_in_fam = next(
@@ -330,17 +291,14 @@ def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
         c.font = _font(_WHITE, bold=True)
         c.alignment = _align()
 
-    # Rows 6..N — one section per axis
     current_row = 6
     idx = 1
     for ax_name, ax_values in axes.items():
-        # Section header
         _write_section_row(ws, current_row, _humanize(ax_name), n_cols)
         current_row += 1
 
         for val in (ax_values if isinstance(ax_values, list) else [ax_values]):
             val_str = str(val)
-            # Find results matching this axis/value combination
             matching = [
                 r for r in results_history
                 if r.get("axes", {}).get(ax_name) == val
@@ -356,7 +314,6 @@ def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
                 best_axes.get(ax_name) == val
                 if best_axes else False
             )
-            # Per-family status cells
             fam_cells = []
             for fam in exp_families:
                 fam_match = next(
@@ -380,11 +337,9 @@ def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
             current_row += 1
             idx += 1
 
-    # Column widths: A=4, B=30 (axis value), rest=20
     col_widths = [4, 30] + [20] * n_families
     _set_col_widths(ws, col_widths)
 
-    # Freeze panes: below header at row 5 (after section header)
     ws.freeze_panes = "A5"
 
 
@@ -393,10 +348,6 @@ def _build_per_task(wb: Workbook, state: dict) -> None:
     results_history: list[dict] = state.get("results_history", [])
     target_metric: str = state.get("target_metric", "") or ""
 
-    # Group results by task (requires explicit 'task' key in axes).
-    # Falls back to a top-level 'task' field.  If neither is present the sheet
-    # is skipped — we don't want spurious per-candidate rows when the project
-    # doesn't have a multi-task structure.
     tasks: dict[str, list[dict]] = {}
     for r in results_history:
         task = r.get("axes", {}).get("task") or r.get("task") or ""
@@ -405,7 +356,7 @@ def _build_per_task(wb: Workbook, state: dict) -> None:
         tasks.setdefault(task, []).append(r)
 
     if not tasks:
-        return  # skip sheet gracefully
+        return
 
     ws = wb.create_sheet("Per-task headline")
     _set_tab_color(ws)
@@ -413,17 +364,14 @@ def _build_per_task(wb: Workbook, state: dict) -> None:
     scope_slug = state.get("scope_slug", "")
     sub = state.get("scope", "") or _humanize(scope_slug)
 
-    # Row 1 title
     c = ws.cell(row=1, column=1, value=f"Per-task headline — {_humanize(scope_slug)}")
     c.fill = _fill(_INK)
     c.font = _font(_WHITE, bold=True, size=12)
     for col in range(2, 8):
         ws.cell(row=1, column=col).fill = _fill(_INK)
 
-    # Row 2 sub-header
     _write_subheader_row(ws, 2, sub, 7)
 
-    # Row 3 — column headers (turquoise)
     hdrs = ["Task", "Best config", target_metric or "Metric", "Status", "Iterations", "Best axes", "Notes"]
     for i, h in enumerate(hdrs):
         c = ws.cell(row=3, column=i + 1, value=h)
@@ -431,13 +379,10 @@ def _build_per_task(wb: Workbook, state: dict) -> None:
         c.font = _font(_INK, bold=True)
         c.alignment = _align()
 
-    # Data rows
     row_num = 4
     for task, task_results in tasks.items():
-        # Best result = highest metric_value with status=complete
         completed = [r for r in task_results if r.get("status") == "complete"]
         if not completed:
-            # use any result
             completed = task_results
         best = max(completed, key=lambda r: r.get("metric_value") or 0, default=None)
         if not best:
@@ -459,7 +404,6 @@ def _build_per_task(wb: Workbook, state: dict) -> None:
             notes,
         ]
         _write_body_row(ws, row_num, row_vals)
-        # Override metric cell with blueviolet
         _write_metric_cell(ws, row_num, 3, str(mv) if mv is not None else "—")
         row_num += 1
 
@@ -488,7 +432,6 @@ def _build_hpo_detail(wb: Workbook, state: dict) -> None:
     c.fill = _fill(_INK)
     c.font = _font(_WHITE, bold=True, size=12)
 
-    # Collect all param keys and metric keys from runs
     param_keys: list[str] = []
     metric_keys: list[str] = []
     seen_p: set[str] = set()
@@ -506,20 +449,17 @@ def _build_hpo_detail(wb: Workbook, state: dict) -> None:
     all_cols = ["Run"] + param_keys + metric_keys
     n_cols = len(all_cols)
 
-    # Title row tail
     for col in range(2, n_cols + 1):
         ws.cell(row=1, column=col).fill = _fill(_INK)
 
     _write_subheader_row(ws, 2, state.get("scope", "") or "", n_cols)
 
-    # Header row (turquoise)
     for i, h in enumerate(all_cols):
         c = ws.cell(row=3, column=i + 1, value=h)
         c.fill = _fill(_TURQUOISE)
         c.font = _font(_INK, bold=True)
         c.alignment = _align(horizontal="center")
 
-    # Find best value per metric column for conditional highlight
     best_metric_vals: dict[str, float] = {}
     for mk in metric_keys:
         vals = [run.get("metrics", {}).get(mk) for run in hpo_runs
@@ -534,13 +474,11 @@ def _build_hpo_detail(wb: Workbook, state: dict) -> None:
         params = run.get("params") or {}
         metrics = run.get("metrics") or {}
 
-        # Build row values
         row_vals = [run_id] + [str(params.get(k, "—")) for k in param_keys]
-        c_start = len(row_vals) + 1  # 1-indexed column where metrics start
+        c_start = len(row_vals) + 1
 
         _write_body_row(ws, row_num, row_vals)
 
-        # Write metric cells — highlight best with turquoise
         for mi, mk in enumerate(metric_keys):
             mv = metrics.get(mk)
             col_num = c_start + mi
@@ -553,7 +491,6 @@ def _build_hpo_detail(wb: Workbook, state: dict) -> None:
                 if is_best:
                     c.fill = _fill(_TURQUOISE)
                     c.font = _font(_INK, bold=True)
-                    # Add ★ marker as suffix in display
                     c.value = f"{mv} ★"
                 else:
                     c.fill = _fill(_PAPER)
@@ -580,7 +517,6 @@ def _build_future_directions(wb: Workbook, state: dict) -> None:
     """
     future: list[dict] = state.get("future_directions") or []
 
-    # Fallback: pending queue items
     if not future:
         for c in state.get("candidate_queue") or []:
             if c.get("status") == "pending":
@@ -611,7 +547,6 @@ def _build_future_directions(wb: Workbook, state: dict) -> None:
 
     _write_subheader_row(ws, 2, state.get("scope", "") or "", 5)
 
-    # Header row
     _write_header_row(ws, 3, ["#", "Experiment", "Effort", "Expected lift / value", "Notes / unlock"])
 
     row_num = 4
@@ -643,17 +578,14 @@ def _build_legend(wb: Workbook) -> None:
     ws = wb.create_sheet("Legend")
     _set_tab_color(ws)
 
-    # Row 1 title
     c = ws.cell(row=1, column=1, value="Legend — color & status reference")
     c.fill = _fill(_INK)
     c.font = _font(_WHITE, bold=True, size=12)
     for col in range(2, 5):
         ws.cell(row=1, column=col).fill = _fill(_INK)
 
-    # Blank row 2
     ws.cell(row=2, column=1).value = ""
 
-    # Section: Status codes
     row = 3
     c = ws.cell(row=row, column=1, value="Status codes")
     c.fill = _fill(_DEEPPINK)
@@ -688,10 +620,8 @@ def _build_legend(wb: Workbook) -> None:
         c.font = _font(_INK, bold=(bg_hex in (_TURQUOISE, _AMBER, _DEEPPINK)))
         c.alignment = _align(horizontal="center")
 
-    # Blank
     row += 2
 
-    # Section: Color palette
     c = ws.cell(row=row, column=1, value="Color palette — priority order")
     c.fill = _fill(_DEEPPINK)
     c.font = _font(_WHITE, bold=True)
@@ -725,7 +655,6 @@ def _build_legend(wb: Workbook) -> None:
         c.alignment = _align(horizontal="center")
         row += 1
 
-    # Final note row
     row += 1
     c = ws.cell(row=row, column=1,
                 value="Rebuild: python skills/autoresearch/templates/_build_xlsx.py --scope <slug>")
@@ -772,7 +701,6 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     wb = Workbook()
-    # Remove the default "Sheet" created by openpyxl
     if "Sheet" in wb.sheetnames:
         del wb["Sheet"]
 
