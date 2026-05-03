@@ -16,7 +16,7 @@ You are bootstrapping an /autoresearch session. The user gave you a free-text sc
     "<category1>": ["<value1>", "<value2>", ...],
     "<category2>": ["<value1>", ...]
   },
-  "target_axis": "<axis-key-name>" or null,
+  "target_axis": "<axis-key-name>" | ["<axis-key-1>", "<axis-key-2>"] | null,
   "rationale": "<1-2 sentences on why these axes were chosen>"
 }
 ```
@@ -35,6 +35,8 @@ You are bootstrapping an /autoresearch session. The user gave you a free-text sc
    - Multi-task NLP: `axes.task = ["sentiment", "ner", "qa"]`, `target_axis = "task"`
 
    The Axis Matrix renders the target axis as side-by-side **columns** (one per target value) so per-target winners can be scanned at a glance. Hyperparameter axes become row sections. If there is no natural target axis (a single-target sweep), set `target_axis: null` and the matrix renders a single "Best metric" column.
+
+   **Multiple target axes.** When the scope has more than one orthogonal target dimension (e.g., a CurieDx sweep across both `pathogen` AND `tissue` = nasal/throat swab; a multi-modal radiogenomics sweep across `gene` AND `modality` = MRI/CT), set `target_axis` to a **list** of axis keys: `target_axis = ["pathogen", "tissue"]`. The xlsx builder will produce one Axis Matrix sheet per target axis, each treating that axis as columns and the rest (including other target axes) as row sections — a marginal view. Don't list more than 2 target axes; beyond that it's likely a misclassification of the search space.
 
 **Cardinality budget:**
 The full Cartesian product of axes is the worst-case search space. Keep it under ~50 cells unless the scope explicitly asks for exhaustive sweep. If the product would exceed 50, propose smaller axis vocabularies.

@@ -552,21 +552,83 @@ def _build_legend(wb: Workbook) -> None:
 
 
 def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
-    """Last sheet — hyperparameter scorecard (CurieDx style).
+    """Hyperparameter scorecard (CurieDx style).
 
-    Leftmost column: every candidate value across every search axis,
-    grouped under a section-header row per axis. Right columns: best
-    metric per (parameter, target) — one column per target value if a
-    target axis exists (e.g. gene, pathogen, task), otherwise a single
-    ``Best metric`` column.
+    Renders one Axis Matrix sheet per declared target axis. ``state.target_axis``
+    may be:
 
-    Layout (multi-target mode)::
+    - a **string** (e.g. ``"pathogen"``) — single sheet
+    - a **list of strings** (e.g. ``["pathogen", "tissue"]``) — one sheet per
+      target axis, each rendering that axis as columns and treating every
+      remaining axis (including the OTHER target axes) as row sections
+    - ``null`` or absent — fallback to common names (``target``, ``gene``,
+      ``pathogen``, ``disease``, ``label``, ``task``); single sheet using the
+      first match. If none match, renders one sheet with a single
+      ``Best metric`` column.
+
+    Each per-target sheet computes per-(parameter, target_value) best metric
+    by aggregating across all OTHER axes (so each sheet is a marginal view).
+
+    See :func:`_build_one_axis_matrix` for the per-sheet layout details.
+    """
+    axes: dict = state.get("axes", {})
+    if not axes:
+        return
+
+    declared_target = state.get("target_axis")
+    fallback_target_keys = (
+        "target", "gene", "pathogen", "disease", "label", "task",
+    )
+
+    # Resolve to a list of target axis keys.
+    target_keys: list = []
+    if isinstance(declared_target, list):
+        target_keys = [t for t in declared_target if t in axes]
+    elif isinstance(declared_target, str) and declared_target in axes:
+        target_keys = [declared_target]
+    else:
+        fallback = next(
+            (k for k in fallback_target_keys if k in axes), None
+        )
+        if fallback is not None:
+            target_keys = [fallback]
+
+    if not target_keys:
+        # No target axis at all: render a single sheet with a "Best metric" col.
+        _build_one_axis_matrix(
+            wb, state, date_str,
+            target_key=None,
+            sheet_name="Axis Matrix",
+        )
+        return
+
+    multi_sheet = len(target_keys) > 1
+    for tk in target_keys:
+        sheet_name = f"Axis Matrix — {tk}" if multi_sheet else "Axis Matrix"
+        _build_one_axis_matrix(
+            wb, state, date_str,
+            target_key=tk,
+            sheet_name=sheet_name,
+        )
+
+
+def _build_one_axis_matrix(
+    wb: Workbook,
+    state: dict,
+    date_str: str,
+    *,
+    target_key: str | None,
+    sheet_name: str,
+) -> None:
+    """Render a single Axis Matrix sheet.
+
+    Layout (multi-target-value mode, e.g. target_key="pathogen")::
 
         | Parameter        | flu     | covid | strep | RSV   |
         | ─ Method ─       | (turquoise stripe across all cols)|
-        | xgb              |  0.849  | 0.74  | 0.796 | 0.717 |  ← per-target winners
-        | tabpfn           |  0.81   | 0.808 | 0.71  | 0.66  |    highlighted in
-        | ─ Feature Mode ─ | (deeppink stripe)                 |    that target's col
+        | xgb              |  0.849  | 0.74  | 0.796 | 0.717 |  ← per-target-value
+        | tabpfn           |  0.81   | 0.808 | 0.71  | 0.66  |    winners highlighted
+        | ─ Feature Mode ─ | (deeppink stripe)                 |    in that col
         | mi_top20         |  0.849  | 0.78  | 0.796 | 0.717 |
         | ...
 
@@ -574,21 +636,11 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     (turquoise → deeppink → amber → blueviolet). Body cells use no
     fill so default Excel gridlines remain visible. Per-axis winners
     are derived from ``results_history`` (max metric per axis-value
-    per target value, complete runs only).
+    per target value, complete runs only) — when multiple target axes
+    exist, this aggregates across the others (a marginal view).
 
-    **Target axis selection.** ``state.target_axis`` names which axis to
-    render as columns (e.g. ``"pathogen"`` for CurieDx, ``"gene"`` for
-    radiogenomics, ``"task"`` for multi-task NLP). When absent or
-    invalid, falls back to common names: ``target``, ``gene``,
-    ``pathogen``, ``disease``, ``label``, ``task``. If no target axis
-    is found or it has only one value, a single ``Best metric`` column
-    is rendered instead.
-
-    **Axis order = tested-first → tested-last.** Sections are emitted in
-    the order they appear in ``state.axes`` (Python dict insertion
-    order). Whoever writes ``state.json`` should list axes in the
-    chronological order they were swept so the matrix reads top-down
-    as the actual search journey.
+    Hyperparameter axis order = dict insertion order in ``state.axes``,
+    which by convention reflects "tested first → tested last."
     """
     axes: dict = state.get("axes", {})
     if not axes:
@@ -596,23 +648,14 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     results_history: list[dict] = state.get("results_history", [])
     scope_slug = state.get("scope_slug", "")
 
-    # Resolve target axis: explicit declaration first, then common names.
-    declared_target = state.get("target_axis")
-    fallback_target_keys = (
-        "target", "gene", "pathogen", "disease", "label", "task",
-    )
-    if declared_target and declared_target in axes:
-        target_key = declared_target
-    else:
-        target_key = next(
-            (k for k in fallback_target_keys if k in axes), None
-        )
     target_values: list = []
-    if target_key is not None:
+    if target_key is not None and target_key in axes:
         tv = axes[target_key]
         target_values = list(tv) if isinstance(tv, list) else [tv]
 
-    # Hyperparameter axes (everything except the target axis).
+    # Hyperparameter axes (everything except THIS target axis).
+    # Note: other target axes (if any) are still rendered as row sections —
+    # this makes the per-target-axis sheets a marginal view across the others.
     axis_items = [
         (name, vals if isinstance(vals, list) else [vals])
         for name, vals in axes.items()
@@ -626,11 +669,11 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     metric_cols = target_values if multi_target else [None]
     n_cols = 1 + len(metric_cols)
 
-    ws = wb.create_sheet("Axis Matrix")
+    ws = wb.create_sheet(sheet_name)
     _set_tab_color(ws)
 
     # Title bar
-    title = f"{_humanize(scope_slug)} — Axis Matrix · {date_str}"
+    title = f"{_humanize(scope_slug)} — {sheet_name} · {date_str}"
     c = ws.cell(row=1, column=1, value=title)
     c.fill = _fill(_INK)
     c.font = _font(_WHITE, bold=True, size=12)
