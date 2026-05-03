@@ -7,7 +7,7 @@ Writes (default):
   results/<date>_<scope>/scorecard_<date>.xlsx
 
 Generates up to 5 sheets (gracefully skipped when state data is absent):
-  Sheet 1 — Axis Matrix:       hyperparameter scorecard, params × gene
+  Sheet 1 — Axis Matrix:       hyperparameter scorecard, params × target
   Sheet 2 — Per-task headline: best config + key metrics per task/target
   Sheet 3 — HPO detail:        hyperparameter sweep results table
   Sheet 4 — Future directions: deferred / next-iteration items
@@ -556,16 +556,17 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
 
     Leftmost column: every candidate value across every search axis,
     grouped under a section-header row per axis. Right columns: best
-    metric per (parameter, gene) — one column per gene if a ``gene``
-    axis exists, otherwise a single ``Best metric`` column.
+    metric per (parameter, target) — one column per target value if a
+    target axis exists (e.g. gene, pathogen, task), otherwise a single
+    ``Best metric`` column.
 
-    Layout (multi-gene mode)::
+    Layout (multi-target mode)::
 
-        | Parameter        | histone | OLIG2 | ACVR1 | TP53  |
+        | Parameter        | flu     | covid | strep | RSV   |
         | ─ Method ─       | (turquoise stripe across all cols)|
-        | xgb              |  0.849  | 0.74  | 0.796 | 0.717 |  ← per-gene winners
+        | xgb              |  0.849  | 0.74  | 0.796 | 0.717 |  ← per-target winners
         | tabpfn           |  0.81   | 0.808 | 0.71  | 0.66  |    highlighted in
-        | ─ Feature Mode ─ | (deeppink stripe)                 |    that gene's col
+        | ─ Feature Mode ─ | (deeppink stripe)                 |    that target's col
         | mi_top20         |  0.849  | 0.78  | 0.796 | 0.717 |
         | ...
 
@@ -573,7 +574,15 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     (turquoise → deeppink → amber → blueviolet). Body cells use no
     fill so default Excel gridlines remain visible. Per-axis winners
     are derived from ``results_history`` (max metric per axis-value
-    per gene, complete runs only).
+    per target value, complete runs only).
+
+    **Target axis selection.** ``state.target_axis`` names which axis to
+    render as columns (e.g. ``"pathogen"`` for CurieDx, ``"gene"`` for
+    radiogenomics, ``"task"`` for multi-task NLP). When absent or
+    invalid, falls back to common names: ``target``, ``gene``,
+    ``pathogen``, ``disease``, ``label``, ``task``. If no target axis
+    is found or it has only one value, a single ``Best metric`` column
+    is rendered instead.
 
     **Axis order = tested-first → tested-last.** Sections are emitted in
     the order they appear in ``state.axes`` (Python dict insertion
@@ -587,26 +596,34 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     results_history: list[dict] = state.get("results_history", [])
     scope_slug = state.get("scope_slug", "")
 
-    # Pull off the gene/target axis (treated as columns, not rows).
-    target_keys = ("gene", "target")
-    target_key = next((k for k in target_keys if k in axes), None)
+    # Resolve target axis: explicit declaration first, then common names.
+    declared_target = state.get("target_axis")
+    fallback_target_keys = (
+        "target", "gene", "pathogen", "disease", "label", "task",
+    )
+    if declared_target and declared_target in axes:
+        target_key = declared_target
+    else:
+        target_key = next(
+            (k for k in fallback_target_keys if k in axes), None
+        )
     target_values: list = []
     if target_key is not None:
         tv = axes[target_key]
         target_values = list(tv) if isinstance(tv, list) else [tv]
 
-    # Hyperparameter axes (everything else).
+    # Hyperparameter axes (everything except the target axis).
     axis_items = [
         (name, vals if isinstance(vals, list) else [vals])
         for name, vals in axes.items()
-        if name not in target_keys
+        if name != target_key
     ]
     if not axis_items or all(len(v) == 0 for _, v in axis_items):
         return
 
     # Column structure: A=Parameter, then one per target value (or single metric col).
-    multi_gene = len(target_values) > 1
-    metric_cols = target_values if multi_gene else [None]
+    multi_target = len(target_values) > 1
+    metric_cols = target_values if multi_target else [None]
     n_cols = 1 + len(metric_cols)
 
     ws = wb.create_sheet("Axis Matrix")
@@ -626,7 +643,7 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
 
     # Header row
     target_metric = state.get("target_metric") or "Best metric"
-    if multi_gene:
+    if multi_target:
         headers = ["Parameter"] + [str(g) for g in target_values]
     else:
         headers = ["Parameter", _humanize(target_metric)]
@@ -636,7 +653,7 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     accent_cycle = [_TURQUOISE, _DEEPPINK, _AMBER, _BLUEVIOLET]
     accent_white_text = {_DEEPPINK, _BLUEVIOLET}  # contrast on dark fills
 
-    def _best_metric(ax_name, ax_value, gene_value):
+    def _best_metric(ax_name, ax_value, target_value):
         """Best metric_value across complete runs matching the filters."""
         matches = []
         for r in results_history:
@@ -645,7 +662,7 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
                 continue
             if r_axes.get(ax_name) != ax_value:
                 continue
-            if gene_value is not None and r_axes.get(target_key) != gene_value:
+            if target_value is not None and r_axes.get(target_key) != target_value:
                 continue
             mv = r.get("metric_value")
             if mv is None:
@@ -667,29 +684,29 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
             ws.cell(row=row, column=col).fill = _fill(accent)
         row += 1
 
-        # Pre-compute the best metric per (gene, ax_value) so we can find
-        # the winning ax_value per gene column for this section.
-        section_metrics: dict = {}  # (gene_value, ax_value) -> mv
+        # Pre-compute the best metric per (target, ax_value) so we can find
+        # the winning ax_value per target column for this section.
+        section_metrics: dict = {}  # (target_value, ax_value) -> mv
         for v in vals:
-            for gene_value in metric_cols:
-                section_metrics[(gene_value, v)] = _best_metric(
-                    ax_name, v, gene_value
+            for target_value in metric_cols:
+                section_metrics[(target_value, v)] = _best_metric(
+                    ax_name, v, target_value
                 )
 
-        # Per-gene-column winning ax_value (the one with the max metric).
-        winning_value_per_col: dict = {}  # gene_value -> ax_value
-        for gene_value in metric_cols:
+        # Per-target-column winning ax_value (the one with the max metric).
+        winning_value_per_col: dict = {}  # target_value -> ax_value
+        for target_value in metric_cols:
             best_v = None
             best_mv = None
             for v in vals:
-                mv = section_metrics.get((gene_value, v))
+                mv = section_metrics.get((target_value, v))
                 if mv is None:
                     continue
                 if best_mv is None or mv > best_mv:
                     best_mv = mv
                     best_v = v
             if best_v is not None:
-                winning_value_per_col[gene_value] = best_v
+                winning_value_per_col[target_value] = best_v
 
         # Body rows
         for v in vals:
@@ -698,11 +715,11 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
             pcell.font = _font(_INK)
             pcell.alignment = _align()
 
-            for col_idx, gene_value in enumerate(metric_cols, start=2):
-                mv = section_metrics.get((gene_value, v))
+            for col_idx, target_value in enumerate(metric_cols, start=2):
+                mv = section_metrics.get((target_value, v))
                 is_winner = (
                     mv is not None
-                    and winning_value_per_col.get(gene_value) == v
+                    and winning_value_per_col.get(target_value) == v
                 )
                 if mv is None:
                     metric_str = "▶ DEFERRED"
@@ -723,8 +740,8 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
                     mcell.font = _font(_BLUEVIOLET, name="Geist Mono")
             row += 1
 
-    # Column widths: param col wider, metric cols narrower in multi-gene mode.
-    if multi_gene:
+    # Column widths: param col wider, metric cols narrower in multi-target mode.
+    if multi_target:
         col_widths = [28] + [16] * len(target_values)
     else:
         col_widths = [32, 18]

@@ -16,6 +16,7 @@ You are bootstrapping an /autoresearch session. The user gave you a free-text sc
     "<category1>": ["<value1>", "<value2>", ...],
     "<category2>": ["<value1>", ...]
   },
+  "target_axis": "<axis-key-name>" or null,
   "rationale": "<1-2 sentences on why these axes were chosen>"
 }
 ```
@@ -26,7 +27,14 @@ You are bootstrapping an /autoresearch session. The user gave you a free-text sc
 3. If the user named a target metric in the scope ("until val_corr > 0.85"), parse it. If not, set target_metric to null and rely on exhaustion-stop.
 4. scope_slug is filename-safe (lowercase, hyphens, no special chars). Should make sense as a research-log entry slug.
 5. If you can't make sense of the scope, return `{"error": "<one-sentence reason>"}` instead — the SKILL.md handles the error path.
-6. **Axis order = chronological sweep order.** List axes in the order they would naturally be swept first → last (e.g., backbone before regularization, model before input modality before evaluation strategy). The downstream `_build_xlsx.py` Axis Matrix renders sections top-to-bottom in this order, so the spreadsheet reads as the actual research journey. If a `gene` / `target` axis exists, it goes LAST in the dict (it's rendered as columns, not rows, but order still matters for compactness in iteration loops).
+6. **Axis order = chronological sweep order.** List axes in the order they would naturally be swept first → last (e.g., backbone before regularization, model before input modality before evaluation strategy). The downstream `_build_xlsx.py` Axis Matrix renders sections top-to-bottom in this order, so the spreadsheet reads as the actual research journey. If a target axis exists (see Rule 7), it goes LAST in the dict — it's rendered as columns rather than rows, but ordering still matters for iteration loops.
+
+7. **Target axis declaration.** Many projects sweep across a set of prediction targets in addition to hyperparameters — genes (radiogenomics), pathogens (CurieDx: flu, covid, strep, RSV), tasks (multi-task NLP), languages, datasets. If the scope implies one of these, include it as a normal axis AND set `target_axis` to that axis's key name. Examples:
+   - CurieDx: `axes.pathogen = ["flu", "covid", "strep"]`, `target_axis = "pathogen"`
+   - Radiogenomics: `axes.gene = ["TP53", "ATRX", ...]`, `target_axis = "gene"`
+   - Multi-task NLP: `axes.task = ["sentiment", "ner", "qa"]`, `target_axis = "task"`
+
+   The Axis Matrix renders the target axis as side-by-side **columns** (one per target value) so per-target winners can be scanned at a glance. Hyperparameter axes become row sections. If there is no natural target axis (a single-target sweep), set `target_axis: null` and the matrix renders a single "Best metric" column.
 
 **Cardinality budget:**
 The full Cartesian product of axes is the worst-case search space. Keep it under ~50 cells unless the scope explicitly asks for exhaustive sweep. If the product would exceed 50, propose smaller axis vocabularies.
