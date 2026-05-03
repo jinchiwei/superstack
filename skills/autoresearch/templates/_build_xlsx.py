@@ -481,12 +481,12 @@ def _build_legend(wb: Workbook) -> None:
     _write_header_row(ws, row, ["", "Status", "Meaning", "Sample fill"])
 
     statuses = [
-        ("WON",      "Ran this iteration and was the winner for its experiment",     "WON",      _TURQUOISE),
-        ("RAN",      "Ran this iteration; informative but not the top choice",       "RAN",      _RAN_LIGHT),
-        ("LOST",     "Ran and was ACTIVELY HARMFUL — avoid in future",               "LOST",     _DEEPPINK),
-        ("NEW",      "Added mid-session; added on top of the original plan",         "NEW",      _AMBER),
-        ("DEF",      "Matrix item was never attempted (deferred to next sprint)",    "DEFERRED", _DEFERRED_GREY),
-        ("HALTED",   "Session halted due to infra failure",                          "HALTED",   _MUTED),
+        ("WON",      "Ran this iteration and was the winner for its experiment",     "★ WON",       _TURQUOISE),
+        ("RAN",      "Ran this iteration; informative but not the top choice",       "✓ RAN",       _RAN_LIGHT),
+        ("LOST",     "Ran and was ACTIVELY HARMFUL — avoid in future",               "✗ LOST",      _DEEPPINK),
+        ("NEW",      "Added mid-session; added on top of the original plan",         "◆ NEW",       _AMBER),
+        ("DEF",      "Matrix item was never attempted (deferred to next sprint)",    "▶ DEFERRED",  _DEFERRED_GREY),
+        ("HALTED",   "Session halted due to infra failure",                          "◼ HALTED",    _MUTED),
     ]
 
     for stat, meaning, sample, bg_hex in statuses:
@@ -658,8 +658,8 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
         accent = accent_cycle[ax_idx % len(accent_cycle)]
         text_on_accent = _WHITE if accent in accent_white_text else _INK
 
-        # Section-header row spanning all columns
-        c = ws.cell(row=row, column=1, value=_humanize(ax_name))
+        # Section-header row spanning all columns (◆ bullet prefix).
+        c = ws.cell(row=row, column=1, value=f"◆  {_humanize(ax_name)}")
         c.fill = _fill(accent)
         c.font = _font(text_on_accent, bold=True, size=11)
         c.alignment = _align()
@@ -700,10 +700,18 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
 
             for col_idx, gene_value in enumerate(metric_cols, start=2):
                 mv = section_metrics.get((gene_value, v))
-                metric_str = f"{mv}" if mv is not None else "—"
+                is_winner = (
+                    mv is not None
+                    and winning_value_per_col.get(gene_value) == v
+                )
+                if mv is None:
+                    metric_str = "—"
+                elif is_winner:
+                    metric_str = f"{mv} ★"  # solid unicode star (text glyph)
+                else:
+                    metric_str = f"{mv}"
                 mcell = ws.cell(row=row, column=col_idx, value=metric_str)
                 mcell.alignment = _align(horizontal="center")
-                is_winner = winning_value_per_col.get(gene_value) == v
                 if is_winner:
                     mcell.fill = _fill(accent)
                     mcell.font = _font(text_on_accent, bold=True,
