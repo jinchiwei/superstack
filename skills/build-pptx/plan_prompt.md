@@ -21,6 +21,7 @@ For each slide, pick exactly one `kind` from this catalog and fill in the matchi
 | `figure-with-aside` | figure left (weight 2) + commentary card right (weight 1) |
 | `cards-with-takeaway` | N cards in a row + dark accent-callout footer |
 | `table-with-takeaway` | full-width data table + dark accent-callout footer |
+| `conclusions` | closing slide — dark navy bg + rotating brand-accent cards |
 | `composition` | 2+ structurally-distinct chunks no named layout captures (fallback) |
 | `freeform` | genuinely bespoke geometry — last resort only |
 
@@ -144,6 +145,28 @@ Full-width data table (3/4 of body height) + dark accent-callout footer (1/4). U
 }
 ```
 - First row is the header (rendered with accent-color fill).
+
+### conclusions
+Closing slide for takeaways / conclusions / summary content. Dark navy
+background, N cards in a 1xN or 2xN grid (each with optional glyph icon),
+auto-rotating brand accents (turquoise → deeppink → amber → blueviolet),
+optional dark accent-callout footer for the path-forward sentence.
+
+```json
+{"title": "Takeaways", "lede": "...", "section_label": "Takeaways",
+ "cards": [{"label": "...", "body": "...", "icon": "FaName"}, ...],
+ "callout": {"text": "Path forward: ...", "tone": "dark"}}
+```
+
+**Auto-fire pattern (preferred over `bg-flip` for closing slides):** When a
+slide's title (or its H1/section label) matches one of `takeaways`,
+`conclusions`, `conclusion`, `summary`, `next steps`, `key findings`,
+`closing`, or `final thoughts` (case-insensitive substring match), pick
+`conclusions` instead of `bg-flip` or `content-text`. The bullets become
+cards (one bullet → one card; bold prefix → label, remainder → body).
+Pick distinct icons per card since closing-slide cards typically span
+distinct semantic categories (result / caveat / target / next step) — the
+icon-homogeneity rule says distinct items get distinct icons.
 
 ### composition
 Weight-based row × column block grid. Use ONLY when a slide has 2+ structurally distinct content chunks (e.g., a figure + a stat row + a callout) that no single named layout captures. Each row has blocks; each block has a kind from the block primitives (`paragraph`, `figure`, `card-row`, `stat-tile`, `accent-callout`, `table`, `quote`, `left-accent-card`).
@@ -348,7 +371,8 @@ embedded `\n`.
 
 **Layout selection priority (apply in order):**
 
-1. **Named layouts first.** Try the 13 named layouts (`content-text`, `content-text-image`, `content-image-only`, `cards-grid`, `cards-heterogeneous`, `three-pillars`, `stat-callouts-right`, `bg-flip`, `timeline`, `stats-with-takeaway`, `figure-with-aside`, `cards-with-takeaway`, `table-with-takeaway`). These are deterministic, brand-locked, and consistent across decks.
+1. **Named layouts first.** Try the 14 named layouts (`conclusions`, `content-text`, `content-text-image`, `content-image-only`, `cards-grid`, `cards-heterogeneous`, `three-pillars`, `stat-callouts-right`, `bg-flip`, `timeline`, `stats-with-takeaway`, `figure-with-aside`, `cards-with-takeaway`, `table-with-takeaway`). These are deterministic, brand-locked, and consistent across decks.
+   - For closing slides (titles matching takeaways/conclusions/summary/next steps/key findings), prefer `conclusions` — its dark bg and rotating accents are designed for visual impact at deck close.
 2. **`composition` is a fallback** — only when the slide has 2+ structurally distinct chunks (e.g., a figure + a paragraph + a stat row + a callout) that no single named layout captures. Composition gives you arbitrary rows × blocks but trades determinism for flexibility.
 3. **`freeform` is the last resort** — only for genuinely bespoke geometry (custom arrows, unusual stat arrangements) that no named layout AND no reasonable composition can express.
 
@@ -359,7 +383,8 @@ When picking a named layout for a slide, prefer in this order:
 1. **Explicit structural patterns** beat heuristics. If the markdown has 3+ `### H3` blocks under one `## H2`, that's a `cards-grid`. If H3 blocks come in pairs of "primary + secondary" sizes (one with a long body, others short), that's `cards-heterogeneous`.
 
 2. **Content semantics** drive the choice when structure is ambiguous:
-   - Title contains "Key", "Takeaway", "Critical", "Bottom line" → `bg-flip`
+   - Title (case-insensitive substring) matches "takeaways", "conclusions", "conclusion", "summary", "next steps", "key findings", "closing", "final thoughts" → `conclusions`
+   - Title contains "Key", "Takeaway", "Critical", "Bottom line" (and does NOT match the `conclusions` auto-fire above) → `bg-flip`
    - Title or body has 3 explicit comparisons (e.g., "Trial · Real-world · Practice") → `three-pillars`
    - Body has chart + ≥2 numeric headlines → `stat-callouts-right`
    - Body has 2-5 standalone metric numbers + one summary sentence → `stats-with-takeaway`

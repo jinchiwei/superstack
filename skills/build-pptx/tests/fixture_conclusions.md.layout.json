@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "deck_md_hash": "fixture-conclusions",
+  "shake_seed": null,
+  "slides": [
+    {
+      "slide_id": "h2-takeaways",
+      "kind": "conclusions",
+      "params": {
+        "title": "Takeaways",
+        "lede": "Five findings that survive every methodology check.",
+        "section_label": "Takeaways",
+        "cards": [
+          {
+            "label": "Headline AUC",
+            "body": "Histone variant generalizes at AUC 0.848 ± 0.040 with FLAIR shape features alone. Five seeds, std < 0.05, leak-free site-mixed eval.",
+            "icon": "FaChartLine"
+          },
+          {
+            "label": "Survivors",
+            "body": "OLIG2 (0.808) and PIK3CA (0.791) — both already leak-free. Histone within-UCSF is 0.685 leak-free.",
+            "icon": "FaCheckCircle"
+          },
+          {
+            "label": "Leakage discovery",
+            "body": "Original mi_top20 LOOCV numbers were inflated by 0.09–0.20. TP53 and ATRX collapse to chance once leakage is removed.",
+            "icon": "FaExclamationTriangle"
+          },
+          {
+            "label": "Honest ceiling",
+            "body": "AUC 0.95 target was never realistic. Site-mixed ~0.85, within-UCSF ~0.70 for the strongest gene.",
+            "icon": "FaCrosshairs"
+          }
+        ],
+        "callout": {
+          "text": "Path forward: more data, not more architectures; site variety in the training set; per-fold feature selection by default.",
+          "tone": "dark"
+        }
+      },
+      "content_hash": "fixture-conclusions-slide"
+    }
+  ]
+}

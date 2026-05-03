@@ -6,7 +6,8 @@ from . import (content_text, content_text_image, content_image_only,
                stat_callouts_right, bg_flip, timeline, freeform,
                composition,
                stats_with_takeaway, figure_with_aside,
-               cards_with_takeaway, table_with_takeaway)
+               cards_with_takeaway, table_with_takeaway,
+               conclusions)
 
 REGISTRY = {
     "content-text":           content_text.render,
@@ -24,6 +25,7 @@ REGISTRY = {
     "table-with-takeaway":    table_with_takeaway.render,
     "freeform":               freeform.render,
     "composition":            composition.render,
+    "conclusions":            conclusions.render,
 }
 
 
