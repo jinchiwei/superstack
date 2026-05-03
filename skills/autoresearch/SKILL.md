@@ -173,7 +173,7 @@ TODAY=$(date -u +%Y-%m-%d)
   --date "$TODAY"
 ```
 
-`init-project` creates `exp/`, `results/`, `docs/`, adds `exp/` to `.gitignore`, and drops branded `_build_pptx.py` / `_build_pdf.py` / `_build_docx.py` templates into `docs/`. The user can edit those freely — autoresearch invokes them at termination if present.
+`init-project` creates `exp/`, `results/`, `docs/`, adds `exp/` to `.gitignore`, and drops branded `_build_pptx.py` / `_build_pdf.py` / `_build_docx.py` / `_build_xlsx.py` templates into `docs/`. The user can edit those freely — autoresearch invokes them at termination if present.
 
 ### Step 6 — Initialize research-log entry (or fall back)
 
@@ -593,7 +593,7 @@ After the final summary is written, invoke any project-local doc builders to pro
 SESSION_DATE=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .session_started_at | cut -dT -f1)
 [[ -z "$SESSION_DATE" || "$SESSION_DATE" == "null" ]] && SESSION_DATE=$(date -u +%Y-%m-%d)
 
-for builder in docs/_build_pptx.py docs/_build_docx.py docs/_build_pdf.py; do
+for builder in docs/_build_pptx.py docs/_build_docx.py docs/_build_pdf.py docs/_build_xlsx.py; do
   if [[ -f "$builder" ]]; then
     python "$builder" --date "$SESSION_DATE" --scope "$SCOPE_SLUG" \
       || echo "warning: $builder failed (continuing — reports are best-effort)"

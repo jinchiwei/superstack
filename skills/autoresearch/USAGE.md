@@ -79,7 +79,7 @@ At termination, the skill invokes any of `docs/_build_pptx.py`, `docs/_build_doc
 Report builds are best-effort: failures (missing `python-pptx` etc.) are logged but don't block termination.
 
 Pip prereqs:
-- `pip install python-pptx python-docx markdown weasyprint`
+- `pip install python-pptx python-docx markdown weasyprint openpyxl`
 - macOS PDF builder also needs system libs: `brew install pango glib`
 
 ## state.json schema (v1)
