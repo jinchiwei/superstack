@@ -705,14 +705,17 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
                     and winning_value_per_col.get(gene_value) == v
                 )
                 if mv is None:
-                    metric_str = "—"
+                    metric_str = "▶ DEFERRED"
                 elif is_winner:
                     metric_str = f"{mv} ★"  # solid unicode star (text glyph)
                 else:
                     metric_str = f"{mv}"
                 mcell = ws.cell(row=row, column=col_idx, value=metric_str)
                 mcell.alignment = _align(horizontal="center")
-                if is_winner:
+                if mv is None:
+                    mcell.fill = _fill(_DEFERRED_GREY)
+                    mcell.font = _font(_MUTED, italic=True, size=9)
+                elif is_winner:
                     mcell.fill = _fill(accent)
                     mcell.font = _font(text_on_accent, bold=True,
                                        name="Geist Mono")
