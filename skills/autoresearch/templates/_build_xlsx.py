@@ -6,12 +6,13 @@ Reads:
 Writes (default):
   results/<date>_<scope>/scorecard_<date>.xlsx
 
-Generates up to 5 sheets (gracefully skipped when state data is absent):
-  Sheet 1 — Matrix:            experiment × axis grid with winner rows
+Generates up to 6 sheets (gracefully skipped when state data is absent):
+  Sheet 1 — Matrix:            iteration grid with axes-as-sections + winners
   Sheet 2 — Per-task headline: best config + key metrics per task/target
   Sheet 3 — HPO detail:        hyperparameter sweep results table
   Sheet 4 — Future directions: deferred / next-iteration items
   Sheet 5 — Legend:            color & status glyph reference
+  Sheet 6 — Axis Matrix:       axes-as-columns scorecard view (CurieDx style)
 
 Brand palette from skills/_shared/branding.py:
   header bg:  INK   #141414, white text, bold
@@ -667,6 +668,122 @@ def _build_legend(wb: Workbook) -> None:
     _freeze(ws, "A2")
 
 
+def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
+    """Last sheet — axes-as-columns view (curiedx scorecard style).
+
+    Mirrors the canonical CurieDx experiment matrix: each axis (the dimensions
+    being explored — backbone, preprocessing, tabular features, etc.) is its
+    own COLUMN, and the rows enumerate the candidate values tried under each
+    axis. Per-axis winners get a turquoise 🏆 row at the top.
+
+    This is the compact "what did we try across the search space" view, in
+    contrast to the main Matrix sheet's iteration-by-iteration grid.
+    """
+    axes: dict = state.get("axes", {})
+    if not axes:
+        return
+    results_history: list[dict] = state.get("results_history", [])
+    current_best: dict | None = state.get("current_best")
+    best_axes: dict = (current_best.get("axes") or {}) if current_best else {}
+    scope_slug = state.get("scope_slug", "")
+
+    ws = wb.create_sheet("Axis Matrix")
+    _set_tab_color(ws)
+
+    axis_names = list(axes.keys())
+    axis_values_lists = [
+        ax_vals if isinstance(ax_vals, list) else [ax_vals]
+        for ax_vals in axes.values()
+    ]
+    max_rows = max((len(v) for v in axis_values_lists), default=0)
+    if max_rows == 0:
+        return
+
+    n_cols = 2 + len(axis_names)  # # / Item-label / one per axis
+
+    # Title bar
+    title = f"{_humanize(scope_slug)} — Axis Matrix · {date_str}"
+    c = ws.cell(row=1, column=1, value=title)
+    c.fill = _fill(_INK)
+    c.font = _font(_WHITE, bold=True, size=12)
+    c.alignment = _align()
+    for col in range(2, n_cols + 1):
+        ws.cell(row=1, column=col).fill = _fill(_INK)
+
+    sub = state.get("scope", "") or _humanize(scope_slug)
+    _write_subheader_row(ws, 2, sub, n_cols)
+
+    # spacer
+    for col in range(1, n_cols + 1):
+        ws.cell(row=3, column=col).fill = _fill("FFFFFF")
+
+    # Header row: # | Item | <axis 1> | <axis 2> | ...
+    headers = ["#", "Item"] + [_humanize(name) for name in axis_names]
+    _write_header_row(ws, 4, headers)
+
+    # Per-axis winner row (★)
+    winner_vals = ["★", "Per-axis winner"]
+    for ax_name in axis_names:
+        winning_value = best_axes.get(ax_name)
+        # find best metric under this winning value if available
+        if winning_value is not None:
+            matches = [
+                r for r in results_history
+                if r.get("axes", {}).get(ax_name) == winning_value
+                and r.get("status") == "complete"
+            ]
+            best = max(matches, key=lambda x: x.get("metric_value") or 0,
+                       default=None)
+            mv = best.get("metric_value") if best else None
+            label = f"🏆 {winning_value}"
+            if mv is not None:
+                label += f"  ({mv})"
+            winner_vals.append(label)
+        else:
+            winner_vals.append("—")
+
+    for i, val in enumerate(winner_vals):
+        c = ws.cell(row=5, column=i + 1, value=val)
+        c.fill = _fill(_TURQUOISE)
+        c.font = _font(_INK, bold=True)
+        c.alignment = _align()
+
+    # Data rows: numbered 1, 2, 3..., one row per candidate index across axes.
+    # Row R holds the R-th candidate of each axis (or blank if that axis has
+    # fewer values than R).
+    for r_idx in range(max_rows):
+        row = 6 + r_idx
+        cells = [str(r_idx + 1), f"option {r_idx + 1}"]
+        for ax_idx, ax_name in enumerate(axis_names):
+            vals = axis_values_lists[ax_idx]
+            if r_idx >= len(vals):
+                cells.append("")
+                continue
+            v = str(vals[r_idx])
+            # check if this value was the winner for that axis
+            is_winner = best_axes.get(ax_name) == vals[r_idx]
+            cells.append(v)
+            if is_winner:
+                # mark just this cell turquoise after default body styling
+                pass
+
+        _write_body_row(ws, row, cells)
+
+        # second pass to upgrade winning cells to turquoise
+        for ax_idx, ax_name in enumerate(axis_names):
+            vals = axis_values_lists[ax_idx]
+            if r_idx >= len(vals):
+                continue
+            if best_axes.get(ax_name) == vals[r_idx]:
+                c = ws.cell(row=row, column=3 + ax_idx)
+                c.fill = _fill(_TURQUOISE)
+                c.font = _font(_INK, bold=True)
+
+    col_widths = [4, 14] + [22] * len(axis_names)
+    _set_col_widths(ws, col_widths)
+    _freeze(ws, "C5")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -709,6 +826,7 @@ def main() -> None:
     _build_hpo_detail(wb, state)
     _build_future_directions(wb, state)
     _build_legend(wb)
+    _build_axis_matrix(wb, state, args.date)
 
     wb.save(out)
     print(f"wrote {out}")
