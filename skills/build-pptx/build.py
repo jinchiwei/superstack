@@ -504,6 +504,23 @@ def _legacy_main(args) -> int:
     return 0
 
 
+_CONCLUSIONS_KEYWORDS = (
+    "takeaways", "takeaway", "conclusions", "conclusion",
+    "summary", "next steps", "key findings", "closing", "final thoughts",
+)
+
+
+def _is_closing_slide(title: str, section_label: str | None) -> bool:
+    """Return True when a slide title (or parent H1 section label) matches
+    the closing-slide pattern — case-insensitive substring match."""
+    candidates = [title or "", section_label or ""]
+    for candidate in candidates:
+        lower = candidate.lower()
+        if any(kw in lower for kw in _CONCLUSIONS_KEYWORDS):
+            return True
+    return False
+
+
 def _infer_default_plan(*, md_text: str, chunks: list[str],
                         slide_records: list[dict], deck_md_hash: str,
                         base_dir: Path):
@@ -611,7 +628,48 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             continue
 
         # Choose layout
-        if cards:
+        if cards and _is_closing_slide(slide_title, current_h1):
+            # Auto-fire conclusions for closing slides with cards
+            _CLOSING_ACCENTS = [
+                branding.TURQUOISE, branding.DEEPPINK,
+                branding.AMBER, branding.BLUEVIOLET,
+            ]
+            _CLOSING_ICONS = [
+                "FaChartLine", "FaCheckCircle",
+                "FaExclamationTriangle", "FaCrosshairs",
+            ]
+            card_list = []
+            for i, c in enumerate(cards):
+                card_entry = {
+                    "label": c["label"],
+                    "body": c["body"],
+                    "icon": str(c["icon"]) if c.get("icon") else _CLOSING_ICONS[i % len(_CLOSING_ICONS)],
+                    "accent_hex": _CLOSING_ACCENTS[i % len(_CLOSING_ACCENTS)],
+                }
+                card_list.append(card_entry)
+            # Determine callout text: prefer trailing body paragraph; fall back
+            # to lede (the lede-extractor may have consumed the "Path forward"
+            # sentence before we got here). When lede becomes the callout we
+            # clear it to avoid duplicate display.
+            callout_text = ""
+            if body:
+                callout_text = " ".join(
+                    _strip_html(b.get("html", "")) for b in body if b.get("html")
+                ).strip()
+            if not callout_text and lede:
+                callout_text = lede
+                lede = ""  # promote to callout; don't show as lede too
+
+            kind = "conclusions"
+            params = {
+                "title": slide_title,
+                "lede": lede,
+                "section_label": current_h1 or "",
+                "cards": card_list,
+            }
+            if callout_text:
+                params["callout"] = {"text": callout_text, "tone": "dark"}
+        elif cards:
             kind = "cards-grid"
             params = {"title": slide_title, "lede": lede, "body": body,
                       "cards": [{"label": c["label"], "body": c["body"],
