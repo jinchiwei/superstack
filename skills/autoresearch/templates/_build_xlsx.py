@@ -17,10 +17,10 @@ Generates up to 6 sheets (gracefully skipped when state data is absent):
 Brand palette from skills/_shared/branding.py:
   header bg:  INK   #141414, white text, bold
   sub-header: dark  #222222, light-grey text
-  winner:     TURQUOISE #40E0D0, ink text, bold, 🏆 marker
+  winner:     TURQUOISE #40E0D0, ink text, bold (no glyph)
   section:    TURQUOISE fill on section-header rows
   warning:    AMBER #F0C840, white text
-  deferred:   light grey #E8E8E8, dark text, ⏭ marker
+  deferred:   light grey #E8E8E8, dark text
   body:       PAPER #FAFAFA fill, ink text
   tab color:  TURQUOISE on every sheet
 
@@ -94,6 +94,7 @@ try:
         _set_tab_color,
         _set_col_widths,
         _freeze_header as _freeze,
+        add_glyph_to_cell as _add_glyph,
     )
 except ImportError:
     # Fallback: inline definitions so autoresearch keeps working even if
@@ -282,7 +283,7 @@ def _build_matrix(wb: Workbook, state: dict, date_str: str) -> None:
         )
         if best_in_fam:
             mv = best_in_fam.get("metric_value", "")
-            winner_row_vals.append(f"🏆 WON  {mv}" if mv else "🏆 WON")
+            winner_row_vals.append(f"WON  {mv}" if mv else "WON")
         else:
             winner_row_vals.append("—")
 
@@ -598,12 +599,12 @@ def _build_legend(wb: Workbook) -> None:
     _write_header_row(ws, row, ["", "Status", "Meaning", "Sample fill"])
 
     statuses = [
-        ("WON",      "Ran this iteration and was the winner for its experiment",     "🏆 WON",      _TURQUOISE),
-        ("RAN",      "Ran this iteration; informative but not the top choice",       "✅ RAN",       _RAN_LIGHT),
-        ("LOST",     "Ran and was ACTIVELY HARMFUL — avoid in future",               "❌ LOST",      _DEEPPINK),
-        ("NEW",      "Added mid-session; added on top of the original plan",         "🆕 NEW",       _AMBER),
-        ("DEF",      "Matrix item was never attempted (deferred to next sprint)",    "⏭ DEFERRED",  _DEFERRED_GREY),
-        ("HALTED",   "Session halted due to infra failure",                          "🛑 HALTED",    _MUTED),
+        ("WON",      "Ran this iteration and was the winner for its experiment",     "WON",      _TURQUOISE),
+        ("RAN",      "Ran this iteration; informative but not the top choice",       "RAN",      _RAN_LIGHT),
+        ("LOST",     "Ran and was ACTIVELY HARMFUL — avoid in future",               "LOST",     _DEEPPINK),
+        ("NEW",      "Added mid-session; added on top of the original plan",         "NEW",      _AMBER),
+        ("DEF",      "Matrix item was never attempted (deferred to next sprint)",    "DEFERRED", _DEFERRED_GREY),
+        ("HALTED",   "Session halted due to infra failure",                          "HALTED",   _MUTED),
     ]
 
     for stat, meaning, sample, bg_hex in statuses:
@@ -669,37 +670,65 @@ def _build_legend(wb: Workbook) -> None:
 
 
 def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
-    """Last sheet — axes-as-columns view (curiedx scorecard style).
+    """Last sheet — hyperparameter scorecard (CurieDx style).
 
-    Mirrors the canonical CurieDx experiment matrix: each axis (the dimensions
-    being explored — backbone, preprocessing, tabular features, etc.) is its
-    own COLUMN, and the rows enumerate the candidate values tried under each
-    axis. Per-axis winners get a turquoise 🏆 row at the top.
+    Leftmost column: every candidate value across every search axis,
+    grouped under a section-header row per axis. Right columns: best
+    metric per (parameter, gene) — one column per gene if a ``gene``
+    axis exists, otherwise a single ``Best metric`` column.
 
-    This is the compact "what did we try across the search space" view, in
-    contrast to the main Matrix sheet's iteration-by-iteration grid.
+    Layout (multi-gene mode)::
+
+        | Parameter        | histone | OLIG2 | ACVR1 | TP53  |
+        | ─ Method ─       | (turquoise stripe across all cols)|
+        | xgb              |  0.849  | 0.74  | 0.796 | 0.717 |  ← per-gene winners
+        | tabpfn           |  0.81   | 0.808 | 0.71  | 0.66  |    highlighted in
+        | ─ Feature Mode ─ | (deeppink stripe)                 |    that gene's col
+        | mi_top20         |  0.849  | 0.78  | 0.796 | 0.717 |
+        | ...
+
+    Section-header rows cycle through the brand palette
+    (turquoise → deeppink → amber → blueviolet). Body cells use no
+    fill so default Excel gridlines remain visible. Per-axis winners
+    are derived from ``results_history`` (max metric per axis-value
+    per gene, complete runs only).
+
+    **Axis order = tested-first → tested-last.** Sections are emitted in
+    the order they appear in ``state.axes`` (Python dict insertion
+    order). Whoever writes ``state.json`` should list axes in the
+    chronological order they were swept so the matrix reads top-down
+    as the actual search journey.
     """
     axes: dict = state.get("axes", {})
     if not axes:
         return
     results_history: list[dict] = state.get("results_history", [])
-    current_best: dict | None = state.get("current_best")
-    best_axes: dict = (current_best.get("axes") or {}) if current_best else {}
     scope_slug = state.get("scope_slug", "")
+
+    # Pull off the gene/target axis (treated as columns, not rows).
+    target_keys = ("gene", "target")
+    target_key = next((k for k in target_keys if k in axes), None)
+    target_values: list = []
+    if target_key is not None:
+        tv = axes[target_key]
+        target_values = list(tv) if isinstance(tv, list) else [tv]
+
+    # Hyperparameter axes (everything else).
+    axis_items = [
+        (name, vals if isinstance(vals, list) else [vals])
+        for name, vals in axes.items()
+        if name not in target_keys
+    ]
+    if not axis_items or all(len(v) == 0 for _, v in axis_items):
+        return
+
+    # Column structure: A=Parameter, then one per target value (or single metric col).
+    multi_gene = len(target_values) > 1
+    metric_cols = target_values if multi_gene else [None]
+    n_cols = 1 + len(metric_cols)
 
     ws = wb.create_sheet("Axis Matrix")
     _set_tab_color(ws)
-
-    axis_names = list(axes.keys())
-    axis_values_lists = [
-        ax_vals if isinstance(ax_vals, list) else [ax_vals]
-        for ax_vals in axes.values()
-    ]
-    max_rows = max((len(v) for v in axis_values_lists), default=0)
-    if max_rows == 0:
-        return
-
-    n_cols = 2 + len(axis_names)  # # / Item-label / one per axis
 
     # Title bar
     title = f"{_humanize(scope_slug)} — Axis Matrix · {date_str}"
@@ -713,75 +742,101 @@ def _build_axis_matrix(wb: Workbook, state: dict, date_str: str) -> None:
     sub = state.get("scope", "") or _humanize(scope_slug)
     _write_subheader_row(ws, 2, sub, n_cols)
 
-    # spacer
-    for col in range(1, n_cols + 1):
-        ws.cell(row=3, column=col).fill = _fill("FFFFFF")
-
-    # Header row: # | Item | <axis 1> | <axis 2> | ...
-    headers = ["#", "Item"] + [_humanize(name) for name in axis_names]
+    # Header row
+    target_metric = state.get("target_metric") or "Best metric"
+    if multi_gene:
+        headers = ["Parameter"] + [str(g) for g in target_values]
+    else:
+        headers = ["Parameter", _humanize(target_metric)]
     _write_header_row(ws, 4, headers)
 
-    # Per-axis winner row (★)
-    winner_vals = ["★", "Per-axis winner"]
-    for ax_name in axis_names:
-        winning_value = best_axes.get(ax_name)
-        # find best metric under this winning value if available
-        if winning_value is not None:
-            matches = [
-                r for r in results_history
-                if r.get("axes", {}).get(ax_name) == winning_value
-                and r.get("status") == "complete"
-            ]
-            best = max(matches, key=lambda x: x.get("metric_value") or 0,
-                       default=None)
-            mv = best.get("metric_value") if best else None
-            label = f"🏆 {winning_value}"
-            if mv is not None:
-                label += f"  ({mv})"
-            winner_vals.append(label)
-        else:
-            winner_vals.append("—")
+    # Cycle of accent colors for axis sections
+    accent_cycle = [_TURQUOISE, _DEEPPINK, _AMBER, _BLUEVIOLET]
+    accent_white_text = {_DEEPPINK, _BLUEVIOLET}  # contrast on dark fills
 
-    for i, val in enumerate(winner_vals):
-        c = ws.cell(row=5, column=i + 1, value=val)
-        c.fill = _fill(_TURQUOISE)
-        c.font = _font(_INK, bold=True)
+    def _best_metric(ax_name, ax_value, gene_value):
+        """Best metric_value across complete runs matching the filters."""
+        matches = []
+        for r in results_history:
+            r_axes = r.get("axes", {}) or {}
+            if r.get("status") != "complete":
+                continue
+            if r_axes.get(ax_name) != ax_value:
+                continue
+            if gene_value is not None and r_axes.get(target_key) != gene_value:
+                continue
+            mv = r.get("metric_value")
+            if mv is None:
+                continue
+            matches.append(mv)
+        return max(matches) if matches else None
+
+    row = 5
+    for ax_idx, (ax_name, vals) in enumerate(axis_items):
+        accent = accent_cycle[ax_idx % len(accent_cycle)]
+        text_on_accent = _WHITE if accent in accent_white_text else _INK
+
+        # Section-header row spanning all columns
+        c = ws.cell(row=row, column=1, value=_humanize(ax_name))
+        c.fill = _fill(accent)
+        c.font = _font(text_on_accent, bold=True, size=11)
         c.alignment = _align()
+        for col in range(2, n_cols + 1):
+            ws.cell(row=row, column=col).fill = _fill(accent)
+        row += 1
 
-    # Data rows: numbered 1, 2, 3..., one row per candidate index across axes.
-    # Row R holds the R-th candidate of each axis (or blank if that axis has
-    # fewer values than R).
-    for r_idx in range(max_rows):
-        row = 6 + r_idx
-        cells = [str(r_idx + 1), f"option {r_idx + 1}"]
-        for ax_idx, ax_name in enumerate(axis_names):
-            vals = axis_values_lists[ax_idx]
-            if r_idx >= len(vals):
-                cells.append("")
-                continue
-            v = str(vals[r_idx])
-            # check if this value was the winner for that axis
-            is_winner = best_axes.get(ax_name) == vals[r_idx]
-            cells.append(v)
-            if is_winner:
-                # mark just this cell turquoise after default body styling
-                pass
+        # Pre-compute the best metric per (gene, ax_value) so we can find
+        # the winning ax_value per gene column for this section.
+        section_metrics: dict = {}  # (gene_value, ax_value) -> mv
+        for v in vals:
+            for gene_value in metric_cols:
+                section_metrics[(gene_value, v)] = _best_metric(
+                    ax_name, v, gene_value
+                )
 
-        _write_body_row(ws, row, cells)
+        # Per-gene-column winning ax_value (the one with the max metric).
+        winning_value_per_col: dict = {}  # gene_value -> ax_value
+        for gene_value in metric_cols:
+            best_v = None
+            best_mv = None
+            for v in vals:
+                mv = section_metrics.get((gene_value, v))
+                if mv is None:
+                    continue
+                if best_mv is None or mv > best_mv:
+                    best_mv = mv
+                    best_v = v
+            if best_v is not None:
+                winning_value_per_col[gene_value] = best_v
 
-        # second pass to upgrade winning cells to turquoise
-        for ax_idx, ax_name in enumerate(axis_names):
-            vals = axis_values_lists[ax_idx]
-            if r_idx >= len(vals):
-                continue
-            if best_axes.get(ax_name) == vals[r_idx]:
-                c = ws.cell(row=row, column=3 + ax_idx)
-                c.fill = _fill(_TURQUOISE)
-                c.font = _font(_INK, bold=True)
+        # Body rows
+        for v in vals:
+            # Param cell — no fill so gridlines show through.
+            pcell = ws.cell(row=row, column=1, value=str(v))
+            pcell.font = _font(_INK)
+            pcell.alignment = _align()
 
-    col_widths = [4, 14] + [22] * len(axis_names)
+            for col_idx, gene_value in enumerate(metric_cols, start=2):
+                mv = section_metrics.get((gene_value, v))
+                metric_str = f"{mv}" if mv is not None else "—"
+                mcell = ws.cell(row=row, column=col_idx, value=metric_str)
+                mcell.alignment = _align(horizontal="center")
+                is_winner = winning_value_per_col.get(gene_value) == v
+                if is_winner:
+                    mcell.fill = _fill(accent)
+                    mcell.font = _font(text_on_accent, bold=True,
+                                       name="Geist Mono")
+                else:
+                    mcell.font = _font(_BLUEVIOLET, name="Geist Mono")
+            row += 1
+
+    # Column widths: param col wider, metric cols narrower in multi-gene mode.
+    if multi_gene:
+        col_widths = [28] + [16] * len(target_values)
+    else:
+        col_widths = [32, 18]
     _set_col_widths(ws, col_widths)
-    _freeze(ws, "C5")
+    _freeze(ws, "B5")
 
 
 # ---------------------------------------------------------------------------

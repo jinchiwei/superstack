@@ -39,3 +39,4 @@ You are mid-run in an /autoresearch session. After each iteration, you decide wh
 4. The candidate queue is a hint, not a contract. You can rewrite it.
 5. Cap log_block at 5 lines. Be concrete: "Tried unet+t1+mse → val_corr=0.72 (best so far); next: transformer+t1+mse to test arch effect at fixed input/loss."
 6. If you have no idea what to try next AND the queue is empty AND nothing in results_history suggests a new axis, output `{"next_candidate": null, ..., "rationale": "search space exhausted"}` — this triggers the exhaustion stop.
+7. **Axis ordering is chronological.** If a pivot introduces a new axis dimension that wasn't in the original sweep, **append** it to the existing `axes` dict (don't insert). The end-of-session `_build_xlsx.py` renders Axis Matrix sections top-to-bottom in dict insertion order so the scorecard reads as "tested first → tested last."
