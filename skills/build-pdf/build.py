@@ -230,7 +230,12 @@ def _render_cover(meta: dict, default_date: str) -> str:
     if meta.get("subtitle"):
         parts.append(f'<p class="subtitle">{html_mod.escape(str(meta["subtitle"]))}</p>')
     if meta.get("name"):
-        parts.append(f'<p class="name">{html_mod.escape(str(meta["name"]))}</p>')
+        # Name field accepts raw HTML so a cover can inline-style portions
+        # of the byline (e.g. a co-author in INK followed by your name in
+        # the default turquoise: '<span style="color:#14141C">Cousin,</span> Self').
+        # The default .name class colors everything turquoise; any inline
+        # span with an explicit color wins.
+        parts.append(f'<p class="name">{meta["name"]}</p>')
     if meta.get("org"):
         parts.append(f'<p class="org">{html_mod.escape(str(meta["org"]))}</p>')
     parts.append('<hr class="cover-rule" />')
