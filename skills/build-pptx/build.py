@@ -510,6 +510,31 @@ _CONCLUSIONS_KEYWORDS = (
 )
 
 
+def _looks_like_stat_label(label: str) -> bool:
+    """True if a card label reads as a stat token (e.g. '0.91', 'OR = 2.44',
+    'p < 0.001', 'r = +0.92', '68.5%'). Used to distinguish
+    stats-with-takeaway from cards-grid.
+
+    Heuristic: short (≤ 25 chars), contains at least one digit, and is
+    dominated by digits relative to letters. Allows a small letter prefix
+    (OR, AUC, p, n, r, β, ρ, Δ) and a trailing unit/operator.
+    """
+    if not label:
+        return False
+    s = label.strip()
+    if len(s) > 25 or len(s) == 0:
+        return False
+    n_letters = sum(1 for c in s if c.isalpha())
+    n_digits = sum(1 for c in s if c.isdigit())
+    if n_digits == 0:
+        return False
+    if n_letters > 8:           # cap letter count — too wordy = categorical
+        return False
+    if n_letters > n_digits + 4:  # letters mustn't dominate digits
+        return False
+    return True
+
+
 def _is_closing_slide(title: str, section_label: str | None) -> bool:
     """Return True when a slide title (or parent H1 section label) matches
     the closing-slide pattern — case-insensitive substring match."""
@@ -670,12 +695,44 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             if callout_text:
                 params["callout"] = {"text": callout_text, "tone": "dark"}
         elif cards:
-            kind = "cards-grid"
-            params = {"title": slide_title, "lede": lede, "body": body,
-                      "cards": [{"label": c["label"], "body": c["body"],
-                                 "icon": str(c["icon"]) if c.get("icon") else None}
-                                for c in cards],
-                      "section_label": current_h1 or ""}
+            # If 2+ cards AND every label looks like a stat token, prefer
+            # stats-with-takeaway (big-number tiles + dark callout footer)
+            # over cards-grid. Trailing prose / lede promotes to callout.
+            stat_eligible = (
+                len(cards) >= 2
+                and not images
+                and not tables
+                and all(_looks_like_stat_label(c.get("label", "")) for c in cards)
+            )
+            if stat_eligible:
+                callout_text = ""
+                if body:
+                    callout_text = " ".join(
+                        _strip_html(b.get("html", "")) for b in body if b.get("html")
+                    ).strip()
+                if not callout_text and lede:
+                    callout_text = lede
+                    lede = ""
+                kind = "stats-with-takeaway"
+                params = {
+                    "title": slide_title,
+                    "lede": lede,
+                    "section_label": current_h1 or "",
+                    "stats": [
+                        {"value": c["label"], "label": "",
+                         "sub": _strip_html(c.get("body", "") or "")}
+                        for c in cards
+                    ],
+                }
+                if callout_text:
+                    params["callout"] = {"text": callout_text, "tone": "dark"}
+            else:
+                kind = "cards-grid"
+                params = {"title": slide_title, "lede": lede, "body": body,
+                          "cards": [{"label": c["label"], "body": c["body"],
+                                     "icon": str(c["icon"]) if c.get("icon") else None}
+                                    for c in cards],
+                          "section_label": current_h1 or ""}
         elif images or tables:
             n_images = len(images)
             aspect = _get_image_aspect(images[0]) if n_images == 1 else None
@@ -684,13 +741,43 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 and aspect is not None and aspect <= 1.3
                 and (bool(body) or bool(lede))
             )
-            kind = "content-text-image" if (body or lede) else "content-image-only"
-            params = {"title": slide_title, "lede": lede,
-                      "body": body if kind == "content-text-image" else [],
-                      "images": [str(p) for p in images],
-                      "tables": tables,
-                      "use_side_by_side": use_side_by_side,
-                      "section_label": current_h1 or ""}
+            # figure-with-aside: 1 wide image + light commentary (≤3 short
+            # paragraphs/bullets, < 350 chars total). Heavy-caption slides
+            # (long bullets, multi-paragraph captions) keep the centered
+            # content-text-image layout because their text doesn't fit a
+            # 1/3-width aside card.
+            body_text = " ".join(
+                _strip_html(b.get("html", "") or "") for b in (body or [])
+            ).strip() if body else ""
+            aside_eligible = (
+                n_images == 1 and len(tables) == 0 and not cards
+                and aspect is not None and aspect > 1.3
+                and (bool(body) or bool(lede))
+                and len(body or []) <= 3
+                and len(body_text) < 350
+            )
+            if aside_eligible:
+                kind = "figure-with-aside"
+                params = {
+                    "title": slide_title,
+                    "lede": lede,
+                    "section_label": current_h1 or "",
+                    "image": str(images[0]),
+                    "alt": "",
+                    "aside": {
+                        "label": "",
+                        "body": body_text or lede,
+                        "icon": None,
+                    },
+                }
+            else:
+                kind = "content-text-image" if (body or lede) else "content-image-only"
+                params = {"title": slide_title, "lede": lede,
+                          "body": body if kind == "content-text-image" else [],
+                          "images": [str(p) for p in images],
+                          "tables": tables,
+                          "use_side_by_side": use_side_by_side,
+                          "section_label": current_h1 or ""}
         elif body:
             kind = "content-text"
             params = {"title": slide_title, "lede": lede, "body": body,
