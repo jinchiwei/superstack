@@ -530,7 +530,7 @@ def _looks_like_stat_label(label: str) -> bool:
         return False
     if n_letters > 8:           # cap letter count — too wordy = categorical
         return False
-    if n_letters > n_digits + 4:  # letters mustn't dominate digits
+    if n_letters > n_digits + 6:  # letters mustn't dominate digits too heavily
         return False
     return True
 
@@ -733,11 +733,12 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 and not _is_closing_slide(slide_title, current_h1)
                 and all(len((c.get("label") or "").strip()) <= 30 for c in cards)
             ):
-                # Exactly 3 short-labeled cards on a non-closing, non-stat slide
-                # → three-pillars (bigger pillar cards + optional arrow
-                # connectors). Cards-grid n=3 already renders 1×3 but
-                # three-pillars is more visually prominent for parallel
-                # framings (e.g., "Severity · APOE4 · Replication").
+                # 3-card non-closing, non-stat slide → three-pillars
+                # (bigger, more visually prominent pillar cards) but with
+                # show_arrows=False so we don't imply a false sequence.
+                # cards-grid n=3 renders small uniform tiles which read as
+                # half-empty on a 3-aim slide. To force arrows on for an
+                # actual sequence, edit the sidecar manually.
                 kind = "three-pillars"
                 params = {
                     "title": slide_title,
@@ -748,7 +749,7 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                          "color_role": None}
                         for c in cards
                     ],
-                    "show_arrows": True,
+                    "show_arrows": False,
                 }
             else:
                 kind = "cards-grid"
@@ -777,8 +778,8 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 n_images == 1 and len(tables) == 0 and not cards
                 and aspect is not None and aspect > 1.3
                 and (bool(body) or bool(lede))
-                and len(body or []) <= 3
-                and len(body_text) < 350
+                and len(body or []) <= 6        # bullets pack fine in an aside
+                and len(body_text) < 500        # generous chars; long captions stay centered
             )
             if aside_eligible:
                 kind = "figure-with-aside"

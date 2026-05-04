@@ -54,7 +54,23 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
     n = len(cards)
     if n == 0:
         return
-    cols = 3 if n >= 3 else max(n, 1)
+    # Smarter grid distribution — favor balanced rows over filling
+    # left-to-right with a half-empty trailing row.
+    #   n=1 → 1×1, n=2 → 1×2, n=3 → 1×3, n=4 → 2×2,
+    #   n=5 → 2×3 (with 1 empty), n=6 → 2×3,
+    #   n=7-8 → 2×4, n=9 → 3×3, n>9 → grow rows.
+    if n <= 3:
+        cols = n
+    elif n == 4:
+        cols = 2          # 2×2 reads cleaner than 1×3+1×1
+    elif n in (5, 6):
+        cols = 3
+    elif n in (7, 8):
+        cols = 4
+    elif n == 9:
+        cols = 3
+    else:
+        cols = 4
     rows = (n + cols - 1) // cols
     gutter = 0.20
     card_w = (body_w - gutter * (cols - 1)) / cols
