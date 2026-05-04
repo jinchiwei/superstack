@@ -532,6 +532,37 @@ def _is_pipeline_slide(title: str, section_label: str | None) -> bool:
     return False
 
 
+def _extract_descriptor(body_text: str, max_len: int = 40) -> str:
+    """Extract a short descriptor (3-6 words / ≤max_len chars) from the start
+    of a stat-tile body. Returns just the descriptor; callers keep the FULL
+    body as the sub-line so the tile reads as
+        {short descriptor}    ← header
+        {value}               ← big number
+        {full body sentence}  ← sub
+    The header gives identification, the sub keeps the explanation.
+
+    Splits at the first strong delimiter in (period, semicolon, em-dash,
+    colon, opening paren, comma) within max_len chars; otherwise truncates at
+    the last word boundary before max_len.
+    """
+    if not body_text:
+        return ""
+    s = body_text.strip()
+    if not s:
+        return ""
+    for sep in (". ", "; ", " — ", " – ", ": ", " (", ", "):
+        idx = s.find(sep)
+        if 8 <= idx <= max_len:
+            return s[:idx].rstrip(" .,;:—–(").strip()
+    # No delimiter — truncate at last word boundary before max_len
+    if len(s) <= max_len:
+        return s.rstrip(" .,").strip()
+    cut = s.rfind(" ", 0, max_len)
+    if cut <= 8:
+        cut = max_len
+    return s[:cut].rstrip(" .,;:—–(").strip()
+
+
 def _looks_like_stat_label(label: str) -> bool:
     """True if a card label reads as a stat token (e.g. '0.91', 'OR = 2.44',
     'p < 0.001', 'r = +0.92', '68.5%'). Used to distinguish
@@ -735,16 +766,31 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 if not callout_text and lede:
                     callout_text = lede
                     lede = ""
+                # Build stat tiles: extract a short descriptor from each card
+                # body and use it as the tile label (small text ABOVE the big
+                # value); keep the FULL body as the sub-line so the user has
+                # the descriptor as a quick header AND the full explanatory
+                # body. Bare 'n = 476' / 'OR = 2.44' tiles are hard to read
+                # without a descriptor; truncating the body to just-the-rest
+                # loses context. Some redundancy at the descriptor↔sub
+                # boundary is intentional — the small header anchors the
+                # tile, the sub gives the full sentence.
+                stats_list = []
+                for c in cards:
+                    body_clean = _strip_html(c.get("body", "") or "").strip()
+                    descriptor = _extract_descriptor(body_clean)
+                    stats_list.append({
+                        "value": c["label"],
+                        "label": descriptor,
+                        "sub": body_clean,
+                    })
+
                 kind = "stats-with-takeaway"
                 params = {
                     "title": slide_title,
                     "lede": lede,
                     "section_label": current_h1 or "",
-                    "stats": [
-                        {"value": c["label"], "label": "",
-                         "sub": _strip_html(c.get("body", "") or "")}
-                        for c in cards
-                    ],
+                    "stats": stats_list,
                 }
                 if callout_text:
                     params["callout"] = {"text": callout_text, "tone": "dark"}
