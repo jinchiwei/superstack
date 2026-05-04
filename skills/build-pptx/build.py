@@ -771,36 +771,25 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                     ],
                 }
             elif (
-                len(cards) == 3
+                3 <= len(cards) <= 4
                 and not images
                 and not tables
                 and not _is_closing_slide(slide_title, current_h1)
             ):
-                # 3 cards (non-closing, non-stat, non-pipeline) →
-                # cards-heterogeneous. The layout name implies hierarchy
-                # but for n=3 it renders as full-width stacked rows with
-                # bigger cards that fill sparse-text slides. cards-grid
-                # n=3 small uniform tiles read as half-empty; three-pillars
-                # wastes vertical space. cards-heterogeneous splits cards
-                # into primary (first) + secondaries (rest) — for parallel
-                # 3-aim slides the only practical effect is a slightly
-                # thicker accent stripe on the first card.
-                first = cards[0]
-                rest = cards[1:]
-                kind = "cards-heterogeneous"
+                # 3-4 cards (non-closing, non-stat, non-pipeline) →
+                # cards-triple. Flat full-width stacked rows that fill
+                # sparse-text slides. No hierarchy implication (vs
+                # cards-heterogeneous), no false sequence (vs three-pillars
+                # with arrows), and bigger cards than cards-grid 1×3.
+                kind = "cards-triple"
                 params = {
                     "title": slide_title,
                     "lede": lede,
                     "section_label": current_h1 or "",
-                    "primary_card": {
-                        "label": first["label"],
-                        "body": first["body"],
-                        "icon": str(first["icon"]) if first.get("icon") else None,
-                    },
-                    "secondary_cards": [
+                    "cards": [
                         {"label": c["label"], "body": c["body"],
                          "icon": str(c["icon"]) if c.get("icon") else None}
-                        for c in rest
+                        for c in cards
                     ],
                 }
             else:
@@ -834,7 +823,13 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 and len(body_text) < 500        # generous chars; long captions stay centered
             )
             if aside_eligible:
-                kind = "figure-with-aside"
+                # Very wide images (panel composites, e.g. 3-up subplot rows)
+                # don't read well in figure-with-aside's 2:1 horizontal split
+                # because the figure gets crushed into 2/3 width. Aspect ≥ 1.8
+                # → figure-with-aside-horizontal: figure on top full-width,
+                # aside below as a caption strip with top accent stripe.
+                kind = ("figure-with-aside-horizontal" if aspect >= 1.8
+                        else "figure-with-aside")
                 params = {
                     "title": slide_title,
                     "lede": lede,
