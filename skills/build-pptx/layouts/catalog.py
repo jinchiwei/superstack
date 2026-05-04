@@ -3,8 +3,8 @@ in here without touching the dispatcher."""
 
 from . import (content_text, content_text_image, content_image_only,
                cards_grid, cards_heterogeneous, three_pillars,
-               stat_callouts_right, bg_flip, timeline, freeform,
-               composition,
+               stat_callouts_right, bg_flip, timeline, vertical_timeline,
+               freeform, composition,
                stats_with_takeaway, figure_with_aside,
                cards_with_takeaway, table_with_takeaway,
                conclusions)
@@ -19,6 +19,7 @@ REGISTRY = {
     "stat-callouts-right":    stat_callouts_right.render,
     "bg-flip":                bg_flip.render,
     "timeline":               timeline.render,
+    "vertical-timeline":      vertical_timeline.render,
     "stats-with-takeaway":    stats_with_takeaway.render,
     "figure-with-aside":      figure_with_aside.render,
     "cards-with-takeaway":    cards_with_takeaway.render,

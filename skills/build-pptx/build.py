@@ -510,6 +510,28 @@ _CONCLUSIONS_KEYWORDS = (
 )
 
 
+# Pipeline-style keywords for vertical-timeline auto-detection.
+# When a slide title (or its parent H1) contains one of these AND the slide
+# has 3-7 cards with short labels, prefer a vertical-timeline render so the
+# sequential nature is visually carried.
+_PIPELINE_KEYWORDS = (
+    "pipeline", "workflow", "stages", "phases",
+    "process", "procedure", "protocol",
+    "steps", "step-by-step",
+)
+
+
+def _is_pipeline_slide(title: str, section_label: str | None) -> bool:
+    """Case-insensitive substring match for pipeline-style slides."""
+    candidates = [title or "", section_label or ""]
+    for candidate in candidates:
+        c = candidate.lower()
+        for kw in _PIPELINE_KEYWORDS:
+            if kw in c:
+                return True
+    return False
+
+
 def _looks_like_stat_label(label: str) -> bool:
     """True if a card label reads as a stat token (e.g. '0.91', 'OR = 2.44',
     'p < 0.001', 'r = +0.92', '68.5%'). Used to distinguish
@@ -727,29 +749,26 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 if callout_text:
                     params["callout"] = {"text": callout_text, "tone": "dark"}
             elif (
-                len(cards) == 3
+                3 <= len(cards) <= 7
                 and not images
                 and not tables
                 and not _is_closing_slide(slide_title, current_h1)
+                and _is_pipeline_slide(slide_title, current_h1)
                 and all(len((c.get("label") or "").strip()) <= 30 for c in cards)
             ):
-                # 3-card non-closing, non-stat slide → three-pillars
-                # (bigger, more visually prominent pillar cards) but with
-                # show_arrows=False so we don't imply a false sequence.
-                # cards-grid n=3 renders small uniform tiles which read as
-                # half-empty on a 3-aim slide. To force arrows on for an
-                # actual sequence, edit the sidecar manually.
-                kind = "three-pillars"
+                # Pipeline-keyword slide (Pipeline / Workflow / Stages /
+                # Process / Steps...) with 3-7 short-labeled cards →
+                # vertical-timeline. The dots-and-rail visual carries the
+                # sequential nature where flat card grids feel disjoint.
+                kind = "vertical-timeline"
                 params = {
                     "title": slide_title,
                     "lede": lede,
                     "section_label": current_h1 or "",
-                    "pillars": [
-                        {"label": c["label"], "body": c["body"],
-                         "color_role": None}
+                    "stages": [
+                        {"label": c["label"], "body": c["body"]}
                         for c in cards
                     ],
-                    "show_arrows": False,
                 }
             else:
                 kind = "cards-grid"
