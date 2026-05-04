@@ -771,7 +771,11 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                     body_clean = _strip_html(c.get("body", "") or "").strip()
                     descriptor = _extract_descriptor(body_clean, max_len=32)
                     if descriptor:
-                        combined_label = f"{descriptor} · {c['label']}"
+                        # Two-line label: descriptor on line 1, value on line
+                        # 2 with leading "· " to indicate the value is a
+                        # sub-stat of the descriptor. Avoids horizontal
+                        # crowding and overlap with the body text below.
+                        combined_label = f"{descriptor}\n· {c['label']}"
                     else:
                         combined_label = c["label"]
                     new_cards.append({

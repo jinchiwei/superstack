@@ -290,15 +290,19 @@ def _add_card(slide, *, label: str, body: str, left: float, top: float,
     else:
         label_left = left + 0.18
         label_w = width - 0.36
-    # Label at 14pt with breathing room before the 12pt body (~0.18in gap).
-    # 2pt size delta gives visual hierarchy. Combined headers like
-    # "{descriptor} · {n = 476}" still fit since descriptor extraction
-    # caps at 32 chars upstream.
+    # Label at 14pt with breathing room before the 12pt body. 2pt size
+    # delta gives visual hierarchy. Labels may contain a soft line break
+    # ("\n") when the dispatcher pre-formats them as two-line headers
+    # (descriptor on line 1, "· value" on line 2 — see build.py stat-tile
+    # branch). Reserve enough vertical space to fit two 14pt lines.
+    has_linebreak = "\n" in (label or "")
+    label_h = 0.62 if has_linebreak else 0.42
+    body_top_offset = 0.90 if has_linebreak else 0.70
     _add_text(slide, label, left=label_left, top=top + 0.10,
-              width=label_w, height=0.42,
+              width=label_w, height=label_h,
               size=14, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
-    _add_text(slide, body, left=left + 0.18, top=top + 0.70,
-              width=width - 0.36, height=height - 0.80,
+    _add_text(slide, body, left=left + 0.18, top=top + body_top_offset,
+              width=width - 0.36, height=height - body_top_offset - 0.10,
               size=12, color_rgb=body_text_color, font=branding.SANS_FONT)
 
 
