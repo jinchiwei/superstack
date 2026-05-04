@@ -69,11 +69,30 @@ def _css_template(*, watermark: str | None, running_header: str | None) -> str:
 """
 
     return f"""
-/* CJK glyph mapping: WeasyPrint's CSS font-family fallback is unreliable
- * for CJK characters — it tends to stay on the primary font even when
- * glyphs are missing.  Using @font-face with unicode-range tells the
- * engine explicitly to use PingFang TC (with Heiti TC fallback) for
- * CJK codepoints, regardless of which font-family is set elsewhere.
+/* CJK glyph mapping via @font-face + unicode-range.
+ *
+ * WeasyPrint's plain CSS font-family fallback is unreliable for CJK
+ * characters: it tends to stay on the primary Latin font (Geist /
+ * Geist Mono) and render CJK codepoints as blank .notdef glyphs even
+ * when a CJK font is later in the font-family list.  Defining a
+ * virtual 'CJK' family with unicode-range explicitly maps the CJK
+ * Unicode blocks to a CJK font.
+ *
+ * Font choice: Noto Sans CJK SC.  Some PDF viewers (PDFgear, certain
+ * mobile Android apps) cannot reliably render the OpenType-CFF
+ * subsets that WeasyPrint produces from macOS fonts like PingFang TC
+ * and Heiti TC — characters appear as blank glyphs even though the
+ * font is properly embedded.  Noto Sans CJK is the open-source
+ * cross-platform standard and renders correctly in every viewer
+ * tested.  Selection happens at the fontconfig level: the skill's
+ * setup.sh installs `~/.config/fontconfig/fonts.conf` that rejects
+ * the Mac CJK fonts so WeasyPrint falls through to Noto.
+ *
+ * Variant: SC (Simplified) is preferred over TC because most of Jin's
+ * Chinese-language docs are SC-leaning, and Noto Sans CJK SC contains
+ * the full Unicode CJK character set including TC-only codepoints —
+ * the SC vs TC choice only changes the preferred glyph form for
+ * "Han Unified" codepoints that have different style preferences.
  *
  * Ranges covered:
  *   U+3000-303F  CJK Symbols and Punctuation (、。「」etc)
@@ -83,17 +102,19 @@ def _css_template(*, watermark: str | None, running_header: str | None) -> str:
  *   U+FF00-FFEF  Halfwidth and Fullwidth Forms */
 @font-face {{
   font-family: 'CJK';
-  src: local('PingFang TC'), local('Heiti TC'), local('PingFang SC'),
-       local('Hiragino Sans GB'), local('Noto Sans CJK TC');
+  src: local('Noto Sans CJK SC'), local('Noto Sans CJK TC'),
+       local('PingFang TC'), local('Heiti TC'),
+       local('PingFang SC'), local('Hiragino Sans GB');
   unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF,
                  U+F900-FAFF, U+FF00-FFEF;
 }}
 @font-face {{
   font-family: 'CJK';
   font-weight: bold;
-  src: local('PingFang TC Semibold'), local('PingFang TC Bold'),
+  src: local('Noto Sans CJK SC Bold'), local('Noto Sans CJK TC Bold'),
+       local('PingFang TC Semibold'), local('PingFang TC Bold'),
        local('Heiti TC Medium'), local('PingFang SC Semibold'),
-       local('Hiragino Sans GB W6'), local('Noto Sans CJK TC Bold');
+       local('Hiragino Sans GB W6');
   unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF,
                  U+F900-FAFF, U+FF00-FFEF;
 }}

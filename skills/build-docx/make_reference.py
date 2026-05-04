@@ -34,22 +34,33 @@ def _hex_to_rgb(hex_str: str) -> RGBColor:
     return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
+# East Asian font for w:eastAsia attribute. Geist / Geist Mono have no CJK
+# coverage, so when w:eastAsia points to them, Word renders Chinese using
+# its own font fallback (which works), but exporting / lighter viewers see
+# the assigned font as "Geist" and may fail to render. Setting eastAsia
+# explicitly to a CJK-capable font fixes the assignment.
+EAST_ASIA_FONT = "Noto Sans CJK TC"  # works on macOS (brew cask) + Linux (apt)
+
+
 def _force_font_on_style(style, font_name: str) -> None:
     """Override Word's theme font fallback by setting w:rFonts attributes directly.
 
     python-docx's `style.font.name = X` writes only one rFonts attribute and leaves
     theme references (asciiTheme, hAnsiTheme) intact, so Word's heading styles still
-    resolve to "+Headings" (Calibri by default). We explicitly set all four script
-    attributes (ascii, hAnsi, cs, eastAsia) AND remove any theme attributes.
+    resolve to "+Headings" (Calibri by default). We explicitly set ascii / hAnsi / cs
+    to ``font_name`` (Geist or Geist Mono — Latin-only fonts) and eastAsia to a
+    CJK-capable font (``EAST_ASIA_FONT``) so Chinese characters get an explicitly
+    correct font assignment rather than relying on Word's smart fallback.
     """
     rpr = style.element.get_or_add_rPr()
     rfonts = rpr.find(qn("w:rFonts"))
     if rfonts is None:
         rfonts = OxmlElement("w:rFonts")
         rpr.append(rfonts)
-    # Set all script attributes explicitly
-    for attr in ("w:ascii", "w:hAnsi", "w:cs", "w:eastAsia"):
+    # Latin scripts use the requested font; East Asian uses CJK-capable font.
+    for attr in ("w:ascii", "w:hAnsi", "w:cs"):
         rfonts.set(qn(attr), font_name)
+    rfonts.set(qn("w:eastAsia"), EAST_ASIA_FONT)
     # Clear theme attributes that would otherwise win
     for theme_attr in ("w:asciiTheme", "w:hAnsiTheme", "w:cstheme", "w:eastAsiaTheme"):
         if rfonts.get(qn(theme_attr)) is not None:

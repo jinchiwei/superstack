@@ -53,3 +53,15 @@ python ~/arcadia/superstack/skills/build-pdf/build.py \
 ## Branding source of truth
 
 All colors and fonts come from `~/arcadia/superstack/skills/_shared/branding.py`. Edit that file to change the palette globally for build-pdf, build-pptx, and build-docx.
+
+## First-time setup (CJK fonts)
+
+If your docs contain Chinese, Japanese, or Korean characters, run the setup script once:
+
+```bash
+bash ~/arcadia/superstack/skills/build-pdf/setup.sh
+```
+
+This installs Noto Sans CJK (`brew install --cask font-noto-sans-cjk` on macOS) and writes `~/.config/fontconfig/fonts.conf` to make WeasyPrint prefer Noto over the macOS-bundled CJK fonts (PingFang, Heiti, Hiragino, Songti, ST*).
+
+**Why this matters:** WeasyPrint embeds macOS CJK fonts as OpenType-CFF subsets that some PDF viewers (notably PDFgear) can't render — characters appear blank even though the font is properly embedded. Noto Sans CJK renders reliably across every viewer tested. Idempotent and safe to re-run.
