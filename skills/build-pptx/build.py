@@ -563,29 +563,80 @@ def _extract_descriptor(body_text: str, max_len: int = 40) -> str:
     return s[:cut].rstrip(" .,;:—–(").strip()
 
 
+_STAT_PREFIXES = (
+    "n ", "n=", "n =", "p ", "p=", "p =", "p<", "p <", "p>", "p >",
+    "r ", "r=", "r =", "r<", "r <", "r>", "r >",
+    "β", "ρ", "δ", "μ", "σ", "χ",
+    "or ", "or=", "or =", "auc", "rr ", "hr ", "ci ", "ci=", "ci =",
+    "f=", "f =", "t=", "t =", "z=", "z =",
+)
+
+
 def _looks_like_stat_label(label: str) -> bool:
     """True if a card label reads as a stat token (e.g. '0.91', 'OR = 2.44',
     'p < 0.001', 'r = +0.92', '68.5%'). Used to distinguish
     stats-with-takeaway from cards-grid.
 
-    Heuristic: short (≤ 25 chars), contains at least one digit, and is
-    dominated by digits relative to letters. Allows a small letter prefix
-    (OR, AUC, p, n, r, β, ρ, Δ) and a trailing unit/operator.
+    Heuristic — short (≤ 25 chars), contains a digit, and matches AT LEAST
+    ONE of the following stat markers:
+      1. Pure numeric label (digits + decimals/operators only, no letters):
+         '0.91', '2.44', '11/11', '68.5%'.
+      2. Has a comparator / unit / sign character: '=', '<', '>', '≤', '≥',
+         '±', '~', '%', '‰'.
+      3. Begins with a known stat prefix: 'n', 'p', 'r', 'OR', 'AUC', 'β',
+         'ρ', 'F', 't', 'z', 'χ', 'HR', 'RR', 'CI', etc.
+
+    Plain "year-like" tokens such as 'RSNA 2026' or 'Q1 2026' have no
+    operator/unit and don't start with a stat prefix, so they correctly
+    classify as categorical (NOT stat).
     """
     if not label:
         return False
     s = label.strip()
-    if len(s) > 25 or len(s) == 0:
+    if not s or len(s) > 25:
         return False
-    n_letters = sum(1 for c in s if c.isalpha())
     n_digits = sum(1 for c in s if c.isdigit())
     if n_digits == 0:
         return False
-    if n_letters > 8:           # cap letter count — too wordy = categorical
-        return False
-    if n_letters > n_digits + 6:  # letters mustn't dominate digits too heavily
-        return False
-    return True
+
+    # 1. Pure numeric (no letters at all) → always a stat
+    n_letters = sum(1 for c in s if c.isalpha())
+    if n_letters == 0:
+        return True
+
+    # 2. Contains an explicit stat marker (operator / unit / sign)
+    if any(ch in s for ch in "=<>≤≥±~%‰"):
+        return True
+
+    s_low = s.lower()
+
+    # 3. Starts with a known stat prefix
+    for prefix in _STAT_PREFIXES:
+        if s_low.startswith(prefix):
+            return True
+
+    # 4. Number followed by a known scientific unit word (e.g. '11 regions',
+    # '287 scans', '54 subjects'). Distinguishes count-with-unit stats from
+    # 'RSNA 2026' / 'Manuscript' phrases.
+    _UNIT_WORDS = (
+        "region", "regions", "scan", "scans", "subject", "subjects",
+        "obs", "observation", "observations", "voxel", "voxels",
+        "case", "cases", "sample", "samples", "participant", "participants",
+        "patient", "patients", "trial", "trials", "epoch", "epochs",
+        "iteration", "iterations", "step", "steps", "minute", "minutes",
+        "hour", "hours", "day", "days", "week", "weeks", "month", "months",
+        "year", "years", "fold", "folds", "site", "sites",
+    )
+    for unit in _UNIT_WORDS:
+        if f" {unit}" in s_low or s_low.endswith(unit):
+            # Plus require the digit to come before the unit (so 'years 2025'
+            # wouldn't pass — only 'X years' / 'X regions' shapes do)
+            unit_idx = s_low.find(unit)
+            if any(c.isdigit() for c in s_low[:unit_idx]):
+                return True
+
+    # Otherwise it's something like 'RSNA 2026' or 'Q3 2025' — categorical.
+    return False
 
 
 def _is_closing_slide(title: str, section_label: str | None) -> bool:
