@@ -718,8 +718,23 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             ]
             card_list = []
             for i, c in enumerate(cards):
+                # Same two-line treatment as stat-eligible cards-grid: when a
+                # closing-slide card label is a bare stat token (e.g.
+                # "r = +0.92" / "11 / 11"), prepend a short descriptor
+                # extracted from the body so the card reads as
+                #     {descriptor}
+                #     · {value}
+                # Already-descriptive labels (e.g. "Survives controls",
+                # "RSNA 2026") leave as-is.
+                raw_label = c.get("label") or ""
+                final_label = raw_label
+                if _looks_like_stat_label(raw_label):
+                    body_clean = _strip_html(c.get("body", "") or "").strip()
+                    descriptor = _extract_descriptor(body_clean, max_len=32)
+                    if descriptor:
+                        final_label = f"{descriptor}\n· {raw_label}"
                 card_entry = {
-                    "label": c["label"],
+                    "label": final_label,
                     "body": c["body"],
                     "icon": str(c["icon"]) if c.get("icon") else _CLOSING_ICONS[i % len(_CLOSING_ICONS)],
                     "accent_hex": _CLOSING_ACCENTS[i % len(_CLOSING_ACCENTS)],
