@@ -752,45 +752,40 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             # stats-with-takeaway (big-number tiles + dark callout footer)
             # over cards-grid. Trailing prose / lede promotes to callout.
             stat_eligible = (
-                2 <= len(cards) <= 8  # 1 row up to n=4; 2 rows for n=5..8
+                2 <= len(cards) <= 8
                 and not images
                 and not tables
                 and all(_looks_like_stat_label(c.get("label", "")) for c in cards)
             )
             if stat_eligible:
-                callout_text = ""
-                if body:
-                    callout_text = " ".join(
-                        _strip_html(b.get("html", "")) for b in body if b.get("html")
-                    ).strip()
-                if not callout_text and lede:
-                    callout_text = lede
-                    lede = ""
-                # Build stat tiles: extract a short descriptor from each card
-                # body and use it as the tile label (small text ABOVE the big
-                # value); keep the FULL body as the sub-line so the user has
-                # the descriptor as a quick header AND the full explanatory
-                # body. Bare 'n = 476' / 'OR = 2.44' tiles are hard to read
-                # without a descriptor; truncating the body to just-the-rest
-                # loses context. Some redundancy at the descriptor↔sub
-                # boundary is intentional — the small header anchors the
-                # tile, the sub gives the full sentence.
-                stats_list = []
+                # Prepend a descriptor extracted from the body to each card's
+                # numeric label so each card reads as
+                #   '{descriptor} · {n = 476}'
+                # instead of the bare 'n = 476' that's unreadable without
+                # context. Render via cards-grid (single combined header +
+                # body) — simpler than the 3-tier stats-with-takeaway visual
+                # (descriptor / big number / sub) which was getting cramped
+                # for slides with substantive body explanations.
+                new_cards = []
                 for c in cards:
                     body_clean = _strip_html(c.get("body", "") or "").strip()
-                    descriptor = _extract_descriptor(body_clean)
-                    stats_list.append({
-                        "value": c["label"],
-                        "label": descriptor,
-                        "sub": body_clean,
+                    descriptor = _extract_descriptor(body_clean, max_len=32)
+                    if descriptor:
+                        combined_label = f"{descriptor} · {c['label']}"
+                    else:
+                        combined_label = c["label"]
+                    new_cards.append({
+                        "label": combined_label,
+                        "body": body_clean,
+                        "icon": str(c["icon"]) if c.get("icon") else None,
                     })
-
-                kind = "stats-with-takeaway"
+                kind = "cards-grid"
                 params = {
                     "title": slide_title,
                     "lede": lede,
+                    "body": body,
                     "section_label": current_h1 or "",
-                    "stats": stats_list,
+                    "cards": new_cards,
                 }
                 if callout_text:
                     params["callout"] = {"text": callout_text, "tone": "dark"}

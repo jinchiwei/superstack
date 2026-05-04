@@ -290,11 +290,13 @@ def _add_card(slide, *, label: str, body: str, left: float, top: float,
     else:
         label_left = left + 0.18
         label_w = width - 0.36
-    _add_text(slide, label, left=label_left, top=top + 0.18,
-              width=label_w, height=0.4,
-              size=13, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
-    _add_text(slide, body, left=left + 0.18, top=top + 0.65,
-              width=width - 0.36, height=height - 0.75,
+    # Label sits high (top + 0.10 vs 0.18) and slightly smaller (11pt vs 13pt)
+    # so combined headers like "{descriptor} · {n = 476}" don't crowd the body.
+    _add_text(slide, label, left=label_left, top=top + 0.10,
+              width=label_w, height=0.32,
+              size=11, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
+    _add_text(slide, body, left=left + 0.18, top=top + 0.46,
+              width=width - 0.36, height=height - 0.56,
               size=12, color_rgb=body_text_color, font=branding.SANS_FONT)
 
 
