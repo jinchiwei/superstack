@@ -726,6 +726,30 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 }
                 if callout_text:
                     params["callout"] = {"text": callout_text, "tone": "dark"}
+            elif (
+                len(cards) == 3
+                and not images
+                and not tables
+                and not _is_closing_slide(slide_title, current_h1)
+                and all(len((c.get("label") or "").strip()) <= 30 for c in cards)
+            ):
+                # Exactly 3 short-labeled cards on a non-closing, non-stat slide
+                # → three-pillars (bigger pillar cards + optional arrow
+                # connectors). Cards-grid n=3 already renders 1×3 but
+                # three-pillars is more visually prominent for parallel
+                # framings (e.g., "Severity · APOE4 · Replication").
+                kind = "three-pillars"
+                params = {
+                    "title": slide_title,
+                    "lede": lede,
+                    "section_label": current_h1 or "",
+                    "pillars": [
+                        {"label": c["label"], "body": c["body"],
+                         "color_role": None}
+                        for c in cards
+                    ],
+                    "show_arrows": True,
+                }
             else:
                 kind = "cards-grid"
                 params = {"title": slide_title, "lede": lede, "body": body,
