@@ -770,6 +770,32 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                         for c in cards
                     ],
                 }
+            elif (
+                len(cards) == 3
+                and not images
+                and not tables
+                and not _is_closing_slide(slide_title, current_h1)
+            ):
+                # 3 cards (non-closing, non-stat, non-pipeline) →
+                # cards-heterogeneous. The layout's name is misleading
+                # (it implies hierarchy) but for n=3 it renders as
+                # full-width stacked rows with bigger cards that fill
+                # sparse-text slides. cards-grid n=3 would render as
+                # small uniform 1×3 tiles which read as half-empty;
+                # three-pillars wastes vertical space and falsely implies
+                # sequence. cards-heterogeneous is the cleanest visual
+                # for 3 short-text cards.
+                kind = "cards-heterogeneous"
+                params = {
+                    "title": slide_title,
+                    "lede": lede,
+                    "section_label": current_h1 or "",
+                    "cards": [
+                        {"label": c["label"], "body": c["body"],
+                         "icon": str(c["icon"]) if c.get("icon") else None}
+                        for c in cards
+                    ],
+                }
             else:
                 kind = "cards-grid"
                 params = {"title": slide_title, "lede": lede, "body": body,
