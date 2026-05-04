@@ -58,14 +58,25 @@ def section_text_color(bg_color: str) -> str:
 
 
 # === Font stacks (CSS family strings) ===
+# CJK fallback chain favors Traditional Chinese (PingFang TC, Heiti TC) since
+# user's Anki deck uses the same; falls through to Simplified, then Japanese,
+# then Noto pan-CJK for cross-platform safety.  Both stacks include the chain
+# so structural elements (headings, eyebrows, callouts in MONO) and reading
+# content (body, bullets in SANS) both render Chinese reliably.
+_CJK_FALLBACK = (
+    "'PingFang TC', 'Heiti TC', 'PingFang SC', "
+    "'Hiragino Sans GB', 'Hiragino Kaku Gothic ProN', "
+    "'Noto Sans CJK TC', 'Noto Sans CJK SC', "
+    "'Microsoft JhengHei', 'Microsoft YaHei'"
+)
 SANS_FONT_STACK = (
-    "'Geist', 'Helvetica', 'Liberation Sans', "
-    "-apple-system, system-ui, "
-    "'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Microsoft YaHei', "
-    "sans-serif"
+    f"'Geist', 'Helvetica', 'Liberation Sans', "
+    f"-apple-system, system-ui, "
+    f"{_CJK_FALLBACK}, sans-serif"
 )
 MONO_FONT_STACK = (
-    "'Geist Mono', 'SF Mono', 'Menlo', 'Liberation Mono', 'Consolas', monospace"
+    f"'Geist Mono', 'SF Mono', 'Menlo', 'Liberation Mono', 'Consolas', "
+    f"{_CJK_FALLBACK}, monospace"
 )
 
 
