@@ -762,10 +762,10 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 # numeric label so each card reads as
                 #   '{descriptor} · {n = 476}'
                 # instead of the bare 'n = 476' that's unreadable without
-                # context. Render via cards-grid (single combined header +
-                # body) — simpler than the 3-tier stats-with-takeaway visual
-                # (descriptor / big number / sub) which was getting cramped
-                # for slides with substantive body explanations.
+                # context. Render via cards-with-takeaway when a slide-level
+                # takeaway exists (lede or trailing prose) — keeps the dark
+                # navy callout footer that anchors the slide's main message.
+                # Falls back to plain cards-grid when no callout text exists.
                 new_cards = []
                 for c in cards:
                     body_clean = _strip_html(c.get("body", "") or "").strip()
@@ -779,14 +779,36 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                         "body": body_clean,
                         "icon": str(c["icon"]) if c.get("icon") else None,
                     })
-                kind = "cards-grid"
-                params = {
-                    "title": slide_title,
-                    "lede": lede,
-                    "body": body,
-                    "section_label": current_h1 or "",
-                    "cards": new_cards,
-                }
+                # Resolve the takeaway text: trailing body prose first, else
+                # the lede. When promoting lede to callout, clear the lede so
+                # it doesn't render twice (top + dark footer).
+                callout_text = ""
+                if body:
+                    callout_text = " ".join(
+                        _strip_html(b.get("html", "")) for b in body if b.get("html")
+                    ).strip()
+                lede_for_chrome = lede
+                if not callout_text and lede:
+                    callout_text = lede
+                    lede_for_chrome = ""
+                if callout_text:
+                    kind = "cards-with-takeaway"
+                    params = {
+                        "title": slide_title,
+                        "lede": lede_for_chrome,
+                        "section_label": current_h1 or "",
+                        "cards": new_cards,
+                        "callout": {"text": callout_text, "tone": "dark"},
+                    }
+                else:
+                    kind = "cards-grid"
+                    params = {
+                        "title": slide_title,
+                        "lede": lede,
+                        "body": body,
+                        "section_label": current_h1 or "",
+                        "cards": new_cards,
+                    }
             elif (
                 3 <= len(cards) <= 7
                 and not images
