@@ -779,16 +779,21 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                         "body": body_clean,
                         "icon": str(c["icon"]) if c.get("icon") else None,
                     })
-                # Resolve the takeaway text: trailing body prose first, else
-                # the lede. When promoting lede to callout, clear the lede so
-                # it doesn't render twice (top + dark footer).
+                # Resolve takeaway text + decide whether the slide warrants a
+                # dark navy footer at all:
+                #   - trailing body prose ALWAYS promotes (it's a real takeaway)
+                #   - lede only promotes when substantive (≥ 180 chars).
+                #     A short lede (e.g. "Singleshell + multishell side-by-side")
+                #     reads better as the regular subtitle in chrome — no
+                #     footer needed.
+                LEDE_TAKEAWAY_MIN_CHARS = 180
                 callout_text = ""
                 if body:
                     callout_text = " ".join(
                         _strip_html(b.get("html", "")) for b in body if b.get("html")
                     ).strip()
                 lede_for_chrome = lede
-                if not callout_text and lede:
+                if not callout_text and lede and len(lede) >= LEDE_TAKEAWAY_MIN_CHARS:
                     callout_text = lede
                     lede_for_chrome = ""
                 if callout_text:
