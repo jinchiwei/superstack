@@ -58,25 +58,31 @@ def section_text_color(bg_color: str) -> str:
 
 
 # === Font stacks (CSS family strings) ===
-# CJK fallback chain favors Traditional Chinese (PingFang TC, Heiti TC) since
-# user's Anki deck uses the same; falls through to Simplified, then Japanese,
-# then Noto pan-CJK for cross-platform safety.  Both stacks include the chain
-# so structural elements (headings, eyebrows, callouts in MONO) and reading
-# content (body, bullets in SANS) both render Chinese reliably.
-_CJK_FALLBACK = (
+# CJK chars are dispatched via a virtual 'CJK' family that build-pdf's CSS
+# defines with @font-face + unicode-range (mapping U+4E00-9FFF and related
+# blocks to PingFang TC → Heiti TC → fallbacks).  This is needed because
+# WeasyPrint's plain font-family fallback is unreliable for CJK — it tends
+# to stay on the first font even when glyphs are missing.  Putting 'CJK'
+# in the chain BEFORE sans-serif/monospace lets unicode-range fire and
+# pick the right CJK font, while keeping Latin chars on Geist/Geist Mono.
+SANS_FONT_STACK = (
+    "'Geist', 'Helvetica', 'Liberation Sans', "
+    "-apple-system, system-ui, "
+    "'CJK', "
     "'PingFang TC', 'Heiti TC', 'PingFang SC', "
     "'Hiragino Sans GB', 'Hiragino Kaku Gothic ProN', "
     "'Noto Sans CJK TC', 'Noto Sans CJK SC', "
-    "'Microsoft JhengHei', 'Microsoft YaHei'"
-)
-SANS_FONT_STACK = (
-    f"'Geist', 'Helvetica', 'Liberation Sans', "
-    f"-apple-system, system-ui, "
-    f"{_CJK_FALLBACK}, sans-serif"
+    "'Microsoft JhengHei', 'Microsoft YaHei', "
+    "sans-serif"
 )
 MONO_FONT_STACK = (
-    f"'Geist Mono', 'SF Mono', 'Menlo', 'Liberation Mono', 'Consolas', "
-    f"{_CJK_FALLBACK}, monospace"
+    "'Geist Mono', 'SF Mono', 'Menlo', 'Liberation Mono', 'Consolas', "
+    "'CJK', "
+    "'PingFang TC', 'Heiti TC', 'PingFang SC', "
+    "'Hiragino Sans GB', 'Hiragino Kaku Gothic ProN', "
+    "'Noto Sans CJK TC', 'Noto Sans CJK SC', "
+    "'Microsoft JhengHei', 'Microsoft YaHei', "
+    "monospace"
 )
 
 

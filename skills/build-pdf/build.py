@@ -69,6 +69,35 @@ def _css_template(*, watermark: str | None, running_header: str | None) -> str:
 """
 
     return f"""
+/* CJK glyph mapping: WeasyPrint's CSS font-family fallback is unreliable
+ * for CJK characters — it tends to stay on the primary font even when
+ * glyphs are missing.  Using @font-face with unicode-range tells the
+ * engine explicitly to use PingFang TC (with Heiti TC fallback) for
+ * CJK codepoints, regardless of which font-family is set elsewhere.
+ *
+ * Ranges covered:
+ *   U+3000-303F  CJK Symbols and Punctuation (、。「」etc)
+ *   U+3400-4DBF  CJK Extension A (rare hanzi)
+ *   U+4E00-9FFF  CJK Unified Ideographs (main hanzi block)
+ *   U+F900-FAFF  CJK Compatibility Ideographs
+ *   U+FF00-FFEF  Halfwidth and Fullwidth Forms */
+@font-face {{
+  font-family: 'CJK';
+  src: local('PingFang TC'), local('Heiti TC'), local('PingFang SC'),
+       local('Hiragino Sans GB'), local('Noto Sans CJK TC');
+  unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF,
+                 U+F900-FAFF, U+FF00-FFEF;
+}}
+@font-face {{
+  font-family: 'CJK';
+  font-weight: bold;
+  src: local('PingFang TC Semibold'), local('PingFang TC Bold'),
+       local('Heiti TC Medium'), local('PingFang SC Semibold'),
+       local('Hiragino Sans GB W6'), local('Noto Sans CJK TC Bold');
+  unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF,
+                 U+F900-FAFF, U+FF00-FFEF;
+}}
+
 @page {{
   size: Letter;
   margin: 1in;
