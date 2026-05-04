@@ -90,17 +90,40 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
     if homogeneous_icons:
         stats = [{**s, "icon": None} for s in stats]
 
-    # ── Stat tiles row ───────────────────────────────────────────────────────
+    # ── Stat tiles grid ──────────────────────────────────────────────────────
+    # n=1..4 → 1 row; n=5..8 → 2 rows so each tile stays readable.
     n = max(len(stats), 1)
     tile_gutter = 0.15
-    tile_w = (body_w - tile_gutter * (n - 1)) / n
+    if n <= 4:
+        cols = n
+    elif n in (5, 6):
+        cols = 3   # 2x3
+    elif n in (7, 8):
+        cols = 4   # 2x4
+    else:
+        cols = 4   # cap; further rows
+    rows = (n + cols - 1) // cols
+    tile_w = (body_w - tile_gutter * (cols - 1)) / cols
+    tile_row_h = (stat_h - tile_gutter * (rows - 1)) / rows if rows > 1 else stat_h
 
     for i, stat in enumerate(stats):
-        tile_left = body_l + i * (tile_w + tile_gutter)
+        r = i // cols
+        c = i % cols
+        # If the last row is partial, center its tiles within the body width
+        row_start = i // cols * cols
+        row_end = min(row_start + cols, n)
+        row_count = row_end - row_start
+        if row_count < cols:
+            row_w = row_count * tile_w + (row_count - 1) * tile_gutter
+            row_left = body_l + (body_w - row_w) / 2
+        else:
+            row_left = body_l
+        tile_left = row_left + c * (tile_w + tile_gutter)
+        tile_top = body_top + r * (tile_row_h + tile_gutter)
         _stat_tile(
             slide,
-            left=tile_left, top=body_top,
-            width=tile_w, height=stat_h,
+            left=tile_left, top=tile_top,
+            width=tile_w, height=tile_row_h,
             params=stat,
             accent_rgb=accent_rgb,
         )

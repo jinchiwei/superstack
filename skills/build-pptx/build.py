@@ -721,7 +721,7 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             # stats-with-takeaway (big-number tiles + dark callout footer)
             # over cards-grid. Trailing prose / lede promotes to callout.
             stat_eligible = (
-                2 <= len(cards) <= 5  # layout supports 2-5 tiles cleanly
+                2 <= len(cards) <= 8  # 1 row up to n=4; 2 rows for n=5..8
                 and not images
                 and not tables
                 and all(_looks_like_stat_label(c.get("label", "")) for c in cards)
@@ -830,15 +830,41 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 # aside below as a caption strip with top accent stripe.
                 kind = ("figure-with-aside-horizontal" if aspect >= 1.8
                         else "figure-with-aside")
+
+                # Resolve aside body + lede without duplicating content.
+                # When body_text is empty (lede was promoted from body and
+                # no other body items remain), the aside has nothing of its
+                # own — pull lede into the aside and clear the lede so chrome
+                # doesn't render the same string twice (top + bottom).
+                # When body_text exists, lede stays at top and body fills aside.
+                if body_text:
+                    aside_body_text = body_text
+                    lede_for_chrome = lede
+                else:
+                    aside_body_text = lede
+                    lede_for_chrome = ""
+
+                # Synthesize an aside label from the first sentence of the body
+                # when the body is multi-sentence — gives the card a header
+                # instead of a sparse wall of text.
+                aside_label = ""
+                if aside_body_text and aside_body_text.count(". ") >= 2:
+                    first_sent = aside_body_text.split(". ", 1)[0].strip()
+                    if 8 <= len(first_sent) <= 90:
+                        aside_label = first_sent.rstrip(".")
+                        aside_body_text = aside_body_text[len(first_sent) + 2:].strip()
+                        # Lift trailing period from label
+                        aside_label = aside_label.rstrip(".")
+
                 params = {
                     "title": slide_title,
-                    "lede": lede,
+                    "lede": lede_for_chrome,
                     "section_label": current_h1 or "",
                     "image": str(images[0]),
                     "alt": "",
                     "aside": {
-                        "label": "",
-                        "body": body_text or lede,
+                        "label": aside_label,
+                        "body": aside_body_text,
                         "icon": None,
                     },
                 }
