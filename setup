@@ -86,7 +86,7 @@ done
 # when SKILL.md is unchanged. (`diff -rq -x .git` reports differences across
 # all subtrees; an empty diff means the install matches the source.)
 echo ""
-echo "[3/3] Installing custom pipeline skills..."
+echo "[3/4] Installing custom pipeline skills..."
 for skill in $CUSTOM_SKILLS; do
     src_dir="$REPO_DIR/skills/$skill"
     dst_dir="$SKILLS_DIR/$skill"
@@ -99,10 +99,56 @@ for skill in $CUSTOM_SKILLS; do
     fi
 done
 
+# --- 4. brand fonts (Geist + Geist Mono) ---
+# build-pdf/build-pptx/build-docx render best when these are installed.
+# Per-user install (no sudo). Idempotent: skips when all 8 already in place.
+echo ""
+echo "[4/4] Installing brand fonts (Geist + Geist Mono)..."
+FONT_SRC="$REPO_DIR/fonts"
+case "$(uname -s)" in
+    Darwin)  FONT_DST="$HOME/Library/Fonts" ;;
+    Linux)   FONT_DST="$HOME/.local/share/fonts/superstack-geist" ;;
+    *)       FONT_DST="" ;;
+esac
+if [ -z "$FONT_DST" ]; then
+    echo "  Unsupported OS for auto-install ($(uname -s)); copy $FONT_SRC/*.ttf manually."
+elif [ ! -d "$FONT_SRC" ]; then
+    echo "  WARNING: fonts/ source dir missing — skipping."
+else
+    mkdir -p "$FONT_DST"
+    FONT_FILES="Geist-Regular.ttf Geist-Italic.ttf Geist-Bold.ttf Geist-BoldItalic.ttf \
+                GeistMono-Regular.ttf GeistMono-Italic.ttf GeistMono-Bold.ttf GeistMono-BoldItalic.ttf"
+    INSTALLED=0
+    for f in $FONT_FILES; do
+        # macOS Library/Fonts is flat; Linux dst is our scoped subdir
+        if [ "$(uname -s)" = "Darwin" ]; then
+            target="$FONT_DST/$f"
+        else
+            target="$FONT_DST/$f"
+        fi
+        if [ ! -f "$target" ] || ! cmp -s "$FONT_SRC/$f" "$target"; then
+            cp "$FONT_SRC/$f" "$target"
+            INSTALLED=$((INSTALLED + 1))
+        fi
+    done
+    if [ "$INSTALLED" -eq 0 ]; then
+        echo "  Fonts already up to date in $FONT_DST, skipped."
+    else
+        echo "  Installed $INSTALLED font file(s) into $FONT_DST"
+        # Linux: refresh font cache so matplotlib / weasyprint / python-pptx pick them up.
+        # macOS: Font Book auto-discovers; no cache refresh needed.
+        if [ "$(uname -s)" = "Linux" ] && command -v fc-cache >/dev/null 2>&1; then
+            fc-cache -f "$FONT_DST" >/dev/null 2>&1 || true
+            echo "  fc-cache refreshed."
+        fi
+    fi
+fi
+
 echo ""
 echo "=== Done! Full pipeline installed. ==="
 echo "  gstack:      $SKILLS_DIR/gstack"
 echo "  superpowers:  $UPSTREAM_DIR/superpowers"
 echo "  custom:       $REPO_DIR/skills/"
+echo "  fonts:        $FONT_DST"
 echo ""
 echo "Run ./update to pull latest from upstream sources."
