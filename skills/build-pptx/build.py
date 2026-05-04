@@ -721,7 +721,7 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             # stats-with-takeaway (big-number tiles + dark callout footer)
             # over cards-grid. Trailing prose / lede promotes to callout.
             stat_eligible = (
-                len(cards) >= 2
+                2 <= len(cards) <= 5  # layout supports 2-5 tiles cleanly
                 and not images
                 and not tables
                 and all(_looks_like_stat_label(c.get("label", "")) for c in cards)
@@ -777,23 +777,30 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                 and not _is_closing_slide(slide_title, current_h1)
             ):
                 # 3 cards (non-closing, non-stat, non-pipeline) →
-                # cards-heterogeneous. The layout's name is misleading
-                # (it implies hierarchy) but for n=3 it renders as
-                # full-width stacked rows with bigger cards that fill
-                # sparse-text slides. cards-grid n=3 would render as
-                # small uniform 1×3 tiles which read as half-empty;
-                # three-pillars wastes vertical space and falsely implies
-                # sequence. cards-heterogeneous is the cleanest visual
-                # for 3 short-text cards.
+                # cards-heterogeneous. The layout name implies hierarchy
+                # but for n=3 it renders as full-width stacked rows with
+                # bigger cards that fill sparse-text slides. cards-grid
+                # n=3 small uniform tiles read as half-empty; three-pillars
+                # wastes vertical space. cards-heterogeneous splits cards
+                # into primary (first) + secondaries (rest) — for parallel
+                # 3-aim slides the only practical effect is a slightly
+                # thicker accent stripe on the first card.
+                first = cards[0]
+                rest = cards[1:]
                 kind = "cards-heterogeneous"
                 params = {
                     "title": slide_title,
                     "lede": lede,
                     "section_label": current_h1 or "",
-                    "cards": [
+                    "primary_card": {
+                        "label": first["label"],
+                        "body": first["body"],
+                        "icon": str(first["icon"]) if first.get("icon") else None,
+                    },
+                    "secondary_cards": [
                         {"label": c["label"], "body": c["body"],
                          "icon": str(c["icon"]) if c.get("icon") else None}
-                        for c in cards
+                        for c in rest
                     ],
                 }
             else:
