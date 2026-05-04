@@ -787,8 +787,6 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                     "section_label": current_h1 or "",
                     "cards": new_cards,
                 }
-                if callout_text:
-                    params["callout"] = {"text": callout_text, "tone": "dark"}
             elif (
                 3 <= len(cards) <= 7
                 and not images
