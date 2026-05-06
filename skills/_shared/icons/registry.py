@@ -28,18 +28,38 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 def _preload_cairo() -> None:
     import ctypes
-    import ctypes.util
-    if ctypes.util.find_library("cairo") is not None:
-        return  # already visible
-    # Try common Homebrew locations
-    for candidate in (
+    # Prefer the short-name dlopen — succeeds if libcairo is on the runtime
+    # linker's search path. ctypes.util.find_library is unreliable here:
+    # on Linux it can return the SONAME (e.g. "libcairo.so.2") via gcc
+    # introspection even when the file isn't on LD_LIBRARY_PATH, so
+    # downstream cairocffi.dlopen still fails. Attempt an actual load
+    # instead, then fall back to explicit known paths.
+    for short in ("libcairo.so.2", "libcairo.2.dylib", "libcairo-2.dll"):
+        try:
+            ctypes.CDLL(short, mode=ctypes.RTLD_GLOBAL)
+            return
+        except OSError:
+            continue
+    # Try common locations:
+    #   macOS Homebrew: /opt/homebrew, /usr/local
+    #   Linux conda:    /opt/conda/lib (SageMaker, CI containers), $CONDA_PREFIX/lib
+    import os
+    candidates = [
         "/opt/homebrew/lib/libcairo.2.dylib",
         "/opt/homebrew/lib/libcairo.dylib",
         "/usr/local/lib/libcairo.2.dylib",
         "/usr/local/lib/libcairo.dylib",
-    ):
+        "/opt/conda/lib/libcairo.so.2",
+        "/opt/conda/lib/libcairo.so",
+    ]
+    if (cp := os.environ.get("CONDA_PREFIX")):
+        candidates.extend([f"{cp}/lib/libcairo.so.2", f"{cp}/lib/libcairo.so"])
+    for candidate in candidates:
         try:
-            ctypes.CDLL(candidate)
+            # RTLD_GLOBAL so symbols are visible to subsequent dlopen()s by
+            # short name from cairocffi/libffi — without this the macOS
+            # preload "works" but Linux still fails on cairocffi import.
+            ctypes.CDLL(candidate, mode=ctypes.RTLD_GLOBAL)
             return
         except OSError:
             continue

@@ -125,12 +125,31 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
         use_side_by_side=False,
     )
 
-    # ── Vertical 2:1 split ──────────────────────────────────────────────────
+    # ── Vertical split — adaptive to aside content length ──────────────────
+    # Short captions (≤ ~150 chars, no multi-bullet body, no label) only need
+    # a thin caption strip; let the figure absorb the rest. Long / multi-line
+    # asides cap at the original 1/3 split so they don't overpower the figure.
     gutter = 0.20
-    total_weight = 3  # figure=2, aside=1
     available_h = body_h - gutter
-    fig_h = available_h * (2 / total_weight)
-    aside_h = available_h * (1 / total_weight)
+
+    aside_label_text = (aside.get("label") or "").strip()
+    aside_body_text  = (aside.get("body")  or "").strip()
+
+    # Estimate natural aside height: stripe + top-pad + label + body lines + bottom-pad.
+    # body width determines wrap; ~110 chars/line at 12pt Geist on a ~12" body.
+    import math
+    chars_per_line = max(60, int(body_w * 9))   # ~9 chars per inch at 12pt
+    n_body_lines   = max(1, math.ceil(len(aside_body_text) / chars_per_line)) if aside_body_text else 0
+    label_block_h  = 0.40 if aside_label_text else 0.0
+    body_block_h   = n_body_lines * 0.24        # ~0.24 in per line at 12pt
+    pad_top        = _ASIDE_STRIPE_H + 0.14
+    pad_bottom     = 0.20
+    natural_aside_h = pad_top + label_block_h + body_block_h + pad_bottom
+
+    min_aside_h = 0.55                          # floor: thin caption strip
+    max_aside_h = available_h * (1 / 3)         # ceiling: original 2:1 split
+    aside_h = max(min_aside_h, min(natural_aside_h, max_aside_h))
+    fig_h   = available_h - aside_h
 
     # ── Figure (top, full width) ────────────────────────────────────────────
     _figure(
