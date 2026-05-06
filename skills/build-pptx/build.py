@@ -182,7 +182,7 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
         and len(tables) == 0
         and not has_cards
         and aspect_for_layout is not None
-        and aspect_for_layout <= 1.3
+        and aspect_for_layout <= 1.0
         and (bool(body) or bool(lede))
     )
 
@@ -940,7 +940,7 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             aspect = _get_image_aspect(images[0]) if n_images == 1 else None
             use_side_by_side = (
                 n_images == 1 and len(tables) == 0 and not cards
-                and aspect is not None and aspect <= 1.3
+                and aspect is not None and aspect <= 1.0
                 and (bool(body) or bool(lede))
             )
             # figure-with-aside: 1 wide image + light commentary (≤3 short
@@ -953,7 +953,7 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             ).strip() if body else ""
             aside_eligible = (
                 n_images == 1 and len(tables) == 0 and not cards
-                and aspect is not None and aspect > 1.3
+                and aspect is not None and aspect > 1.0
                 and (bool(body) or bool(lede))
                 and len(body or []) <= 6        # bullets pack fine in an aside
                 and len(body_text) < 500        # generous chars; long captions stay centered
