@@ -639,6 +639,57 @@ def _looks_like_stat_label(label: str) -> bool:
     return False
 
 
+def _split_bullet_to_label_body(text: str) -> tuple[str, str]:
+    """Try to split a bullet's plain text into a (label, body) pair so it can
+    render as a card with a header instead of a flat line.
+
+    Recognized shapes (in order):
+      - "**bold prefix** rest"       → label="bold prefix", body="rest"
+      - "Label: body"                → label="Label", body="body"
+                                       (label ≤ 30 chars, no nested colon)
+      - "Label — body"               → label="Label", body="body" (em-dash)
+      - "Label - body"               → label="Label", body="body" (hyphen,
+                                       label ≤ 24 chars, body must exist)
+
+    Falls back to ("", text) when no clean split is found. Empty labels render
+    as a body-only card row, which is still denser than content-text bullets.
+    """
+    if not text:
+        return ("", "")
+    s = text.strip()
+
+    # Already-stripped HTML so a leading bold span looks like "**foo**". The
+    # markdown parser may also have bolded the prefix via inline formatting
+    # before _strip_html, leaving the asterisks behind — handle either form.
+    m = re.match(r"^\*\*(.+?)\*\*[\s:—–-]*(.*)$", s)
+    if m and m.group(1).strip() and m.group(2).strip():
+        return (m.group(1).strip(), m.group(2).strip())
+
+    # "Label: body" — label cannot itself contain a colon.
+    if ":" in s:
+        head, _, tail = s.partition(":")
+        head, tail = head.strip(), tail.strip()
+        if 2 <= len(head) <= 30 and tail and ":" not in head:
+            return (head, tail)
+
+    # "Label — body"
+    for sep in (" — ", " – "):
+        if sep in s:
+            head, _, tail = s.partition(sep)
+            head, tail = head.strip(), tail.strip()
+            if 2 <= len(head) <= 40 and tail:
+                return (head, tail)
+
+    # "Label - body" (single hyphen with spaces, conservative length cap)
+    if " - " in s:
+        head, _, tail = s.partition(" - ")
+        head, tail = head.strip(), tail.strip()
+        if 2 <= len(head) <= 24 and tail:
+            return (head, tail)
+
+    return ("", s)
+
+
 def _is_closing_slide(title: str, section_label: str | None) -> bool:
     """Return True when a slide title (or parent H1 section label) matches
     the closing-slide pattern — case-insensitive substring match."""
@@ -1006,6 +1057,32 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                         "icon": None,
                     },
                 }
+            elif tables and not images:
+                # Tables-only slide → table-with-takeaway. Picking
+                # content-text-image for table-only content (the historical
+                # default) leaves an empty image gutter and renders sparse.
+                # The table-with-takeaway layout fills the slide with a
+                # full-width table + an optional dark accent footer.
+                first_table = tables[0] if tables and isinstance(tables[0], list) \
+                              and tables[0] and isinstance(tables[0][0], list) \
+                              else tables  # accept both nested + flat shapes
+                callout_text = ""
+                if body:
+                    callout_text = " ".join(
+                        _strip_html(b.get("html", "") or "") for b in body if b.get("html")
+                    ).strip()
+                if not callout_text and lede:
+                    callout_text = lede
+                    lede = ""
+                kind = "table-with-takeaway"
+                params = {
+                    "title": slide_title,
+                    "lede": lede,
+                    "section_label": current_h1 or "",
+                    "rows": first_table,
+                }
+                if callout_text:
+                    params["callout"] = {"text": callout_text, "tone": "dark"}
             else:
                 kind = "content-text-image" if (body or lede) else "content-image-only"
                 params = {"title": slide_title, "lede": lede,
@@ -1015,9 +1092,34 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                           "use_side_by_side": use_side_by_side,
                           "section_label": current_h1 or ""}
         elif body:
-            kind = "content-text"
-            params = {"title": slide_title, "lede": lede, "body": body,
-                      "section_label": current_h1 or ""}
+            # Promote sparse bullet-only body to cards-triple so a 3-bullet
+            # TL;DR slide doesn't render as a wall of empty space below the
+            # bullets. Triggers when 2-5 bullet-only items, no images / tables
+            # / cards, and the body would otherwise spread thinly across the
+            # slide. Each bullet becomes a card; if the bullet has a clear
+            # "label: body" or "**label** body" shape, split it; otherwise
+            # the bullet text becomes the body and label is left empty.
+            bullet_only = (
+                2 <= len(body) <= 5
+                and all(b.get("kind") == "bullet" for b in body)
+            )
+            if bullet_only:
+                bullet_cards = []
+                for b in body:
+                    text = _strip_html(b.get("html", "") or "").strip()
+                    label, card_body = _split_bullet_to_label_body(text)
+                    bullet_cards.append({"label": label, "body": card_body, "icon": None})
+                kind = "cards-triple"
+                params = {
+                    "title": slide_title,
+                    "lede": lede,
+                    "section_label": current_h1 or "",
+                    "cards": bullet_cards,
+                }
+            else:
+                kind = "content-text"
+                params = {"title": slide_title, "lede": lede, "body": body,
+                          "section_label": current_h1 or ""}
         else:
             # Empty chunk — skip
             continue

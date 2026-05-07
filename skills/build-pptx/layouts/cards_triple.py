@@ -150,15 +150,22 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) ->
                 except Exception:
                     pass
 
-        _add_text(slide, c_label,
-                  left=label_l, top=cur_top + _LABEL_TOP_OFF,
-                  width=label_w, height=_LABEL_H_ALLOC,
-                  size=_LABEL_SIZE, color_rgb=accent_rgb,
-                  font=branding.MONO_FONT, bold=True)
+        # Skip the label box entirely when there's no label — body floats up
+        # to occupy the freed height. Keeps body-only cards from showing a
+        # phantom empty header above the text.
+        if c_label:
+            _add_text(slide, c_label,
+                      left=label_l, top=cur_top + _LABEL_TOP_OFF,
+                      width=label_w, height=_LABEL_H_ALLOC,
+                      size=_LABEL_SIZE, color_rgb=accent_rgb,
+                      font=branding.MONO_FONT, bold=True)
+            body_top_off = _BODY_TOP_OFF
+        else:
+            body_top_off = _LABEL_TOP_OFF  # body starts where label would have
         _add_text(slide, c_body,
-                  left=body_l + _PAD_LEFT, top=cur_top + _BODY_TOP_OFF,
+                  left=body_l + _PAD_LEFT, top=cur_top + body_top_off,
                   width=body_w - 2 * _PAD_LEFT,
-                  height=c_h - _BODY_TOP_OFF - _PAD_BOT,
+                  height=c_h - body_top_off - _PAD_BOT,
                   size=_BODY_SIZE, color_rgb=INK_RGB, font=branding.SANS_FONT)
 
         cur_top = cur_top + c_h + gutter
