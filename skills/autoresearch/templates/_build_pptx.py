@@ -158,9 +158,14 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
             parts.append(body)
             parts.append("")
         for fig in figs:
-            rel = fig.relative_to(session_root.parent.parent) \
-                  if session_root.parent.parent in fig.parents else fig
-            parts.append(f"![{fig.stem}]({fig})")
+            # Paths in the synthesized markdown must be relative to the deck.md
+            # location (= session_root), since build-pptx resolves image paths
+            # relative to the markdown file's parent dir.
+            try:
+                rel = fig.resolve().relative_to(session_root.resolve())
+            except ValueError:
+                rel = fig
+            parts.append(f"![{fig.stem}]({rel})")
             parts.append("")
 
     # Closing
