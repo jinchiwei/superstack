@@ -27,6 +27,7 @@ is the `--date` + `--scope` CLI surface; everything else is replaceable.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -111,6 +112,79 @@ def _iter_dirs(session_root: Path) -> list[Path]:
                    if p.is_dir() and p.name.startswith("iter-")])
 
 
+def _load_author() -> dict:
+    """Resolve author metadata for the deck byline.
+
+    Resolution order:
+      1. $AUTORESEARCH_AUTHOR_NAME / $AUTORESEARCH_AUTHOR_ORG env vars
+      2. ~/.gstack/superstack/author.json (canonical config)
+      3. {} (no byline)
+    """
+    name = os.environ.get("AUTORESEARCH_AUTHOR_NAME", "").strip()
+    org = os.environ.get("AUTORESEARCH_AUTHOR_ORG", "").strip()
+    email = os.environ.get("AUTORESEARCH_AUTHOR_EMAIL", "").strip()
+    if name or org:
+        return {"name": name, "org": org, "email": email}
+    cfg = Path.home() / ".gstack" / "superstack" / "author.json"
+    if cfg.is_file():
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            return {
+                "name":  (data.get("name")  or "").strip(),
+                "org":   (data.get("org")   or "").strip(),
+                "email": (data.get("email") or "").strip(),
+            }
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _read_state(scope_slug: str) -> dict:
+    """Best-effort: load the autoresearch state.json so we can populate
+    the methods + results slides with axes, candidate count, and
+    completed-iter metrics. Returns {} if state isn't found.
+
+    Tries cwd-derived slug first (the canonical project key), then the scope
+    slug as a fallback.
+    """
+    gstack_home = Path(os.environ.get("GSTACK_HOME", Path.home() / ".gstack"))
+    cwd_slug = Path.cwd().resolve().name
+    candidates = [
+        gstack_home / "projects" / cwd_slug   / "autoresearch" / "state.json",
+        gstack_home / "projects" / scope_slug / "autoresearch" / "state.json",
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+    return {}
+
+
+def _summarize_axes(axes: dict) -> list[tuple[str, str]]:
+    """Turn an axes dict into [(name, "value, value, value")] tuples for
+    display on the methods slide."""
+    out = []
+    for k, v in (axes or {}).items():
+        if isinstance(v, (list, tuple)):
+            out.append((k, ", ".join(str(x) for x in v)))
+        else:
+            out.append((k, str(v)))
+    return out
+
+
+def _top_results(results_history: list, *, op: str = "max", k: int = 3) -> list:
+    """Return the top-k completed results by metric_value, descending if
+    op='max' else ascending. Skips entries without a numeric metric_value."""
+    valid = [r for r in (results_history or [])
+             if isinstance(r.get("metric_value"), (int, float))
+             and r.get("status") == "complete"]
+    reverse = (op == "max")
+    valid.sort(key=lambda r: r["metric_value"], reverse=reverse)
+    return valid[:k]
+
+
 def _read_readme_meta(session_root: Path) -> dict:
     """Pull scope text + target from results/<date>_<scope>/README.md if present."""
     readme = session_root / "README.md"
@@ -130,40 +204,133 @@ def _read_readme_meta(session_root: Path) -> dict:
 def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
     """Build the markdown source for build-pptx.
 
-    Slide policy: one clean slide per iteration. Each iter slide has:
-      - title           "iter-N — <candidate humanized>"
-      - lede            the headline metric line (one-liner)
-      - one figure      first fig_*.png in the iter dir (build-pptx will pick
-                        figure-with-aside / -horizontal based on aspect)
+    Deck structure (research-presentation flow):
+      1. Title slide (auto from frontmatter — name, org, date)
+      2. Background — scope + target metric + motivation
+      3. Methods — axes / candidate count / cohort + CV summary from state.json
+      4. Results — top candidates by metric (auto-ranked from results_history)
+      5. Conclusions — best candidate + recommendations
+      6. Iteration detail — one slide per iter with headline + figure
+      7. Thanks (auto-added by build-pptx)
 
     Iter slides do NOT include tables, second figures, or multi-section H2
     bodies — those packed badly into content-text-image and frequently caused
     PowerPoint to flag the file for repair. Tables belong in scorecard.xlsx
-    and the per-iter summary.md (and PDF/DOCX exports). Iters that produced
-    no figure get a one-card slide with the headline as the card body.
+    and the PDF/DOCX exports.
     """
     meta = _read_readme_meta(session_root)
+    state = _read_state(scope)
+    author = _load_author()
     pretty_scope = _humanize(scope)
-    target_line = meta["target"] or "no explicit target — stop on exhaustion"
+    target_line = meta["target"] or state.get("scope") or "no explicit target — stop on exhaustion"
 
     parts: list[str] = []
-    # YAML frontmatter — build-pptx renders this into the title slide. No
-    # leading body H1 (that produces a duplicate title slide).
+
+    # ---- YAML frontmatter (build-pptx auto-renders the title slide) -------
     parts.append("---")
-    parts.append(f'title: "{pretty_scope} — Session Report"')
-    parts.append(f'subtitle: "Autoresearch · {date}"')
+    parts.append(f'title: "{pretty_scope}"')
+    parts.append(f'subtitle: "Autoresearch session report"')
+    if author.get("name"):
+        parts.append(f'name: "{author["name"]}"')
+    if author.get("org"):
+        parts.append(f'org: "{author["org"]}"')
     parts.append(f'date: "{date}"')
     parts.append("---")
     parts.append("")
 
-    # Optional scope/target preamble as a single content slide.
-    if meta["scope_text"] or meta["target"]:
-        parts.append("## Session overview")
+    # ---- Background slide --------------------------------------------------
+    parts.append("## Background")
+    parts.append("")
+    if meta["scope_text"]:
+        parts.append(f"**Scope** — {meta['scope_text']}")
+    else:
+        parts.append(f"**Scope** — {pretty_scope}")
+    parts.append("")
+    parts.append(f"**Target** — {target_line}")
+    parts.append("")
+    n_iters_total = len(_iter_dirs(session_root))
+    parts.append(f"**Iterations completed** — {n_iters_total}")
+    parts.append("")
+
+    # ---- Methods slide -----------------------------------------------------
+    axes = _summarize_axes(state.get("axes") or {})
+    n_candidates_planned = len(state.get("candidate_queue") or [])
+    if axes or n_candidates_planned or state.get("axes_rationale"):
+        parts.append("---")
         parts.append("")
-        if meta["scope_text"]:
-            parts.append(meta["scope_text"])
+        parts.append("## Methods")
+        parts.append("")
+        if axes:
+            parts.append("**Search axes**")
+            for name, vals in axes:
+                parts.append(f"- `{name}` — {vals}")
             parts.append("")
-        parts.append(f"Target — {target_line}")
+        if n_candidates_planned:
+            parts.append(f"**Candidates planned** — {n_candidates_planned} "
+                         f"(Cartesian product of axes; pending replans)")
+            parts.append("")
+        rationale = state.get("axes_rationale") or ""
+        if rationale and len(rationale) < 400:
+            parts.append(rationale)
+            parts.append("")
+
+    # ---- Results slide -----------------------------------------------------
+    target_op = "max"
+    target_meta = state.get("target_metric") or {}
+    if isinstance(target_meta, dict) and target_meta.get("op") in ("min", "max"):
+        target_op = target_meta["op"]
+    top = _top_results(state.get("results_history") or [], op=target_op, k=3)
+    if top:
+        parts.append("---")
+        parts.append("")
+        parts.append("## Results")
+        parts.append("")
+        op_label = "highest" if target_op == "max" else "lowest"
+        parts.append(f"Top candidates by metric ({op_label} first):")
+        parts.append("")
+        parts.append("| Rank | Candidate | Metric |")
+        parts.append("|---|---|---:|")
+        for rank, r in enumerate(top, 1):
+            cand_id = r.get("id", "—")
+            metric = r.get("metric_value")
+            parts.append(f"| {rank} | `{cand_id}` | {metric:.4f} |"
+                         if isinstance(metric, (int, float))
+                         else f"| {rank} | `{cand_id}` | — |")
+        parts.append("")
+
+    # ---- Conclusions slide -------------------------------------------------
+    if top:
+        parts.append("---")
+        parts.append("")
+        parts.append("## Conclusions")
+        parts.append("")
+        best = top[0]
+        cand_id = best.get("id", "—")
+        metric = best.get("metric_value")
+        parts.append(f"**Best configuration** — `{cand_id}`"
+                     + (f" (metric = {metric:.4f})"
+                        if isinstance(metric, (int, float)) else ""))
+        parts.append("")
+        # Auto-fold the second + third place into a quick comparison line so
+        # the slide isn't a one-liner.
+        if len(top) >= 2:
+            others = ", ".join(
+                f"`{r['id']}` ({r['metric_value']:.4f})" for r in top[1:]
+            )
+            parts.append(f"Runners-up — {others}")
+            parts.append("")
+        parts.append("Per-iteration figures + tables follow. "
+                     "Full data + bootstrap CIs in `scorecard.xlsx`.")
+        parts.append("")
+
+    # ---- Per-iteration detail slides --------------------------------------
+    if n_iters_total:
+        parts.append("---")
+        parts.append("")
+        parts.append("## Iteration detail")
+        parts.append("")
+        parts.append(f"{n_iters_total} iterations — one figure per slide, "
+                     "headline metric as caption.")
         parts.append("")
 
     iters = _iter_dirs(session_root)
@@ -206,8 +373,7 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
             parts.append("")
 
     # No explicit closing slide — build-pptx adds its own "Thanks" end slide
-    # automatically. Adding our own markdown closing produced two stacked
-    # Thanks slides at the end of the deck.
+    # automatically.
 
     return "\n".join(parts)
 

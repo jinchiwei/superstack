@@ -224,22 +224,42 @@ def test_deck_iter_without_figure_still_produces_slide(session_root):
     assert "0.85" in iter3_chunk or "no figure produced" in iter3_chunk
 
 
-def test_deck_includes_session_overview_when_readme_has_meta(session_root):
+def test_deck_has_background_slide(session_root):
     md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
-    assert "## Session overview" in md
+    assert "## Background" in md
     assert "Test session for pptx synthesizer" in md
     assert "maximize AUC on bact_pos" in md
 
 
-def test_deck_omits_overview_when_readme_missing(tmp_path):
-    """If README.md has no Scope/Target lines, skip the overview slide."""
+def test_deck_background_present_even_when_readme_bare(tmp_path):
+    """Background slide is always emitted (it can default to the scope slug
+    if README has no metadata) — research presentations always need context."""
     root = tmp_path / "results" / "2026-05-07_bare"
     root.mkdir(parents=True)
     iter1 = root / "iter-01_x"
     iter1.mkdir()
     (iter1 / "summary.md").write_text("# x\nSome content\n")
     md = bp.synthesize_deck_md(root, date="2026-05-07", scope="bare")
-    assert "## Session overview" not in md
+    assert "## Background" in md
+
+
+def test_deck_includes_author_byline_from_env(session_root, monkeypatch):
+    monkeypatch.setenv("AUTORESEARCH_AUTHOR_NAME", "Test Author")
+    monkeypatch.setenv("AUTORESEARCH_AUTHOR_ORG", "Test Org")
+    md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
+    assert 'name: "Test Author"' in md
+    assert 'org: "Test Org"' in md
+
+
+def test_deck_byline_blank_when_no_config(session_root, monkeypatch, tmp_path):
+    """If env vars are unset and the config file is absent, the frontmatter
+    should not include name/org keys."""
+    monkeypatch.delenv("AUTORESEARCH_AUTHOR_NAME", raising=False)
+    monkeypatch.delenv("AUTORESEARCH_AUTHOR_ORG", raising=False)
+    monkeypatch.setattr(bp.Path, "home", lambda: tmp_path)  # no author.json under fake home
+    md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
+    assert "name:" not in md.split("\n---\n", 1)[0]  # only check frontmatter
+    assert "org:" not in md.split("\n---\n", 1)[0]
 
 
 def test_deck_iter_slide_separator_present(session_root):
