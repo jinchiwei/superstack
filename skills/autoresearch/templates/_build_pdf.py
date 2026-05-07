@@ -86,6 +86,45 @@ h2.section {
   white-space: pre-wrap; word-wrap: break-word;
 }
 
+.iter-block .body { font-size: 10pt; line-height: 1.5; }
+.iter-block .body h1, .iter-block .body h2, .iter-block .body h3 {
+  font-family: 'Geist', sans-serif; color: #14141C; font-weight: 700;
+  margin: 8pt 0 4pt 0;
+}
+.iter-block .body h2 { font-size: 11pt; color: #6B6B73; letter-spacing: 0.04em; }
+.iter-block .body h3 { font-size: 10pt; color: #6B6B73; }
+.iter-block .body p { margin: 4pt 0; }
+.iter-block .body strong { color: #14141C; }
+.iter-block .body code {
+  font-family: 'Geist Mono', monospace; font-size: 9pt;
+  background: #F5F5F8; padding: 1pt 4pt; border-radius: 2pt;
+}
+.iter-block .body table {
+  width: 100%; border-collapse: collapse; margin: 6pt 0;
+  font-family: 'Geist Mono', monospace; font-size: 9pt;
+  page-break-inside: avoid;
+}
+.iter-block .body table th {
+  text-align: left; padding: 4pt 6pt;
+  border-bottom: 1pt solid #14141C;
+  color: #6B6B73; font-weight: 700;
+}
+.iter-block .body table td {
+  padding: 3pt 6pt; border-bottom: 0.5pt solid #EEEEF2;
+  color: #14141C;
+}
+.iter-block figure {
+  margin: 8pt 0; page-break-inside: avoid; text-align: center;
+}
+.iter-block figure img {
+  max-width: 100%; max-height: 4.5in; height: auto;
+  border: 0.5pt solid #E5E5EA;
+}
+.iter-block figure figcaption {
+  font-family: 'Geist Mono', monospace; font-size: 8pt;
+  color: #6B6B73; margin-top: 3pt;
+}
+
 table.results {
   width: 100%; border-collapse: collapse; margin-top: 10pt;
   font-family: 'Geist Mono', monospace; font-size: 9pt;
@@ -134,12 +173,14 @@ def _read_session(date_str, scope):
         body = summary.read_text() if summary.exists() else ""
         metric_m = re.search(r"^\s*metric\s*[:|]\s*(.+)$", body, re.MULTILINE | re.IGNORECASE)
         status_m = re.search(r"^\s*status\s*[:|]\s*(.+)$", body, re.MULTILINE | re.IGNORECASE)
+        figs = sorted(d.glob("fig_*.png"))
         candidates.append({
             "iter": int(m.group(1)),
             "candidate": m.group(2),
             "summary": body,
             "metric": metric_m.group(1).strip() if metric_m else "—",
             "status": status_m.group(1).strip() if status_m else "—",
+            "figures": figs,
         })
 
     return {
@@ -185,7 +226,21 @@ def main():
         )
         body_text = (c["summary"] or "").strip()
         if body_text:
-            parts.append(f'<pre>{html_mod.escape(body_text)}</pre>')
+            # Render the iter summary as proper markdown (tables, headings,
+            # inline code) instead of dumping a raw <pre>. Strip the leading
+            # h1 since the iter-block already shows the candidate name.
+            stripped = re.sub(r"\A#\s+[^\n]*\n+", "", body_text)
+            html = markdown.markdown(stripped, extensions=["tables", "fenced_code"])
+            parts.append(f'<div class="body">{html}</div>')
+        for fig in c.get("figures", []):
+            # Use absolute path so weasyprint resolves the image regardless of
+            # cwd at render time.
+            parts.append(
+                f'<figure>'
+                f'<img src="file://{fig.resolve()}" alt="{html_mod.escape(fig.stem)}" />'
+                f'<figcaption>{html_mod.escape(fig.stem)}</figcaption>'
+                f'</figure>'
+            )
         parts.append('</div>')
 
     if s["candidates"]:

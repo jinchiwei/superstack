@@ -76,6 +76,27 @@ def _read_iter_summary(iter_dir: Path) -> str:
     return re.sub(r"\A#\s+[^\n]*\n+", "", text).strip()
 
 
+def _extract_headline(summary_text: str) -> str:
+    """Pull the headline metric line out of a summary so we can use it as a
+    short slide caption. Looks for the first line beginning with **Headline
+    metric** or **<word> AUC** etc. Returns "" if nothing obvious."""
+    if not summary_text:
+        return ""
+    for line in summary_text.splitlines():
+        s = line.strip()
+        if s.startswith("**Headline metric"):
+            # Strip leading "**Headline metric (...):**" wrapper
+            return re.sub(r"\*\*[^*]+\*\*\s*", "", s, count=1).strip()
+        if s.startswith("**") and ("AUC" in s or "ECE" in s or "metric" in s.lower()):
+            return re.sub(r"\*\*([^*]+)\*\*\s*:?\s*", r"\1: ", s, count=1).strip()
+    # Fallback: first non-empty paragraph, capped
+    for line in summary_text.splitlines():
+        s = line.strip()
+        if s and not s.startswith(("|", "#", "`")):
+            return s[:160].rstrip()
+    return ""
+
+
 def _iter_figures(iter_dir: Path) -> list[Path]:
     """Return all fig_*.png files in the iter dir, sorted by name."""
     if not iter_dir.is_dir():
@@ -109,36 +130,41 @@ def _read_readme_meta(session_root: Path) -> dict:
 def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
     """Build the markdown source for build-pptx.
 
-    Layout:
-      - frontmatter (title/subtitle/date)
-      - h1 + lede
-      - iteration cards: each iter is a slide titled "iter-N — <candidate>"
-        with the iter summary body and any fig_*.png embedded.
-      - closing slide
+    Slide policy: one clean slide per iteration. Each iter slide has:
+      - title           "iter-N — <candidate humanized>"
+      - lede            the headline metric line (one-liner)
+      - one figure      first fig_*.png in the iter dir (build-pptx will pick
+                        figure-with-aside / -horizontal based on aspect)
+
+    Iter slides do NOT include tables, second figures, or multi-section H2
+    bodies — those packed badly into content-text-image and frequently caused
+    PowerPoint to flag the file for repair. Tables belong in scorecard.xlsx
+    and the per-iter summary.md (and PDF/DOCX exports). Iters that produced
+    no figure get a one-card slide with the headline as the card body.
     """
     meta = _read_readme_meta(session_root)
     pretty_scope = _humanize(scope)
     target_line = meta["target"] or "no explicit target — stop on exhaustion"
 
     parts: list[str] = []
+    # YAML frontmatter — build-pptx renders this into the title slide. No
+    # leading body H1 (that produces a duplicate title slide).
     parts.append("---")
     parts.append(f'title: "{pretty_scope} — Session Report"')
     parts.append(f'subtitle: "Autoresearch · {date}"')
     parts.append(f'date: "{date}"')
     parts.append("---")
     parts.append("")
-    parts.append(f"# {pretty_scope} — Session Report")
-    parts.append("")
-    if meta["scope_text"]:
-        parts.append(meta["scope_text"])
-    else:
-        parts.append(
-            f"Autoresearch session for `{scope}` on {date}. "
-            "One slide per iteration; figures embedded where produced."
-        )
-    parts.append("")
-    parts.append(f"Target: {target_line}")
-    parts.append("")
+
+    # Optional scope/target preamble as a single content slide.
+    if meta["scope_text"] or meta["target"]:
+        parts.append("## Session overview")
+        parts.append("")
+        if meta["scope_text"]:
+            parts.append(meta["scope_text"])
+            parts.append("")
+        parts.append(f"Target — {target_line}")
+        parts.append("")
 
     iters = _iter_dirs(session_root)
     for d in iters:
@@ -148,33 +174,40 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
         iter_num = int(m.group(1))
         candidate = m.group(2)
         body = _read_iter_summary(d)
+        headline = _extract_headline(body)
         figs = _iter_figures(d)
 
         parts.append("---")
         parts.append("")
         parts.append(f"## iter-{iter_num} — {_humanize(candidate)}")
         parts.append("")
-        if body:
-            parts.append(body)
+        if headline:
+            parts.append(headline)
             parts.append("")
-        for fig in figs:
-            # Paths in the synthesized markdown must be relative to the deck.md
-            # location (= session_root), since build-pptx resolves image paths
-            # relative to the markdown file's parent dir.
+
+        if figs:
+            # First figure only — build-pptx picks figure-with-aside or
+            # figure-with-aside-horizontal based on aspect ratio. Embedding a
+            # second figure here forces the planner to fall back to
+            # content-image-only (no caption) or splits to two slides
+            # without a caption — neither matches the headline-aside pattern
+            # we want.
+            fig = figs[0]
             try:
                 rel = fig.resolve().relative_to(session_root.resolve())
             except ValueError:
                 rel = fig
             parts.append(f"![{fig.stem}]({rel})")
             parts.append("")
+        elif not headline:
+            # No figure AND no headline — emit a placeholder so the slide
+            # isn't visually empty. The scorecard.xlsx still has the data.
+            parts.append("(no figure produced — see scorecard.xlsx)")
+            parts.append("")
 
-    # Closing
-    parts.append("---")
-    parts.append("")
-    parts.append("## Thanks")
-    parts.append("")
-    parts.append(f"Autoresearch session report · {date} · scope `{scope}`")
-    parts.append("")
+    # No explicit closing slide — build-pptx adds its own "Thanks" end slide
+    # automatically. Adding our own markdown closing produced two stacked
+    # Thanks slides at the end of the deck.
 
     return "\n".join(parts)
 
