@@ -154,13 +154,20 @@ def test_deck_has_yaml_frontmatter(session_root):
     assert 'title:' in md[:second_dash]
 
 
-def test_deck_has_no_body_h1(session_root):
-    """build-pptx renders the cover from frontmatter; a body H1 produces a
-    duplicate title slide. We must not emit one."""
+def test_deck_h1s_are_section_dividers_not_cover_dupes(session_root):
+    """Body H1s are SECTION DIVIDERS (auto-emitted by build-pptx as navy
+    section break slides) — not a duplicate cover. Verify the H1s in the
+    body are recognized section names, never the deck title itself."""
     md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
     body = md.split("\n---\n", 2)[2]  # everything after frontmatter
-    assert not any(line.startswith("# ") for line in body.splitlines()), \
-        "synthesizer must not emit a body H1"
+    body_h1s = [ln[2:].strip() for ln in body.splitlines()
+                if ln.startswith("# ") and not ln.startswith("# iter-")]
+    # All body H1s should be section names, not the deck title (pretty_scope).
+    deck_title = bp._humanize("my-scope")  # "My Scope"
+    assert deck_title not in body_h1s, \
+        f"body H1 collides with deck title '{deck_title}': {body_h1s}"
+    # And there should be at least one H1 (Background) so we get a divider.
+    assert body_h1s, "expected at least one section-divider H1"
 
 
 def test_deck_has_no_trailing_thanks(session_root):
@@ -224,23 +231,92 @@ def test_deck_iter_without_figure_still_produces_slide(session_root):
     assert "0.85" in iter3_chunk or "no figure produced" in iter3_chunk
 
 
+def test_deck_uses_h1_for_section_dividers(session_root):
+    """build-pptx auto-emits a section-divider slide for every `# H1`. The
+    synthesizer MUST use H1 (not H2) for section breaks so the deck has
+    proper visual structure. Locks in the canonical structure documented
+    in skills/build-pptx/tests/fixture_realistic.md."""
+    md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
+    h1_lines = [ln for ln in md.splitlines() if ln.startswith("# ") and not ln.startswith("# iter-")]
+    h1_titles = [ln[2:].strip() for ln in h1_lines]
+    # We expect a Background section at minimum; Methods/Results/Conclusions/
+    # Iteration detail come along when state.json has data.
+    assert "Background" in h1_titles, f"missing # Background section divider; got H1s: {h1_titles}"
+    assert any(t in h1_titles for t in ("Methods", "Iteration detail")), \
+        f"expected at least Methods or Iteration detail; got: {h1_titles}"
+
+
+def test_deck_each_section_has_content_slides(session_root):
+    """Every # H1 section divider must be followed by ≥1 ## H2 content slide
+    before the next # H1. A bare H1 with no content under it is the failure
+    mode that left earlier proto decks visually empty."""
+    md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
+    chunks = md.split("\n# ")
+    # chunks[0] is everything before first H1 (frontmatter + maybe content).
+    # chunks[1:] each START with a section name + content.
+    for chunk in chunks[1:]:
+        # Strip the section name (first line) and check for at least one H2
+        # before the chunk ends or another H1 appears.
+        section_name = chunk.split("\n", 1)[0].strip()
+        body = chunk.split("\n", 1)[1] if "\n" in chunk else ""
+        assert any(ln.startswith("## ") for ln in body.splitlines()), \
+            f"section '# {section_name}' has no ## H2 content slides under it"
+
+
+def test_deck_uses_canonical_section_names_for_accent(session_root):
+    """Section names must match the keywords in branding.match_section_color
+    so accent colors propagate. Locks in the canonical Background / Methods
+    / Results / Conclusions naming."""
+    md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
+    h1s = [ln[2:].strip() for ln in md.splitlines() if ln.startswith("# ")]
+    canonical = {"Background", "Methods", "Results", "Conclusions",
+                 "Iteration detail", "Limitations", "Discussion"}
+    non_canonical = [h for h in h1s if h not in canonical and not h.startswith("iter-")]
+    assert not non_canonical, \
+        (f"non-canonical H1 section names break section-color propagation: "
+         f"{non_canonical}. Use canonical names from branding._SECTION_KEYWORDS.")
+
+
 def test_deck_has_background_slide(session_root):
     md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
-    assert "## Background" in md
+    assert "# Background" in md
     assert "Test session for pptx synthesizer" in md
     assert "maximize AUC on bact_pos" in md
 
 
+def test_findings_md_overrides_auto_narrative(session_root):
+    """If <session_root>/findings.md exists, the synthesizer should drop it
+    in verbatim instead of auto-generating Background/Methods/Results/etc."""
+    findings = session_root / "findings.md"
+    findings.write_text(
+        "# Custom Section\n\n"
+        "---\n\n"
+        "## Custom slide\n\n"
+        "Custom narrative content.\n"
+    )
+    try:
+        md = bp.synthesize_deck_md(session_root, date="2026-05-07", scope="my-scope")
+        assert "# Custom Section" in md
+        assert "Custom narrative content" in md
+        # Auto-generated sections should NOT appear when findings.md is provided.
+        assert "## Scope and motivation" not in md
+        assert "## Iteration loop" not in md
+    finally:
+        findings.unlink()
+
+
 def test_deck_background_present_even_when_readme_bare(tmp_path):
-    """Background slide is always emitted (it can default to the scope slug
-    if README has no metadata) — research presentations always need context."""
+    """Background section divider is always emitted (it falls back to a
+    default sentence when README has no metadata) — research presentations
+    always need context."""
     root = tmp_path / "results" / "2026-05-07_bare"
     root.mkdir(parents=True)
     iter1 = root / "iter-01_x"
     iter1.mkdir()
     (iter1 / "summary.md").write_text("# x\nSome content\n")
     md = bp.synthesize_deck_md(root, date="2026-05-07", scope="bare")
-    assert "## Background" in md
+    assert "# Background" in md
+    assert "## Scope and motivation" in md  # at least one content slide under it
 
 
 def test_deck_includes_author_byline_from_env(session_root, monkeypatch):

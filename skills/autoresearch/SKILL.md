@@ -591,6 +591,16 @@ fi
 
 After the final summary is written, invoke any project-local doc builders to produce a shareable session report. Each builder is called with the standard `--date` + `--scope` args and writes to `results/<date>_<scope>/` (e.g. `SESSION_REPORT.{pptx,pdf,docx}`, `scorecard_<date>.xlsx`). The default `_build_pptx.py` template synthesizes a markdown deck — auto-embedding every `fig_*.png` it finds in iter dirs — and shells out to the `build-pptx` skill, so the deck inherits that skill's full layout catalog and branding.
 
+**Deck synthesis: read build-pptx's SKILL.md FIRST.** Before authoring or modifying `templates/_build_pptx.py`, read `skills/build-pptx/SKILL.md` and `skills/build-pptx/tests/fixture_realistic.md` end-to-end. Critical structural rules that are easy to miss:
+
+- `# H1` between `---` separators auto-emits a **section-divider slide** (navy background, large title) — H1s are NOT regular content titles. Use them only for top-level sections (Background, Methods, Results, Conclusions, Iteration detail).
+- `## H2` is for content slides under the previous H1's section. Each H2 should have substantive content (multiple sentences, a table, a figure, or a card list) — never a one-line slide.
+- Section accent colors auto-propagate from H1 → all content slides under it via `branding.match_section_color`. Use canonical section names (Background / Methods / Results / Conclusions / Limitations / Validation / etc) to inherit the correct turquoise / deeppink / amber / blueviolet palette.
+- Frontmatter `name:` and `org:` populate the auto-cover byline. The autoresearch synthesizer reads these from `~/.gstack/superstack/author.json` (or `$AUTORESEARCH_AUTHOR_NAME` / `$AUTORESEARCH_AUTHOR_ORG`) so deck attribution is consistent across projects.
+- `findings.md` in the session root, if present, replaces the auto-generated Background+Methods+Results+Conclusions block. Iteration-detail slides are always auto-generated.
+
+A regression test in `tests/test_build_pptx.py` verifies the synthesizer emits H1 dividers + dense content slides — do not break it.
+
 ```bash
 SESSION_DATE=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .session_started_at | cut -dT -f1)
 [[ -z "$SESSION_DATE" || "$SESSION_DATE" == "null" ]] && SESSION_DATE=$(date -u +%Y-%m-%d)

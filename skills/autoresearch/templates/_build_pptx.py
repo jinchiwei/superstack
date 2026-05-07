@@ -204,19 +204,28 @@ def _read_readme_meta(session_root: Path) -> dict:
 def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
     """Build the markdown source for build-pptx.
 
-    Deck structure (research-presentation flow):
-      1. Title slide (auto from frontmatter — name, org, date)
-      2. Background — scope + target metric + motivation
-      3. Methods — axes / candidate count / cohort + CV summary from state.json
-      4. Results — top candidates by metric (auto-ranked from results_history)
-      5. Conclusions — best candidate + recommendations
-      6. Iteration detail — one slide per iter with headline + figure
-      7. Thanks (auto-added by build-pptx)
+    Follows the canonical research-deck structure documented in
+    skills/build-pptx/SKILL.md and exemplified by tests/fixture_realistic.md:
 
-    Iter slides do NOT include tables, second figures, or multi-section H2
-    bodies — those packed badly into content-text-image and frequently caused
-    PowerPoint to flag the file for repair. Tables belong in scorecard.xlsx
-    and the PDF/DOCX exports.
+      # H1  — auto-emits a section-divider slide (navy background)
+      ## H2 — content slide title under the previous H1's section
+
+    Sections emitted:
+      Title slide        (auto from YAML frontmatter — name, org, date)
+      # Background       — scope + motivation + target
+      # Methods          — search axes + CV / methodology
+      # Results          — top-3 candidates + performance summary
+      # Conclusions      — best config + recommendations
+      # Iteration detail — one slide per iter (figure + headline metric)
+      Thanks             (auto-added by build-pptx)
+
+    Each section has multiple substantive H2 content slides — no one-liner
+    sparse slides, no slides packed with table+image+text overflow.
+
+    Optional override: if `<session_root>/findings.md` exists, its body
+    replaces the auto-generated Background+Methods+Results+Conclusions block.
+    The user is expected to author that file with proper section structure
+    (H1 dividers + H2 content slides). Iter detail is always auto-generated.
     """
     meta = _read_readme_meta(session_root)
     state = _read_state(scope)
@@ -229,7 +238,8 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
     # ---- YAML frontmatter (build-pptx auto-renders the title slide) -------
     parts.append("---")
     parts.append(f'title: "{pretty_scope}"')
-    parts.append(f'subtitle: "Autoresearch session report"')
+    parts.append('subtitle: "Autoresearch session report"')
+    parts.append('eyebrow: "AUTORESEARCH"')
     if author.get("name"):
         parts.append(f'name: "{author["name"]}"')
     if author.get("org"):
@@ -238,144 +248,211 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
     parts.append("---")
     parts.append("")
 
-    # ---- Background slide --------------------------------------------------
-    parts.append("## Background")
-    parts.append("")
-    if meta["scope_text"]:
-        parts.append(f"**Scope** — {meta['scope_text']}")
+    # ---- Body: user-provided narrative or auto-generated -------------------
+    findings = session_root / "findings.md"
+    if findings.is_file():
+        # User has provided structured narrative — drop it in verbatim. They
+        # are expected to use proper H1/H2 structure.
+        parts.append(findings.read_text(encoding="utf-8").strip())
+        parts.append("")
     else:
-        parts.append(f"**Scope** — {pretty_scope}")
-    parts.append("")
-    parts.append(f"**Target** — {target_line}")
-    parts.append("")
-    n_iters_total = len(_iter_dirs(session_root))
-    parts.append(f"**Iterations completed** — {n_iters_total}")
-    parts.append("")
+        parts.extend(_render_auto_narrative(
+            scope=scope, pretty_scope=pretty_scope,
+            meta=meta, state=state, target_line=target_line,
+            session_root=session_root,
+        ))
 
-    # ---- Methods slide -----------------------------------------------------
-    axes = _summarize_axes(state.get("axes") or {})
-    n_candidates_planned = len(state.get("candidate_queue") or [])
-    if axes or n_candidates_planned or state.get("axes_rationale"):
+    # ---- Iteration detail section -----------------------------------------
+    iters = _iter_dirs(session_root)
+    if iters:
         parts.append("---")
         parts.append("")
-        parts.append("## Methods")
+        parts.append("# Iteration detail")
         parts.append("")
-        if axes:
-            parts.append("**Search axes**")
-            for name, vals in axes:
-                parts.append(f"- `{name}` — {vals}")
-            parts.append("")
-        if n_candidates_planned:
-            parts.append(f"**Candidates planned** — {n_candidates_planned} "
-                         f"(Cartesian product of axes; pending replans)")
-            parts.append("")
-        rationale = state.get("axes_rationale") or ""
-        if rationale and len(rationale) < 400:
-            parts.append(rationale)
-            parts.append("")
 
-    # ---- Results slide -----------------------------------------------------
+        for d in iters:
+            m = re.match(r"iter-(\d+)_(.+)", d.name)
+            if not m:
+                continue
+            iter_num = int(m.group(1))
+            candidate = m.group(2)
+            body = _read_iter_summary(d)
+            headline = _extract_headline(body)
+            figs = _iter_figures(d)
+
+            parts.append("---")
+            parts.append("")
+            parts.append(f"## iter-{iter_num} — {_humanize(candidate)}")
+            parts.append("")
+            if headline:
+                parts.append(headline)
+                parts.append("")
+
+            if figs:
+                fig = figs[0]
+                try:
+                    rel = fig.resolve().relative_to(session_root.resolve())
+                except ValueError:
+                    rel = fig
+                parts.append(f"![{fig.stem}]({rel})")
+                parts.append("")
+            elif not headline:
+                parts.append("(no figure produced — see scorecard.xlsx)")
+                parts.append("")
+
+    # No explicit closing slide — build-pptx auto-adds Thanks.
+    return "\n".join(parts)
+
+
+def _render_auto_narrative(*, scope: str, pretty_scope: str, meta: dict,
+                           state: dict, target_line: str,
+                           session_root: Path) -> list[str]:
+    """Auto-generate the Background / Methods / Results / Conclusions sections
+    when no findings.md is present. Returns a list of markdown lines (no
+    leading "---" — caller stitches sections together)."""
+    iters = _iter_dirs(session_root)
+    n_iters_total = len(iters)
+    axes = _summarize_axes(state.get("axes") or {})
+    n_candidates_planned = len(state.get("candidate_queue") or [])
     target_op = "max"
     target_meta = state.get("target_metric") or {}
     if isinstance(target_meta, dict) and target_meta.get("op") in ("min", "max"):
         target_op = target_meta["op"]
     top = _top_results(state.get("results_history") or [], op=target_op, k=3)
-    if top:
-        parts.append("---")
-        parts.append("")
-        parts.append("## Results")
-        parts.append("")
-        op_label = "highest" if target_op == "max" else "lowest"
-        parts.append(f"Top candidates by metric ({op_label} first):")
-        parts.append("")
-        parts.append("| Rank | Candidate | Metric |")
-        parts.append("|---|---|---:|")
-        for rank, r in enumerate(top, 1):
-            cand_id = r.get("id", "—")
-            metric = r.get("metric_value")
-            parts.append(f"| {rank} | `{cand_id}` | {metric:.4f} |"
-                         if isinstance(metric, (int, float))
-                         else f"| {rank} | `{cand_id}` | — |")
-        parts.append("")
+    op_label = "highest" if target_op == "max" else "lowest"
+    all_metrics = [r.get("metric_value") for r in (state.get("results_history") or [])
+                   if isinstance(r.get("metric_value"), (int, float))]
 
-    # ---- Conclusions slide -------------------------------------------------
+    out: list[str] = []
+
+    # ===== Background section =====
+    out += ["---", "", "# Background", ""]
+
+    # H2 1: Scope + motivation
+    out += ["---", "", "## Scope and motivation", ""]
+    if meta["scope_text"]:
+        out += [meta["scope_text"], ""]
+    else:
+        out += [f"Autoresearch session for `{scope}`. The session sweeps a "
+                "configured search space across modeling axes, runs each "
+                "candidate end-to-end, and ranks them by a target metric.", ""]
+    if state.get("axes_rationale"):
+        out += [state["axes_rationale"], ""]
+    out += [f"This session ran **{n_iters_total} iterations** over "
+            f"**{n_candidates_planned}** planned candidates, with results "
+            f"persisted to `results/` and `scorecard.xlsx` for downstream "
+            "analysis.", ""]
+
+    # H2 2: Search target
+    out += ["---", "", "## Search target", ""]
+    out += [f"**Target** — {target_line}", ""]
+    if isinstance(target_meta, dict) and target_meta.get("metric"):
+        out += [f"Optimization direction: `{target_op}imize "
+                f"{target_meta['metric']}`. Each iteration writes a "
+                "`summary.md` whose first non-blank metric line is parsed "
+                "and ranked.", ""]
+    else:
+        out += ["No explicit numeric target was set; the session ran until "
+                "the candidate queue was exhausted, then ranked completed "
+                "iterations by their reported metrics.", ""]
+
+    # ===== Methods section =====
+    out += ["---", "", "# Methods", ""]
+
+    # H2 1: Search axes
+    if axes:
+        out += ["---", "", "## Search axes", ""]
+        for name, vals in axes:
+            out += [f"### `{name}`", "", vals, ""]
+    else:
+        out += ["---", "", "## Search structure", "",
+                f"Single-track session with no branching axes. "
+                f"{n_iters_total} iterations queued from project context.", ""]
+
+    # H2 2: Pipeline / iteration loop
+    out += ["---", "", "## Iteration loop", "",
+            "Each candidate is run independently end-to-end with stdout "
+            "captured to `last-iteration.log`. Results land in "
+            "`$AUTORESEARCH_OUT_RESULTS/{summary.md, metrics.json, fig_*.png}`.",
+            "",
+            "After each iteration the autoresearch skill records the result "
+            "in `state.json`, runs adaptive replanning, appends a block to "
+            "the research-log entry, and schedules the next iteration. "
+            "On error, the failure pipeline classifies and routes to retry, "
+            "code-fix, or skip.", ""]
+
+    # ===== Results section =====
+    if top or all_metrics:
+        out += ["---", "", "# Results", ""]
+
+        # H2 1: Top candidates table
+        if top:
+            out += ["---", "", "## Top candidates", "",
+                    f"Top candidates by metric ({op_label} first):", "",
+                    "| Rank | Candidate | Metric |",
+                    "|---|---|---:|"]
+            for rank, r in enumerate(top, 1):
+                cand_id = r.get("id", "—")
+                metric = r.get("metric_value")
+                if isinstance(metric, (int, float)):
+                    out.append(f"| {rank} | `{cand_id}` | {metric:.4f} |")
+                else:
+                    out.append(f"| {rank} | `{cand_id}` | — |")
+            out += [""]
+
+        # H2 2: Headline numbers / spread
+        if len(all_metrics) >= 2:
+            out += ["---", "", "## Performance spread", ""]
+            best_m = max(all_metrics) if target_op == "max" else min(all_metrics)
+            worst_m = min(all_metrics) if target_op == "max" else max(all_metrics)
+            spread = abs(best_m - worst_m)
+            out += [f"Across {len(all_metrics)} completed iterations, the "
+                    f"target metric ranged from **{worst_m:.4f}** "
+                    f"(weakest) to **{best_m:.4f}** (strongest) — a spread "
+                    f"of **{spread:.4f}**.", ""]
+            if top and len(top) >= 2:
+                m1 = top[0].get("metric_value")
+                m2 = top[1].get("metric_value")
+                if isinstance(m1, (int, float)) and isinstance(m2, (int, float)):
+                    delta = abs(m1 - m2)
+                    out += [f"The top two candidates differ by "
+                            f"**{delta:.4f}** — see "
+                            f"`scorecard.xlsx` for bootstrap CIs and "
+                            "stratum-level breakdown.", ""]
+
+    # ===== Conclusions section =====
     if top:
-        parts.append("---")
-        parts.append("")
-        parts.append("## Conclusions")
-        parts.append("")
+        out += ["---", "", "# Conclusions", ""]
+
+        # H2 1: Best configuration
         best = top[0]
+        out += ["---", "", "## Best configuration", ""]
         cand_id = best.get("id", "—")
         metric = best.get("metric_value")
-        parts.append(f"**Best configuration** — `{cand_id}`"
-                     + (f" (metric = {metric:.4f})"
-                        if isinstance(metric, (int, float)) else ""))
-        parts.append("")
-        # Auto-fold the second + third place into a quick comparison line so
-        # the slide isn't a one-liner.
+        out += [f"**Configuration** — `{cand_id}`", ""]
+        if isinstance(metric, (int, float)):
+            out += [f"**Headline metric** — {metric:.4f}", ""]
+        out += ["See the iteration-detail section for per-candidate ROC "
+                "and calibration figures, or `scorecard.xlsx` for the full "
+                "ranked matrix with bootstrap CIs.", ""]
+
+        # H2 2: Recommendations
+        out += ["---", "", "## Recommendations", ""]
         if len(top) >= 2:
-            others = ", ".join(
-                f"`{r['id']}` ({r['metric_value']:.4f})" for r in top[1:]
-            )
-            parts.append(f"Runners-up — {others}")
-            parts.append("")
-        parts.append("Per-iteration figures + tables follow. "
-                     "Full data + bootstrap CIs in `scorecard.xlsx`.")
-        parts.append("")
+            ru = ", ".join(f"`{r['id']}`" for r in top[1:])
+            out += [f"- **Ship** `{cand_id}` for downstream evaluation.", ""]
+            out += [f"- **Validate** the top configuration on held-out data "
+                    "before locking it in for deployment.", ""]
+            out += [f"- **Compare** against runners-up ({ru}) "
+                    "if their tradeoffs (calibration, fairness, "
+                    "interpretability) matter for the deployment context.", ""]
+        else:
+            out += [f"- Treat `{cand_id}` as the working best.", ""]
+            out += ["- Validate on held-out data before deployment.", ""]
+        out += ["- Open questions and follow-up axes belong in the "
+                "research-log entry for this session.", ""]
 
-    # ---- Per-iteration detail slides --------------------------------------
-    if n_iters_total:
-        parts.append("---")
-        parts.append("")
-        parts.append("## Iteration detail")
-        parts.append("")
-        parts.append(f"{n_iters_total} iterations — one figure per slide, "
-                     "headline metric as caption.")
-        parts.append("")
-
-    iters = _iter_dirs(session_root)
-    for d in iters:
-        m = re.match(r"iter-(\d+)_(.+)", d.name)
-        if not m:
-            continue
-        iter_num = int(m.group(1))
-        candidate = m.group(2)
-        body = _read_iter_summary(d)
-        headline = _extract_headline(body)
-        figs = _iter_figures(d)
-
-        parts.append("---")
-        parts.append("")
-        parts.append(f"## iter-{iter_num} — {_humanize(candidate)}")
-        parts.append("")
-        if headline:
-            parts.append(headline)
-            parts.append("")
-
-        if figs:
-            # First figure only — build-pptx picks figure-with-aside or
-            # figure-with-aside-horizontal based on aspect ratio. Embedding a
-            # second figure here forces the planner to fall back to
-            # content-image-only (no caption) or splits to two slides
-            # without a caption — neither matches the headline-aside pattern
-            # we want.
-            fig = figs[0]
-            try:
-                rel = fig.resolve().relative_to(session_root.resolve())
-            except ValueError:
-                rel = fig
-            parts.append(f"![{fig.stem}]({rel})")
-            parts.append("")
-        elif not headline:
-            # No figure AND no headline — emit a placeholder so the slide
-            # isn't visually empty. The scorecard.xlsx still has the data.
-            parts.append("(no figure produced — see scorecard.xlsx)")
-            parts.append("")
-
-    # No explicit closing slide — build-pptx adds its own "Thanks" end slide
-    # automatically.
-
-    return "\n".join(parts)
+    return out
 
 
 # ---------------------------------------------------------------------------
