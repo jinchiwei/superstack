@@ -907,16 +907,18 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                     ],
                 }
             elif (
-                3 <= len(cards) <= 4
+                2 <= len(cards) <= 4
                 and not images
                 and not tables
                 and not _is_closing_slide(slide_title, current_h1)
             ):
-                # 3-4 cards (non-closing, non-stat, non-pipeline) →
+                # 2-4 cards (non-closing, non-stat, non-pipeline) →
                 # cards-triple. Flat full-width stacked rows that fill
                 # sparse-text slides. No hierarchy implication (vs
                 # cards-heterogeneous), no false sequence (vs three-pillars
                 # with arrows), and bigger cards than cards-grid 1×3.
+                # 2-card variant also dispatches here — same row pattern,
+                # avoids the awkward 50/50 visual of cards-grid n=2.
                 kind = "cards-triple"
                 params = {
                     "title": slide_title,

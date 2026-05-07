@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime
@@ -60,12 +61,31 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Import shared styling primitives from skills/_shared/branding_xlsx.py.
-# We resolve the path relative to this file so the script works regardless of
-# cwd.
+#
+# Resolution order:
+#   1. $SUPERSTACK_HOME/skills/_shared        (explicit override)
+#   2. ../../_shared (relative to this file)  (works in-repo at templates/)
+#   3. ~/arcadia/superstack/skills/_shared    (default install location)
+#   4. ~/.claude/skills/_shared               (local-skills install location)
+#
+# We need the absolute-path variants because this template is dropped into
+# projects under <project>/docs/_build_xlsx.py at init time, where the
+# parents[2] heuristic resolves to <project>/ and breaks the import.
 # ---------------------------------------------------------------------------
 
 _HERE = Path(__file__).resolve()
-_SHARED = _HERE.parents[2] / "_shared"
+_SHARED_CANDIDATES = [
+    Path(os.environ.get("SUPERSTACK_HOME", "")) / "skills" / "_shared"
+        if os.environ.get("SUPERSTACK_HOME") else None,
+    _HERE.parents[2] / "_shared",
+    Path.home() / "arcadia" / "superstack" / "skills" / "_shared",
+    Path.home() / ".claude" / "skills" / "_shared",
+]
+_SHARED = next((p for p in _SHARED_CANDIDATES if p and p.is_dir()), None)
+if _SHARED is None:
+    raise SystemExit(
+        "Could not locate skills/_shared/. Set $SUPERSTACK_HOME or install superstack."
+    )
 sys.path.insert(0, str(_SHARED))
 
 try:
@@ -206,13 +226,39 @@ def _write_metric_cell(ws, row_num: int, col_num: int, value: str) -> None:
 # State reading
 # ---------------------------------------------------------------------------
 
-def _read_state(slug: str) -> dict:
-    gstack_home = Path.home() / ".gstack"
-    state_path = gstack_home / "projects" / slug / "autoresearch" / "state.json"
-    if not state_path.exists():
-        raise SystemExit(f"No state.json found at {state_path}")
+def _read_state(scope: str) -> dict:
+    """Locate state.json for the current project + verify scope matches.
+
+    autoresearch keys state.json by *project slug* (derived from cwd), not by
+    *scope slug*. Search order:
+      1. ~/.gstack/projects/<cwd-basename>/autoresearch/state.json
+      2. Fallback: ~/.gstack/projects/<scope>/autoresearch/state.json
+         (covers the legacy case where someone seeded state by scope slug).
+
+    Once located, verify state["scope_slug"] == scope to fail loud on mismatch.
+    """
+    gstack_home = Path(os.environ.get("GSTACK_HOME", Path.home() / ".gstack"))
+    cwd_slug = Path.cwd().resolve().name
+    candidates = [
+        gstack_home / "projects" / cwd_slug / "autoresearch" / "state.json",
+        gstack_home / "projects" / scope    / "autoresearch" / "state.json",
+    ]
+    state_path = next((p for p in candidates if p.exists()), None)
+    if state_path is None:
+        raise SystemExit(
+            f"No state.json found. Looked in:\n  "
+            + "\n  ".join(str(p) for p in candidates)
+        )
     with state_path.open() as fh:
-        return json.load(fh)
+        state = json.load(fh)
+    state_scope = state.get("scope_slug", "")
+    if state_scope and state_scope != scope:
+        print(
+            f"warning: --scope='{scope}' but state.json has scope_slug='{state_scope}'. "
+            f"Using state.json from {state_path}.",
+            file=sys.stderr,
+        )
+    return state
 
 
 def _humanize(slug: str) -> str:

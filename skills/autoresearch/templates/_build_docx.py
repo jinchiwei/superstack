@@ -5,7 +5,7 @@ Reads:
   results/{date}_{scope}/iter-*/summary.md
 
 Writes:
-  docs/runs/{date}_{scope}/SESSION_REPORT.docx
+  results/{date}_{scope}/SESSION_REPORT.docx
 
 Style: conservative, paper-like. Black body text on white. Brand-color accents
 on H1 and H2 only (turquoise / blueviolet). Geist for headings, Geist Mono for
@@ -118,7 +118,7 @@ def main():
     args = p.parse_args()
 
     session = _read_session(args.date, args.scope)
-    out_dir = Path("docs") / "runs" / f"{args.date}_{args.scope}"
+    out_dir = Path("results") / f"{args.date}_{args.scope}"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "SESSION_REPORT.docx"
 

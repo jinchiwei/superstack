@@ -365,6 +365,8 @@ After the command, the skill REQUIRES that `$AUTORESEARCH_OUT_RESULTS/summary.md
 
 If `exit_code == 0` AND `summary.md` exists, parse the metric from the log or from `summary.md` (the LLM extracts it; the format depends on the project — usually a known stdout pattern or a metrics JSON written by the run).
 
+**Figure contract (STRONGLY RECOMMENDED):** every phase script SHOULD also write at least one `fig_*.png` (e.g. `fig_roc.png`, `fig_calibration.png`, `fig_strata_forest.png`) into `$AUTORESEARCH_OUT_RESULTS`. The deck builder (`_build_pptx.py`) auto-discovers and embeds every `fig_*.png` it finds under `iter-*/` — so any figure the experiment produces lands on its own slide in the session report. Sessions that skip figures get text-only decks; reviewers will ask. When generating an experiment driver, default to plotting an ROC + calibration curve for any classification phase; an AUC-by-stratum forest plot for any subgroup phase; and an OOF/preds save (e.g. `oofs.npz`) so plots can be regenerated later without re-running training.
+
 ### Step 4 — Handle failure (if any)
 
 If `exit_code != 0`, apply the failure pipeline:
@@ -587,7 +589,7 @@ fi
 
 ### Generate session reports
 
-After the final summary is written, invoke any project-local doc builders to produce a shareable session report. Each builder is called with the standard `--date` + `--scope` args and writes to `docs/runs/<date>_<scope>/`.
+After the final summary is written, invoke any project-local doc builders to produce a shareable session report. Each builder is called with the standard `--date` + `--scope` args and writes to `results/<date>_<scope>/` (e.g. `SESSION_REPORT.{pptx,pdf,docx}`, `scorecard_<date>.xlsx`). The default `_build_pptx.py` template synthesizes a markdown deck — auto-embedding every `fig_*.png` it finds in iter dirs — and shells out to the `build-pptx` skill, so the deck inherits that skill's full layout catalog and branding.
 
 ```bash
 SESSION_DATE=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .session_started_at | cut -dT -f1)
