@@ -304,91 +304,172 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
     return "\n".join(parts)
 
 
+_AXIS_DESCRIPTIONS = {
+    "phase":    "Evaluation lens applied to the model — different phases stress different aspects (per-site discrimination, OOD generalization, calibration, fairness, etc).",
+    "cohort":   "Patient population scope — which sites/groups are included for training and evaluation.",
+    "arch":     "Model architecture variant under test.",
+    "backbone": "Backbone encoder family (e.g., ResNet, ViT, ConvNeXt).",
+    "loss":     "Training loss formulation.",
+    "lr":       "Learning rate scan range or specific values.",
+    "head":     "Classifier head topology (linear, MLP, attention pooling).",
+    "input":    "Input modality / sequence (T1, T2, audio, image, etc).",
+    "split":    "Cross-validation split strategy.",
+}
+
+
+def _group_results_by_axis(results: list, axis: str) -> dict:
+    """Bucket results_history entries by a single axis value (e.g. 'phase')."""
+    buckets: dict = {}
+    for r in (results or []):
+        if r.get("status") != "complete":
+            continue
+        key = (r.get("axes") or {}).get(axis)
+        if key is None:
+            continue
+        buckets.setdefault(key, []).append(r)
+    return buckets
+
+
+def _phase_summary_rows(results: list) -> list[tuple[str, str, str]]:
+    """For sessions with phase × cohort axes, produce a per-phase summary
+    matrix: [(phase, "metric @ 3site", "metric @ 5site"), ...]. Falls back
+    cleanly when one of the axes is missing."""
+    by_phase = _group_results_by_axis(results, "phase")
+    if not by_phase:
+        return []
+    cohorts = sorted({(r.get("axes") or {}).get("cohort") for r in results
+                      if (r.get("axes") or {}).get("cohort") is not None
+                      and r.get("status") == "complete"})
+    rows = []
+    for phase, entries in by_phase.items():
+        per_cohort = {(r.get("axes") or {}).get("cohort"): r.get("metric_value")
+                      for r in entries}
+        cells = []
+        for c in cohorts:
+            v = per_cohort.get(c)
+            cells.append(f"{v:.4f}" if isinstance(v, (int, float)) else "—")
+        rows.append((phase, cells, cohorts))
+    return rows
+
+
 def _render_auto_narrative(*, scope: str, pretty_scope: str, meta: dict,
                            state: dict, target_line: str,
                            session_root: Path) -> list[str]:
-    """Auto-generate the Background / Methods / Results / Conclusions sections
-    when no findings.md is present. Returns a list of markdown lines (no
-    leading "---" — caller stitches sections together)."""
+    """Auto-generate Background / Methods / Results / Conclusions sections
+    when no findings.md is present. Returns a list of markdown lines.
+
+    Each H2 content slide is structured as cards-grid (3-4 cards) or a
+    multi-paragraph block — never a single sentence — so the rendered slide
+    has visual + textual density.
+    """
     iters = _iter_dirs(session_root)
     n_iters_total = len(iters)
-    axes = _summarize_axes(state.get("axes") or {})
+    axes_dict = state.get("axes") or {}
+    axes = _summarize_axes(axes_dict)
     n_candidates_planned = len(state.get("candidate_queue") or [])
     target_op = "max"
     target_meta = state.get("target_metric") or {}
     if isinstance(target_meta, dict) and target_meta.get("op") in ("min", "max"):
         target_op = target_meta["op"]
-    top = _top_results(state.get("results_history") or [], op=target_op, k=3)
+    results_history = state.get("results_history") or []
+    top = _top_results(results_history, op=target_op, k=3)
     op_label = "highest" if target_op == "max" else "lowest"
-    all_metrics = [r.get("metric_value") for r in (state.get("results_history") or [])
-                   if isinstance(r.get("metric_value"), (int, float))]
+
+    # Phase × cohort matrix when applicable (avoids the misleading
+    # cross-metric "spread" calculation).
+    phase_rows = _phase_summary_rows(results_history) if "phase" in axes_dict else []
+    has_phase_grouping = bool(phase_rows) and len(axes_dict.get("phase") or []) > 1
 
     out: list[str] = []
 
-    # ===== Background section =====
+    # ============================================================
+    # # Background  — auto turquoise
+    # ============================================================
     out += ["---", "", "# Background", ""]
 
-    # H2 1: Scope + motivation
+    # ── ## Scope and motivation : cards-grid (4 cards) ──
+    # Cards force visual structure even when the underlying content is
+    # short. 4 short factual cards beat 2 dense sentences of plain prose.
     out += ["---", "", "## Scope and motivation", ""]
     if meta["scope_text"]:
         out += [meta["scope_text"], ""]
+    elif state.get("axes_rationale"):
+        out += [state["axes_rationale"], ""]
+    out += ["### Scope", "",
+            (meta["scope_text"] or pretty_scope), ""]
+    out += ["### Iterations", "",
+            f"{n_iters_total} runs · {n_candidates_planned} planned candidates", ""]
+    if "cohort" in axes_dict:
+        cohorts = ", ".join(str(c) for c in axes_dict["cohort"])
+        out += ["### Cohorts", "", cohorts, ""]
+    if "phase" in axes_dict:
+        phases = ", ".join(str(p) for p in axes_dict["phase"])
+        out += ["### Phases", "", phases, ""]
+    out += ["### Output", "",
+            "Per-iter `summary.md` + figures, `scorecard.xlsx` matrix, this deck.", ""]
+
+    # ── ## Search target ──
+    out += ["---", "", "## Search target", ""]
+    if isinstance(target_meta, dict) and target_meta.get("metric"):
+        out += [f"**Target** — `{target_op}imize {target_meta['metric']}`. "
+                f"Each iteration writes a `summary.md` whose first metric "
+                f"line is parsed, ranked, and persisted to `state.json`.", ""]
     else:
-        out += [f"Autoresearch session for `{scope}`. The session sweeps a "
-                "configured search space across modeling axes, runs each "
-                "candidate end-to-end, and ranks them by a target metric.", ""]
+        out += [f"**Target** — {target_line}", "",
+                "No single numeric target was set up-front. Each phase "
+                "reports its own headline metric — AUC for discrimination "
+                "phases, ECE for calibration, worst-stratum AUC for "
+                "fairness — so cross-phase ranking is intentionally "
+                "deferred to the per-phase results matrix below.", ""]
     if state.get("axes_rationale"):
         out += [state["axes_rationale"], ""]
-    out += [f"This session ran **{n_iters_total} iterations** over "
-            f"**{n_candidates_planned}** planned candidates, with results "
-            f"persisted to `results/` and `scorecard.xlsx` for downstream "
-            "analysis.", ""]
 
-    # H2 2: Search target
-    out += ["---", "", "## Search target", ""]
-    out += [f"**Target** — {target_line}", ""]
-    if isinstance(target_meta, dict) and target_meta.get("metric"):
-        out += [f"Optimization direction: `{target_op}imize "
-                f"{target_meta['metric']}`. Each iteration writes a "
-                "`summary.md` whose first non-blank metric line is parsed "
-                "and ranked.", ""]
-    else:
-        out += ["No explicit numeric target was set; the session ran until "
-                "the candidate queue was exhausted, then ranked completed "
-                "iterations by their reported metrics.", ""]
-
-    # ===== Methods section =====
+    # ============================================================
+    # # Methods  — auto deeppink
+    # ============================================================
     out += ["---", "", "# Methods", ""]
 
-    # H2 1: Search axes
+    # ── ## Search axes  : cards-grid with descriptions ──
     if axes:
         out += ["---", "", "## Search axes", ""]
+        out += [f"The session sweeps **{len(axes)} axes**: "
+                f"{' × '.join('`' + n + '`' for n, _ in axes)}. "
+                f"Cartesian product = {n_candidates_planned} candidates.", ""]
         for name, vals in axes:
-            out += [f"### `{name}`", "", vals, ""]
+            desc = _AXIS_DESCRIPTIONS.get(name, "Project-defined search dimension.")
+            out += [f"### `{name}` — {vals}", "", desc, ""]
     else:
         out += ["---", "", "## Search structure", "",
                 f"Single-track session with no branching axes. "
                 f"{n_iters_total} iterations queued from project context.", ""]
 
-    # H2 2: Pipeline / iteration loop
+    # ── ## Iteration loop ──
     out += ["---", "", "## Iteration loop", "",
-            "Each candidate is run independently end-to-end with stdout "
-            "captured to `last-iteration.log`. Results land in "
-            "`$AUTORESEARCH_OUT_RESULTS/{summary.md, metrics.json, fig_*.png}`.",
-            "",
-            "After each iteration the autoresearch skill records the result "
-            "in `state.json`, runs adaptive replanning, appends a block to "
-            "the research-log entry, and schedules the next iteration. "
-            "On error, the failure pipeline classifies and routes to retry, "
-            "code-fix, or skip.", ""]
+            "Each candidate runs end-to-end as a separate process with "
+            "stdout captured to `last-iteration.log`. Outputs land in "
+            "`$AUTORESEARCH_OUT_RESULTS/{summary.md, metrics.json, "
+            "fig_*.png}`; raw checkpoints in `$AUTORESEARCH_OUT_EXP/`.", "",
+            "After each iteration the autoresearch skill parses the "
+            "headline metric, records it in `state.json`, runs adaptive "
+            "replanning over the remaining candidate queue, appends a "
+            "block to the research-log entry, and schedules the next "
+            "iteration. Failures route through a classifier (transient → "
+            "retry, code_bug → stash + fix, infrastructure → halt-gate).", ""]
 
-    # ===== Results section =====
-    if top or all_metrics:
+    # ============================================================
+    # # Results  — auto amber
+    # ============================================================
+    has_any_results = bool(top) or bool(phase_rows)
+    if has_any_results:
         out += ["---", "", "# Results", ""]
 
-        # H2 1: Top candidates table
+        # ── ## Top candidates : table ──
         if top:
             out += ["---", "", "## Top candidates", "",
-                    f"Top candidates by metric ({op_label} first):", "",
+                    f"Top candidates by metric ({op_label} first). Each "
+                    "row's metric is the headline value reported by the "
+                    "iteration's `summary.md` — see iter detail slides for "
+                    "bootstrap CIs and stratum-level breakdown.", "",
                     "| Rank | Candidate | Metric |",
                     "|---|---|---:|"]
             for rank, r in enumerate(top, 1):
@@ -400,52 +481,63 @@ def _render_auto_narrative(*, scope: str, pretty_scope: str, meta: dict,
                     out.append(f"| {rank} | `{cand_id}` | — |")
             out += [""]
 
-        # H2 2: Headline numbers / spread
-        if len(all_metrics) >= 2:
-            out += ["---", "", "## Performance spread", ""]
-            best_m = max(all_metrics) if target_op == "max" else min(all_metrics)
-            worst_m = min(all_metrics) if target_op == "max" else max(all_metrics)
-            spread = abs(best_m - worst_m)
-            out += [f"Across {len(all_metrics)} completed iterations, the "
-                    f"target metric ranged from **{worst_m:.4f}** "
-                    f"(weakest) to **{best_m:.4f}** (strongest) — a spread "
-                    f"of **{spread:.4f}**.", ""]
-            if top and len(top) >= 2:
-                m1 = top[0].get("metric_value")
-                m2 = top[1].get("metric_value")
-                if isinstance(m1, (int, float)) and isinstance(m2, (int, float)):
-                    delta = abs(m1 - m2)
-                    out += [f"The top two candidates differ by "
-                            f"**{delta:.4f}** — see "
-                            f"`scorecard.xlsx` for bootstrap CIs and "
-                            "stratum-level breakdown.", ""]
+        # ── ## Phase × cohort matrix (when applicable) ──
+        # Avoids the "spread across heterogeneous metrics" trap by showing
+        # each phase as its own row with cohort-specific cells.
+        if has_phase_grouping:
+            cohorts = phase_rows[0][2]  # all phases share the same cohort columns
+            out += ["---", "", "## Phase × cohort matrix", "",
+                    f"Headline metric per phase × cohort. Metrics differ "
+                    f"by phase — AUC for discrimination, ECE for "
+                    f"calibration, worst-stratum AUC for stratified — so "
+                    f"compare WITHIN a row, not across rows.", ""]
+            header = "| Phase | " + " | ".join(cohorts) + " |"
+            sep = "|---|" + "---:|" * len(cohorts)
+            out += [header, sep]
+            for phase, cells, _ in phase_rows:
+                out.append(f"| `{phase}` | " + " | ".join(cells) + " |")
+            out += [""]
 
-    # ===== Conclusions section =====
+    # ============================================================
+    # # Conclusions  — auto turquoise
+    # ============================================================
     if top:
         out += ["---", "", "# Conclusions", ""]
 
-        # H2 1: Best configuration
+        # ── ## Best configuration : multi-paragraph ──
         best = top[0]
         out += ["---", "", "## Best configuration", ""]
         cand_id = best.get("id", "—")
         metric = best.get("metric_value")
-        out += [f"**Configuration** — `{cand_id}`", ""]
         if isinstance(metric, (int, float)):
-            out += [f"**Headline metric** — {metric:.4f}", ""]
-        out += ["See the iteration-detail section for per-candidate ROC "
-                "and calibration figures, or `scorecard.xlsx` for the full "
-                "ranked matrix with bootstrap CIs.", ""]
+            out += [f"**`{cand_id}`** — headline metric **{metric:.4f}**.", ""]
+        else:
+            out += [f"**`{cand_id}`**.", ""]
+        if len(top) >= 2:
+            m1 = top[0].get("metric_value")
+            m2 = top[1].get("metric_value")
+            if isinstance(m1, (int, float)) and isinstance(m2, (int, float)):
+                out += [f"The top two candidates differ by "
+                        f"**{abs(m1 - m2):.4f}** — see `scorecard.xlsx` "
+                        "for bootstrap CIs.", ""]
+        out += ["See the iteration-detail section below for per-candidate "
+                "ROC, calibration, and stratified figures. Per-phase "
+                "context lives in the research-log entry; raw OOF "
+                "predictions are saved as `oofs.npz` for replotting "
+                "without retraining.", ""]
 
-        # H2 2: Recommendations
+        # ── ## Recommendations : bullets ──
         out += ["---", "", "## Recommendations", ""]
         if len(top) >= 2:
             ru = ", ".join(f"`{r['id']}`" for r in top[1:])
             out += [f"- **Ship** `{cand_id}` for downstream evaluation.", ""]
-            out += [f"- **Validate** the top configuration on held-out data "
-                    "before locking it in for deployment.", ""]
-            out += [f"- **Compare** against runners-up ({ru}) "
-                    "if their tradeoffs (calibration, fairness, "
-                    "interpretability) matter for the deployment context.", ""]
+            out += [f"- **Validate** on held-out data before locking it in "
+                    "for deployment — the headline metric is from "
+                    "in-distribution OOF, not external test.", ""]
+            out += [f"- **Compare** against runners-up ({ru}) when "
+                    "deployment tradeoffs (calibration, fairness, "
+                    "interpretability, latency) matter beyond raw "
+                    "discrimination.", ""]
         else:
             out += [f"- Treat `{cand_id}` as the working best.", ""]
             out += ["- Validate on held-out data before deployment.", ""]
