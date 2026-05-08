@@ -171,7 +171,12 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
     li_blocks = [m.group(1) for m in
                  re.finditer(r"<li[^>]*>(.*?)</li>", body_region, re.DOTALL)]
     auto_cards = None
-    if li_blocks and not cards:
+    # Skip the bullets→cards promotion when images coexist on the slide:
+    # the cards branch in build.py's dispatcher doesn't render images, so
+    # promoting here would silently drop the figure. With images present,
+    # leave bullets as bullets — content-text-image / figure-with-aside
+    # render them as bullet text alongside the image.
+    if li_blocks and not cards and not images:
         auto_cards = _detect_def_cards_from_li_html(li_blocks)
 
     paragraphs: list[dict] = []
