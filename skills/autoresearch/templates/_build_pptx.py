@@ -162,6 +162,44 @@ def _peer_comparison(results_history: list, axes_dict: dict, this_axes: dict,
             + (" (better)" if (delta > 0) == (target_op == "max") else " (worse)"))
 
 
+def _read_iter_metrics(iter_dir: Path) -> dict | None:
+    """Load iter-NN/metrics.json if present. Returns the parsed dict or None."""
+    p = iter_dir / "metrics.json"
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _format_op_points(op: dict) -> list[str]:
+    """Format an op_points dict (with youden / sens95 / spec95 sub-dicts) into
+    short markdown bullet strings for the iter slide. Returns ≤2 bullets so
+    they fit beside the figure in figure-with-aside."""
+    if not op:
+        return []
+    bullets = []
+    y = op.get("youden") or {}
+    if y:
+        sens, spec = y.get("sens", 0), y.get("spec", 0)
+        ppv, npv = y.get("ppv", 0), y.get("npv", 0)
+        bullets.append(
+            f"- **Operating** — Youden sens {sens:.0%} · spec {spec:.0%} · "
+            f"PPV {ppv:.2f} · NPV {npv:.2f}"
+        )
+    s95 = op.get("sens95") or {}
+    sp95 = op.get("spec95") or {}
+    extras = []
+    if s95:
+        extras.append(f"sens@95% spec → spec {s95.get('spec', 0):.2f}")
+    if sp95:
+        extras.append(f"spec@95% sens → sens {sp95.get('sens', 0):.2f}")
+    if extras:
+        bullets.append(f"- **Threshold** — {' · '.join(extras)}")
+    return bullets
+
+
 def _result_for_iter(results_history: list, iter_dir_name: str) -> dict | None:
     """Find the matching results_history entry for this iter dir.
 
@@ -384,6 +422,9 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
             headline = _extract_headline(body)
             secondary = _extract_secondary_metric(body)
             figs = _iter_figures(d)
+            metrics = _read_iter_metrics(d)
+            op = (metrics or {}).get("op_points") or {}
+            op_bullets = _format_op_points(op)
             iter_result = _result_for_iter(results_history, d.name)
             this_axes = (iter_result or {}).get("axes") or {}
             this_metric = (iter_result or {}).get("metric_value")
@@ -410,7 +451,7 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
                 parts.append(f"Iteration with {axes_descr}.")
                 parts.append("")
 
-            # Body bullets: result + comparison + secondary metric.
+            # Body bullets: result + comparison + secondary metric + op_points.
             bullets = []
             if headline:
                 bullets.append(f"- **Result** — {headline}")
@@ -418,6 +459,7 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
                 bullets.append(f"- **Also** — {secondary}")
             if peer_str:
                 bullets.append(f"- **Comparison** — {peer_str}")
+            bullets.extend(op_bullets)  # operating-point bullets when available
             if bullets:
                 parts.extend(bullets)
                 parts.append("")
