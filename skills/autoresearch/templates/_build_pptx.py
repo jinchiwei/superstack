@@ -98,6 +98,78 @@ def _extract_headline(summary_text: str) -> str:
     return ""
 
 
+_PHASE_PURPOSES = {
+    "per_site":       "How does the model perform on each individual site? Tests for site-specific failure modes that aggregate metrics hide.",
+    "cohort_fair":    "Apples-to-apples comparison across cohorts using both standard CV and site-stratified CV — separates model quality from cohort difficulty.",
+    "loso":           "Leave-one-site-out — does the model generalize to a held-out site it has never seen during training?",
+    "fusion_variant": "Tab-only vs image-only vs early-concat vs late-fusion — which fusion strategy actually wins?",
+    "calibration":    "Are the predicted probabilities trustworthy? Compares raw / Platt / isotonic / temperature-scaled outputs by ECE.",
+    "stratified":     "Performance by patient subgroup (sex, age, centor, etc) — surfaces fairness or worst-case-stratum gaps.",
+    "ablation":       "Which input feature or component is actually carrying the signal?",
+    "hpo":            "Hyperparameter sweep — locates the operating point in axes-space.",
+}
+
+
+def _extract_secondary_metric(summary_text: str) -> str:
+    """Pull a SECOND headline-style line from a summary (e.g., site-stratified
+    AUC line that follows the standard CV one). Returns "" if none."""
+    if not summary_text:
+        return ""
+    headlines = []
+    for line in summary_text.splitlines():
+        s = line.strip()
+        # Match either "**Headline metric ...:** X" or "**Site-stratified ... AUC:** X"
+        m = re.match(r"^\*\*([^*]+)\*\*\s*:?\s*(.*)$", s)
+        if m and ("AUC" in s or "ECE" in s or "metric" in s.lower()):
+            label = m.group(1).strip().rstrip(":").strip()
+            value = m.group(2).strip().lstrip(":").strip()
+            if value:  # only count lines that actually have a value
+                headlines.append(f"{label}: {value}")
+        if len(headlines) >= 2:
+            return headlines[1]
+    return ""
+
+
+def _peer_comparison(results_history: list, axes_dict: dict, this_axes: dict,
+                     this_metric, target_op: str = "max") -> str:
+    """Find a peer iteration (same phase, different cohort) and produce a
+    comparison string like "vs 5site: −0.043". Returns "" if no good peer."""
+    if not isinstance(this_metric, (int, float)):
+        return ""
+    if not this_axes or "phase" not in this_axes or "cohort" not in this_axes:
+        return ""
+    peer = None
+    for r in (results_history or []):
+        if r.get("status") != "complete":
+            continue
+        rax = r.get("axes") or {}
+        if (rax.get("phase") == this_axes.get("phase")
+            and rax.get("cohort") != this_axes.get("cohort")
+            and isinstance(r.get("metric_value"), (int, float))):
+            peer = r
+            break
+    if peer is None:
+        return ""
+    peer_metric = peer["metric_value"]
+    delta = this_metric - peer_metric
+    sign = "+" if delta >= 0 else "−"
+    return (f"vs {peer['axes']['cohort']}: {sign}{abs(delta):.4f}"
+            + (" (better)" if (delta > 0) == (target_op == "max") else " (worse)"))
+
+
+def _result_for_iter(results_history: list, iter_dir_name: str) -> dict | None:
+    """Find the matching results_history entry for this iter dir.
+
+    Match is loose: try exact id match first, then look for an entry whose
+    axes match what _iter_dirs derives from the dir name."""
+    # Strip "iter-NN_" prefix
+    cand_slug = re.sub(r"^iter-\d+_", "", iter_dir_name)
+    for r in results_history or []:
+        if r.get("id") == cand_slug:
+            return r
+    return None
+
+
 def _iter_figures(iter_dir: Path) -> list[Path]:
     """Return all fig_*.png files in the iter dir, sorted by name."""
     if not iter_dir.is_dir():
@@ -270,6 +342,14 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
         parts.append("# Iteration detail")
         parts.append("")
 
+        # Pre-pull state once so each iter slide can compute peer deltas.
+        results_history = state.get("results_history") or []
+        axes_dict = state.get("axes") or {}
+        target_op = "max"
+        target_meta = state.get("target_metric") or {}
+        if isinstance(target_meta, dict) and target_meta.get("op") in ("min", "max"):
+            target_op = target_meta["op"]
+
         for d in iters:
             m = re.match(r"iter-(\d+)_(.+)", d.name)
             if not m:
@@ -278,14 +358,44 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
             candidate = m.group(2)
             body = _read_iter_summary(d)
             headline = _extract_headline(body)
+            secondary = _extract_secondary_metric(body)
             figs = _iter_figures(d)
+            iter_result = _result_for_iter(results_history, d.name)
+            this_axes = (iter_result or {}).get("axes") or {}
+            this_metric = (iter_result or {}).get("metric_value")
+            phase_name = this_axes.get("phase")
+            purpose = _PHASE_PURPOSES.get(phase_name, "") if phase_name else ""
+            peer_str = _peer_comparison(results_history, axes_dict, this_axes,
+                                         this_metric, target_op=target_op)
 
             parts.append("---")
             parts.append("")
             parts.append(f"## iter-{iter_num} — {_humanize(candidate)}")
             parts.append("")
+
+            # Lede sentence: what this iter tests (the "why"). Pull from the
+            # phase description, fall back to a generic sentence built from
+            # the iter's axes.
+            if purpose:
+                parts.append(purpose)
+                parts.append("")
+            elif this_axes:
+                axes_descr = ", ".join(
+                    f"`{k}={v}`" for k, v in this_axes.items()
+                )
+                parts.append(f"Iteration with {axes_descr}.")
+                parts.append("")
+
+            # Body bullets: result + comparison + secondary metric.
+            bullets = []
             if headline:
-                parts.append(headline)
+                bullets.append(f"- **Result** — {headline}")
+            if secondary:
+                bullets.append(f"- **Also** — {secondary}")
+            if peer_str:
+                bullets.append(f"- **Comparison** — {peer_str}")
+            if bullets:
+                parts.extend(bullets)
                 parts.append("")
 
             if figs:
@@ -296,7 +406,7 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
                     rel = fig
                 parts.append(f"![{fig.stem}]({rel})")
                 parts.append("")
-            elif not headline:
+            elif not bullets:
                 parts.append("(no figure produced — see scorecard.xlsx)")
                 parts.append("")
 
