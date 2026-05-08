@@ -546,6 +546,16 @@ ScheduleWakeup(
 
 After ScheduleWakeup returns, exit. Done with this iteration.
 
+## Reporting conventions (canonical)
+
+When this skill — or any project that produces a figure deliverable downstream of an autoresearch run — renders feature names or metric tables, the following rules are NON-NEGOTIABLE:
+
+1. **Feature-direction / SHAP plots MUST use human-readable axis labels.** Pyradiomics raw column names like `log-sigma-2-0-mm-3D_glcm_Imc1` or `original_glcm_Idn` are unreadable on a slide. Always pass them through `superstack/skills/_shared/feature_naming.py::clean_radiomic_feature_name` before rendering. The helper expands matrix abbreviations (GLCM → "Co-occurrence", GLRLM → "Run-length", etc.) and feature-name shorthand (Imc1 → "Information Measure of Correlation 1", Idn → "Inverse Difference Normalized"), and renders the image filter as a parenthetical suffix.
+
+2. **Metric leaderboard tables (matplotlib) MUST size column widths to content.** matplotlib's default `Table` gives every column equal width — long pipeline names get visually truncated while short numeric columns waste space. Always pass `colWidths=` computed via `superstack/skills/_shared/plotting_helpers.py::proportional_col_widths(rows, headers)`.
+
+Both helpers are zero-dependency and import-safe; project code should add `superstack/skills/_shared` to `sys.path` and import them directly.
+
 ## Termination
 
 When a stop condition is hit (Step 1 of RUNNING mode), produce the final summary and exit WITHOUT calling ScheduleWakeup.
