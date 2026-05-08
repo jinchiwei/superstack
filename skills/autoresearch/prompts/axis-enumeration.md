@@ -5,6 +5,7 @@ You are bootstrapping an /autoresearch session. The user gave you a free-text sc
 **Inputs:**
 - `scope`: free-text description (e.g. "iterate over architectures, input modes, loss functions for the FW prediction model")
 - `project_context`: a Read of the user's project README/CLAUDE.md/relevant code if useful
+- `lit_review_summary` (optional): the `axis_implications` field from the upstream Step 2.5 lit-review synthesis. Empty string means no lit context (either it was skipped, the search returned nothing relevant, or lit review failed). When non-empty, it names specific axis values the literature suggests including or excluding (e.g. "transformers consistently outperform CNNs on this task; consider adding a transformer baseline").
 
 **Outputs (JSON, no prose):**
 
@@ -24,6 +25,7 @@ You are bootstrapping an /autoresearch session. The user gave you a free-text sc
 **Rules:**
 1. Each axis is a category with 2-8 concrete options. Don't enumerate continuous ranges as discrete values unless the user named them.
 2. Stick close to what the scope says. Don't invent unrelated dimensions.
+2a. **Honor `lit_review_summary` when present.** If the lit review explicitly suggests including a specific approach as a baseline ("consider adding a transformer baseline"), include it as an axis value when it fits the scope. If the lit review identifies a specific approach that's been shown not to work in this domain ("plain MLPs collapse on this task"), omit that value. The summary is advisory, not commanding — if the user's scope explicitly contradicts the lit review's suggestion (e.g., scope says "MLPs only"), follow the scope. Note any such overrides in `rationale`.
 3. If the user named a target metric in the scope ("until val_corr > 0.85"), parse it. If not, set target_metric to null and rely on exhaustion-stop.
 4. scope_slug is filename-safe (lowercase, hyphens, no special chars). Should make sense as a research-log entry slug.
 5. If you can't make sense of the scope, return `{"error": "<one-sentence reason>"}` instead — the SKILL.md handles the error path.

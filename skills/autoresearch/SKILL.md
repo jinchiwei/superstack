@@ -112,11 +112,45 @@ The user invocation is `/autoresearch "<scope>"`. The scope arg is in `$ARGS` or
 
 Use Read on `CLAUDE.md`, `README.md`, and 1-2 obviously relevant source files if present. Just enough to ground the axis enumeration. Don't read the world.
 
+### Step 2.5 — Literature review (research scopes only)
+
+Run a focused literature review **before** axis enumeration so axes can be informed by what's been tried, and so the user sees the novelty case in Step 4 alongside the proposed sweep.
+
+**Stage A — classify + propose queries.** Apply `prompts/lit-review-classify.md` with:
+- `scope`: the scope text
+- `project_context`: a brief summary of what was read in Step 2
+
+The output is one of:
+- `{"skip": true, "reason": "..."}` — non-research scope (QA automation, build matrix, ops sweep, etc.). Set `$LIT_REVIEW_AVAILABLE=false`, write `$state_dir/lit-review-skipped.txt` with the reason, and proceed to Step 3 (axis enumeration runs without lit context).
+- `{"queries": [...], "sources": [...], "focus": "..."}` — proceed to Stage B.
+
+**Stage B — fetch abstracts.** For each query, invoke:
+
+```bash
+"$SKILL_DIR/bin/lit-search" \
+  --query "$Q" \
+  --max-results 8 \
+  --source "$(echo "$SOURCES" | tr ' ' ,)" \
+  > "$state_dir/lit-papers-$i.json"
+```
+
+Concatenate and de-duplicate by `url` across queries. Save the merged list to `$state_dir/lit-papers.json`. Per-query `bin/lit-search` failures are non-fatal; the script handles partial failures gracefully (e.g., a Semantic Scholar 429 leaves PubMed + arXiv results intact).
+
+If the merged list is empty after all queries, set `$LIT_REVIEW_AVAILABLE=true` but with the empty-result handling path (the synthesizer still runs and returns a "no comparable prior work" framing).
+
+**Stage C — synthesize.** Apply `prompts/lit-review-synthesize.md` with:
+- `scope`, `focus` (from Stage A), `project_context`, `papers` (merged list)
+
+Save the synthesis to `$state_dir/lit-review.json` and a human-readable `$state_dir/lit-review.md`. Surface the `axis_implications` field into Step 3 as additional context.
+
+**Failure modes:** if Stage A errors (LLM returns malformed JSON), retry once. If it fails again, set `$LIT_REVIEW_AVAILABLE=false` and proceed without lit review (do NOT block the session). If Stage C errors, save raw papers but proceed without synthesis. Lit review is **non-essential** — never block axis enumeration on a lit-review failure.
+
 ### Step 3 — Enumerate axes via the LLM
 
 Apply the prompt at `prompts/axis-enumeration.md` with:
 - `scope`: the scope text
 - `project_context`: a brief summary of what you read
+- `lit_review_summary` (optional): the `axis_implications` field from Step 2.5 if `$LIT_REVIEW_AVAILABLE=true`. Pass an empty string otherwise.
 
 Produce the JSON with `scope_slug`, `target_metric`, `axes`, `rationale`.
 
@@ -126,11 +160,18 @@ If the LLM returns `{"error": ...}`, surface the error to the user via AskUserQu
 
 This is the **only blocking AskUserQuestion in the entire skill workflow.** Pre-launch, before walking away. After this, the no-questions invariant kicks in.
 
-Use AskUserQuestion with the rendered axes:
+Use AskUserQuestion with the rendered plan. When `$LIT_REVIEW_AVAILABLE=true`, include the lit-review block above the axes; when skipped, include a one-liner naming the skip reason; when unavailable due to failure, omit the block entirely.
 
 ```
 Plan: <scope_slug>
 Target: <target_metric or "no explicit target — stop on exhaustion">
+
+Lit review: <N queries, M abstracts; top relevance: <top_relevant[0].title>>
+  Prior work: <prior_work_summary, 1-2 lines>
+  Novelty: <novelty_argument, 1 line>
+  [or] Lit review skipped — <reason>
+  [or] (block omitted on failure)
+
 Axes:
   arch: [unet, transformer, mlp]
   input: [t1, t2, dwi]
@@ -144,6 +185,7 @@ Options:
 - **A) Confirm and launch (recommended)** — write state.json with phase=running, schedule first iteration
 - **B) Edit axes inline** — let user redirect via "Other" free-text
 - **C) Cancel** — exit cleanly, no state.json written
+- **D) Override lit-review classification** — only show this option when the classifier ran (skipped or proceeded). Lets the user flip the decision: if proceeded, mark as skipped; if skipped, force a re-classify with a hint. Re-loops to Step 2.5.
 
 ### Step 5 — Initialize state.json
 
@@ -201,6 +243,32 @@ fi
 ```
 
 `$INITIAL_ENTRY_BODY` is rendered by the LLM following the existing research-log format rules (h1 title, structured blurb on line 3, Date / Project / Status block, Why, Plan, Axes, Target).
+
+When `$LIT_REVIEW_AVAILABLE=true`, insert a `## Prior work & novelty` section between `## Why` and `## Plan`. Render it from `$state_dir/lit-review.json` produced in Step 2.5. Format:
+
+```markdown
+## Prior work & novelty
+
+**Prior work:** {prior_work_summary}
+
+**Dominant approaches in the literature:**
+- {dominant_approaches[0]}
+- {dominant_approaches[1]}
+- ...
+
+**Gaps:**
+- {gaps[0]}
+- {gaps[1]}
+- ...
+
+**Novelty argument:** {novelty_argument}
+
+**Top relevant prior work:**
+1. [{top_relevant[0].title}]({top_relevant[0].url}) ({top_relevant[0].year}) — {top_relevant[0].why_relevant}
+2. ...
+```
+
+Skip the section entirely when `$LIT_REVIEW_AVAILABLE=false` (research-log entry has Why → Plan → Axes → Target as before). Do not write a "Lit review skipped" placeholder; absence is the signal. The skip reason is captured in `$state_dir/lit-review-skipped.txt` for later reference if needed.
 
 ### Step 7 — Schedule first iteration
 

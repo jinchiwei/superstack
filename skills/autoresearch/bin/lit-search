@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+"""bin/lit-search — query PubMed / arXiv / Semantic Scholar and return paper hits.
+
+Usage:
+  lit-search --query "<text>" [--max-results N] [--source pubmed,arxiv,semanticscholar]
+             [--cache-dir DIR] [--no-cache]
+
+Output (stdout): JSON array of papers, sorted by source then relevance:
+  [
+    {
+      "title":     "<paper title>",
+      "authors":   ["<author 1>", "<author 2>", ...],
+      "year":      <int or null>,
+      "abstract":  "<abstract text or empty>",
+      "url":       "<canonical URL>",
+      "source":    "pubmed" | "arxiv" | "semanticscholar"
+    },
+    ...
+  ]
+
+Cache (default ~/.cache/autoresearch/lit-search/<sha1>.json) is keyed on
+(query, sorted sources, max_results). Idempotent — safe to re-run.
+
+Errors from individual sources are logged to stderr and skipped; the script
+exits 0 unless ALL sources failed.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import logging
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger("lit-search")
+
+USER_AGENT = "autoresearch-lit-search/1.0 (https://github.com/jinchiwei/superstack)"
+DEFAULT_TIMEOUT = 45  # seconds per HTTP call (arXiv can be slow)
+
+EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
+ARXIV = "https://export.arxiv.org/api/query"
+S2 = "https://api.semanticscholar.org/graph/v1/paper/search"
+
+# ---------------------------------------------------------------------------
+# HTTP
+# ---------------------------------------------------------------------------
+
+def _http_get(url: str, *, timeout: int = DEFAULT_TIMEOUT) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+# ---------------------------------------------------------------------------
+# PubMed
+# ---------------------------------------------------------------------------
+
+def search_pubmed(query: str, max_results: int) -> list[dict[str, Any]]:
+    api_key = os.environ.get("NCBI_API_KEY", "")
+    base_qs = {"db": "pubmed", "retmode": "json", "retmax": str(max_results), "term": query}
+    if api_key:
+        base_qs["api_key"] = api_key
+    esearch_url = f"{EUTILS}esearch.fcgi?{urllib.parse.urlencode(base_qs)}"
+
+    try:
+        body = _http_get(esearch_url)
+        data = json.loads(body)
+    except (urllib.error.URLError, json.JSONDecodeError) as exc:
+        logger.warning("PubMed esearch failed: %s", exc)
+        return []
+
+    pmids = (data.get("esearchresult") or {}).get("idlist") or []
+    if not pmids:
+        return []
+
+    # NCBI etiquette: sleep 100ms between requests if no API key
+    if not api_key:
+        time.sleep(0.1)
+
+    efetch_qs = {"db": "pubmed", "rettype": "xml", "retmode": "xml", "id": ",".join(pmids)}
+    if api_key:
+        efetch_qs["api_key"] = api_key
+    efetch_url = f"{EUTILS}efetch.fcgi?{urllib.parse.urlencode(efetch_qs)}"
+    try:
+        xml_bytes = _http_get(efetch_url)
+        root = ET.fromstring(xml_bytes)
+    except (urllib.error.URLError, ET.ParseError) as exc:
+        logger.warning("PubMed efetch failed: %s", exc)
+        return []
+
+    out: list[dict[str, Any]] = []
+    for art in root.findall(".//PubmedArticle"):
+        pmid_el = art.find(".//PMID")
+        pmid = pmid_el.text if pmid_el is not None else ""
+        title_el = art.find(".//ArticleTitle")
+        title = "".join(title_el.itertext()).strip() if title_el is not None else ""
+        # Abstract is split into multiple <AbstractText> chunks (Background, Methods, ...)
+        abs_chunks = []
+        for ab in art.findall(".//Abstract/AbstractText"):
+            label = ab.get("Label")
+            text = "".join(ab.itertext()).strip()
+            if label:
+                abs_chunks.append(f"{label}: {text}")
+            else:
+                abs_chunks.append(text)
+        abstract = " ".join(abs_chunks).strip()
+        # Authors
+        authors: list[str] = []
+        for au in art.findall(".//AuthorList/Author"):
+            last = au.find("LastName")
+            init = au.find("Initials")
+            if last is not None and last.text:
+                name = last.text
+                if init is not None and init.text:
+                    name = f"{name} {init.text}"
+                authors.append(name)
+        # Year
+        year = None
+        year_el = art.find(".//PubDate/Year")
+        if year_el is None:
+            year_el = art.find(".//PubDate/MedlineDate")
+        if year_el is not None and year_el.text:
+            try:
+                year = int(year_el.text[:4])
+            except ValueError:
+                year = None
+        out.append({
+            "title": title,
+            "authors": authors,
+            "year": year,
+            "abstract": abstract,
+            "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else "",
+            "source": "pubmed",
+        })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# arXiv
+# ---------------------------------------------------------------------------
+
+_ATOM_NS = {"a": "http://www.w3.org/2005/Atom", "ax": "http://arxiv.org/schemas/atom"}
+
+
+def search_arxiv(query: str, max_results: int) -> list[dict[str, Any]]:
+    qs = {
+        "search_query": f"all:{query}",
+        "start": "0",
+        "max_results": str(max_results),
+        "sortBy": "relevance",
+        "sortOrder": "descending",
+    }
+    url = f"{ARXIV}?{urllib.parse.urlencode(qs)}"
+    try:
+        xml_bytes = _http_get(url)
+        root = ET.fromstring(xml_bytes)
+    except (urllib.error.URLError, ET.ParseError) as exc:
+        logger.warning("arXiv query failed: %s", exc)
+        return []
+
+    out: list[dict[str, Any]] = []
+    for entry in root.findall("a:entry", _ATOM_NS):
+        title_el = entry.find("a:title", _ATOM_NS)
+        title = (title_el.text or "").strip().replace("\n", " ") if title_el is not None else ""
+        abs_el = entry.find("a:summary", _ATOM_NS)
+        abstract = (abs_el.text or "").strip().replace("\n", " ") if abs_el is not None else ""
+        link = ""
+        for ln in entry.findall("a:link", _ATOM_NS):
+            if ln.get("rel") in (None, "alternate"):
+                link = ln.get("href") or ""
+                break
+        published = entry.find("a:published", _ATOM_NS)
+        year = None
+        if published is not None and published.text:
+            try:
+                year = int(published.text[:4])
+            except ValueError:
+                year = None
+        authors = [
+            (a.find("a:name", _ATOM_NS).text or "").strip()
+            for a in entry.findall("a:author", _ATOM_NS)
+            if a.find("a:name", _ATOM_NS) is not None
+        ]
+        out.append({
+            "title": title,
+            "authors": [a for a in authors if a],
+            "year": year,
+            "abstract": abstract,
+            "url": link,
+            "source": "arxiv",
+        })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Semantic Scholar
+# ---------------------------------------------------------------------------
+
+def search_semanticscholar(query: str, max_results: int) -> list[dict[str, Any]]:
+    fields = "title,abstract,authors,year,url,externalIds"
+    qs = {"query": query, "limit": str(max_results), "fields": fields}
+    url = f"{S2}?{urllib.parse.urlencode(qs)}"
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    api_key = os.environ.get("S2_API_KEY", "")
+    if api_key:
+        headers["x-api-key"] = api_key
+
+    # S2 aggressively rate-limits anonymous traffic. One retry with backoff
+    # covers the common 429 case; persistent 429 means we should skip cleanly.
+    data = None
+    for attempt, delay in enumerate([0, 5]):
+        if delay:
+            time.sleep(delay)
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+                break
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt == 0:
+                continue
+            logger.warning(
+                "Semantic Scholar query failed: HTTP %s%s",
+                exc.code,
+                " (rate-limited; consider setting S2_API_KEY)" if exc.code == 429 else "",
+            )
+            return []
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            logger.warning("Semantic Scholar query failed: %s", exc)
+            return []
+    if data is None:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for paper in data.get("data") or []:
+        authors = [(a.get("name") or "").strip() for a in (paper.get("authors") or [])]
+        # Prefer s2 url, fall back to DOI
+        ext = paper.get("externalIds") or {}
+        url_ = paper.get("url") or (
+            f"https://doi.org/{ext['DOI']}" if ext.get("DOI") else ""
+        )
+        out.append({
+            "title": (paper.get("title") or "").strip(),
+            "authors": [a for a in authors if a],
+            "year": paper.get("year"),
+            "abstract": (paper.get("abstract") or "").strip(),
+            "url": url_,
+            "source": "semanticscholar",
+        })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Cache + driver
+# ---------------------------------------------------------------------------
+
+SOURCES = {
+    "pubmed": search_pubmed,
+    "arxiv": search_arxiv,
+    "semanticscholar": search_semanticscholar,
+}
+
+
+def cache_key(query: str, sources: list[str], max_results: int) -> str:
+    canon = json.dumps(
+        {"q": query.strip().lower(), "s": sorted(sources), "n": max_results},
+        sort_keys=True,
+    )
+    return hashlib.sha1(canon.encode("utf-8")).hexdigest()
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Search literature across multiple sources.")
+    p.add_argument("--query", required=True)
+    p.add_argument("--max-results", type=int, default=10)
+    p.add_argument(
+        "--source",
+        default="pubmed,arxiv,semanticscholar",
+        help="Comma-separated subset of: pubmed,arxiv,semanticscholar",
+    )
+    p.add_argument(
+        "--cache-dir",
+        default=str(Path.home() / ".cache" / "autoresearch" / "lit-search"),
+    )
+    p.add_argument("--no-cache", action="store_true")
+    p.add_argument("--verbose", action="store_true")
+    args = p.parse_args(argv)
+
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING,
+        format="%(levelname)s %(message)s",
+    )
+
+    sources = [s.strip() for s in args.source.split(",") if s.strip()]
+    bad = [s for s in sources if s not in SOURCES]
+    if bad:
+        print(f"unknown source(s): {bad}", file=sys.stderr)
+        return 2
+    if not sources:
+        print("at least one --source required", file=sys.stderr)
+        return 2
+
+    cache_dir = Path(args.cache_dir)
+    key = cache_key(args.query, sources, args.max_results)
+    cache_path = cache_dir / f"{key}.json"
+
+    if not args.no_cache and cache_path.is_file():
+        try:
+            sys.stdout.write(cache_path.read_text())
+            return 0
+        except OSError:
+            pass  # fall through to fresh fetch
+
+    results: list[dict[str, Any]] = []
+    failures: list[str] = []
+    for src in sources:
+        try:
+            hits = SOURCES[src](args.query, args.max_results)
+        except Exception as exc:
+            logger.warning("%s raised: %s", src, exc)
+            failures.append(src)
+            continue
+        if not hits:
+            logger.info("%s returned 0 hits", src)
+        results.extend(hits)
+
+    if not results and failures == sources:
+        print(f"all sources failed: {failures}", file=sys.stderr)
+        return 1
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(results, ensure_ascii=False, indent=2)
+    if not args.no_cache:
+        try:
+            cache_path.write_text(payload)
+        except OSError as exc:
+            logger.warning("could not write cache file %s: %s", cache_path, exc)
+    sys.stdout.write(payload)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
