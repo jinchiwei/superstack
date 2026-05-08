@@ -327,20 +327,39 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
         # are expected to use proper H1/H2 structure.
         parts.append(findings.read_text(encoding="utf-8").strip())
         parts.append("")
+        post_iters_block: list[str] = []
     else:
-        parts.extend(_render_auto_narrative(
+        narrative = _render_auto_narrative(
             scope=scope, pretty_scope=pretty_scope,
             meta=meta, state=state, target_line=target_line,
             session_root=session_root,
-        ))
+        )
+        # Split the narrative into pre-iters (Background / Methods / Results
+        # header + analytical-results slides) and post-iters (Conclusions).
+        # This way per-iter detail slides go INSIDE the Results section,
+        # preserving the Results→iter→Conclusions reading order.
+        post_marker = "# Conclusions"
+        try:
+            split_idx = narrative.index("---") if False else None  # noqa: keep linters happy
+            for i, line in enumerate(narrative):
+                if line == post_marker:
+                    # Step backward to include the preceding "---" + blank.
+                    # Narrative emits ["---", "", "# Conclusions", ...]
+                    split_idx = i - 2 if i >= 2 and narrative[i - 2] == "---" else i
+                    break
+            else:
+                split_idx = len(narrative)
+        except ValueError:
+            split_idx = len(narrative)
+        parts.extend(narrative[:split_idx])
+        post_iters_block = narrative[split_idx:]
 
-    # ---- Iteration detail section -----------------------------------------
+    # ---- Per-iteration detail. section_label inherits from the prior # H1
+    # ---- (= "Results" when auto-narrative is on, or whatever the user's
+    # ---- findings.md ended on). Iter slides live UNDER Results, not in a
+    # ---- separate "Iteration detail" section.
     iters = _iter_dirs(session_root)
     if iters:
-        parts.append("---")
-        parts.append("")
-        parts.append("# Iteration detail")
-        parts.append("")
 
         # Pre-pull state once so each iter slide can compute peer deltas.
         results_history = state.get("results_history") or []
@@ -409,6 +428,11 @@ def synthesize_deck_md(session_root: Path, *, date: str, scope: str) -> str:
             elif not bullets:
                 parts.append("(no figure produced — see scorecard.xlsx)")
                 parts.append("")
+
+    # Conclusions section comes AFTER iter detail slides — gives the deck a
+    # Background → Methods → Results (analytical + iters) → Conclusions
+    # reading flow. (When findings.md is provided, this is empty.)
+    parts.extend(post_iters_block)
 
     # No explicit closing slide — build-pptx auto-adds Thanks.
     return "\n".join(parts)
@@ -569,7 +593,10 @@ def _render_auto_narrative(*, scope: str, pretty_scope: str, meta: dict,
     # ============================================================
     # # Results  — auto amber
     # ============================================================
-    has_any_results = bool(top) or bool(phase_rows)
+    # Always emit the # Results divider when we have iter dirs OR analytical
+    # results. Per-iter detail slides emitted later by synthesize_deck_md
+    # inherit this section context (and its amber accent).
+    has_any_results = bool(top) or bool(phase_rows) or n_iters_total > 0
     if has_any_results:
         out += ["---", "", "# Results", ""]
 
