@@ -64,6 +64,11 @@ def _humanize(slug: str) -> str:
     if not slug:
         return ""
     slug = re.sub(r"^iter-\d+_", "", slug)
+    # Strip trailing version markers like "_v2", "_v3_strat", "_rerun" that
+    # bloat the rendered slide title and force figure-with-aside to wrap →
+    # shrink the figure. The slug stays in the dir / state.json for ID
+    # purposes; we just don't show it on the slide.
+    slug = re.sub(r"_(v\d+(_\w+)?|rerun|retry|fix\d*)$", "", slug)
     parts = re.split(r"[-_]+", slug)
     return " ".join(p[:1].upper() + p[1:] if p else "" for p in parts).strip()
 
