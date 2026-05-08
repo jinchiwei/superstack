@@ -1109,13 +1109,39 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                     text = _strip_html(b.get("html", "") or "").strip()
                     label, card_body = _split_bullet_to_label_body(text)
                     bullet_cards.append({"label": label, "body": card_body, "icon": None})
-                kind = "cards-triple"
-                params = {
-                    "title": slide_title,
-                    "lede": lede,
-                    "section_label": current_h1 or "",
-                    "cards": bullet_cards,
-                }
+
+                # Closing-section bullet slides (Conclusions / Takeaways /
+                # Next steps / etc) get the dark-bg conclusions layout
+                # instead of cards-triple — same trigger as the cards-detected
+                # path at line 811. Each card gets a brand-cycle accent + icon.
+                if _is_closing_slide(slide_title, current_h1):
+                    _ACCENTS = [branding.TURQUOISE, branding.DEEPPINK,
+                                branding.AMBER, branding.BLUEVIOLET]
+                    _ICONS = ["FaChartLine", "FaCheckCircle",
+                              "FaExclamationTriangle", "FaCrosshairs"]
+                    enriched_cards = []
+                    for i, c in enumerate(bullet_cards):
+                        enriched_cards.append({
+                            "label": c["label"],
+                            "body": c["body"],
+                            "icon": _ICONS[i % len(_ICONS)],
+                            "accent_hex": _ACCENTS[i % len(_ACCENTS)],
+                        })
+                    kind = "conclusions"
+                    params = {
+                        "title": slide_title,
+                        "lede": lede,
+                        "section_label": current_h1 or "",
+                        "cards": enriched_cards,
+                    }
+                else:
+                    kind = "cards-triple"
+                    params = {
+                        "title": slide_title,
+                        "lede": lede,
+                        "section_label": current_h1 or "",
+                        "cards": bullet_cards,
+                    }
             else:
                 kind = "content-text"
                 params = {"title": slide_title, "lede": lede, "body": body,

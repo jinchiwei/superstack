@@ -678,7 +678,7 @@ def _render_auto_narrative(*, scope: str, pretty_scope: str, meta: dict,
         else:
             out += [f"- Treat `{cand_id}` as the working best.", ""]
             out += ["- Validate on held-out data before deployment.", ""]
-        out += ["- Open questions and follow-up axes belong in the "
+        out += ["- **Document** open questions and follow-up axes in the "
                 "research-log entry for this session.", ""]
 
     return out
