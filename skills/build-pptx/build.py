@@ -777,17 +777,51 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
                     consumed.add(id(lede_para))
                 sub_lede = _strip_html(lede_para["html"]) if lede_para else ""
                 sub_title = (img_rec["alt"] or slide_title or "").strip() or slide_title
-                params = {
-                    "title": sub_title, "lede": sub_lede,
-                    "body": [],
-                    "images": [str(img_rec["path"])],
-                    "tables": [],
-                    "section_label": current_h1 or "",
-                }
+                # Score-based dispatch (mirrors the single-image path below):
+                # if the lede + image aspect score >= 2, prefer figure-with-aside
+                # over content-image-only so multi-image H1 sections still reach
+                # for the richer layout per image.
+                sub_aspect = _get_image_aspect(str(img_rec["path"]))
+                sub_score = 0
+                if sub_aspect is not None and sub_lede:
+                    if sub_aspect >= 1.3:
+                        sub_score += 2
+                    elif sub_aspect >= 1.0:
+                        sub_score += 1
+                    if 50 <= len(sub_lede) < 500:
+                        sub_score += 2
+                    elif len(sub_lede) < 1000:
+                        sub_score += 1
+                    sub_score += 1  # body=[] always satisfies bullet count
+                if sub_score >= 2 and sub_aspect is not None:
+                    sub_kind = ("figure-with-aside-horizontal"
+                                if sub_aspect >= 1.8 else "figure-with-aside")
+                    # split lede → aside label (first sentence) + body (rest)
+                    label, body_rest = "", sub_lede
+                    if sub_lede.count(". ") >= 1:
+                        first_sent = sub_lede.split(". ", 1)[0].strip().rstrip(".")
+                        if 8 <= len(first_sent) <= 90:
+                            label = first_sent
+                            body_rest = sub_lede[len(first_sent) + 2:].strip()
+                    sub_params = {
+                        "title": sub_title, "lede": "",
+                        "section_label": current_h1 or "",
+                        "image": str(img_rec["path"]), "alt": "",
+                        "aside": {"label": label, "body": body_rest, "icon": None},
+                    }
+                else:
+                    sub_kind = "content-image-only"
+                    sub_params = {
+                        "title": sub_title, "lede": sub_lede,
+                        "body": [],
+                        "images": [str(img_rec["path"])],
+                        "tables": [],
+                        "section_label": current_h1 or "",
+                    }
                 slides.append(SlideEntry(
                     slide_id=f"{slide_id}/img-{j}",
-                    kind="content-image-only",
-                    params=params,
+                    kind=sub_kind,
+                    params=sub_params,
                     content_hash=f"{content_hash}-img-{j}",
                 ))
             # Trailing paragraphs after the last image
@@ -1004,13 +1038,36 @@ def _infer_default_plan(*, md_text: str, chunks: list[str],
             body_text = " ".join(
                 _strip_html(b.get("html", "") or "") for b in (body or [])
             ).strip() if body else ""
-            aside_eligible = (
+            # Score-based dispatch (replaces the old hard-predicate gate).
+            # figure-with-aside accumulates points from:
+            #   - aspect: 2 if >= 1.3, 1 if >= 1.0 (square images can still work);
+            #   - caption length: 2 for ideal 50-500 chars; 1 for 500-1000 chars;
+            #   - body bullet count: 1 if <= 6 bullets;
+            # If the cumulative score >= ASIDE_SCORE_THRESHOLD (=2), pick the
+            # aside layout; otherwise fall through to content-text-image /
+            # content-image-only as before. Tighter rules (`aspect > 1.3 AND
+            # len < 500 AND <=6 bullets`) still always score >= 4 → unchanged
+            # behavior on previously-aside slides; only previously-rejected
+            # slides at the boundary now get aside.
+            ASIDE_SCORE_THRESHOLD = 2
+            aside_score = 0
+            aside_basics_ok = (
                 n_images == 1 and len(tables) == 0 and not cards
-                and aspect is not None and aspect > 1.0
-                and (bool(body) or bool(lede))
-                and len(body or []) <= 6        # bullets pack fine in an aside
-                and len(body_text) < 500        # generous chars; long captions stay centered
+                and aspect is not None and (bool(body) or bool(lede))
             )
+            if aside_basics_ok:
+                if aspect >= 1.3:
+                    aside_score += 2
+                elif aspect >= 1.0:
+                    aside_score += 1
+                cap_len = len(body_text) if body_text else len(lede or "")
+                if 50 <= cap_len < 500:
+                    aside_score += 2
+                elif cap_len < 1000:
+                    aside_score += 1
+                if len(body or []) <= 6:
+                    aside_score += 1
+            aside_eligible = aside_score >= ASIDE_SCORE_THRESHOLD
             if aside_eligible:
                 # Very wide images (panel composites, e.g. 3-up subplot rows)
                 # don't read well in figure-with-aside's 2:1 horizontal split

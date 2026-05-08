@@ -59,14 +59,30 @@ def render(slide, *, left: float, top: float, width: float, height: float,
             except Exception:
                 pass
 
+    # Label height adapts to content: \n (two-line stat format,
+    # "{descriptor}\n· {value}") needs ~2 lines; long single-line labels
+    # that wrap in the narrow aside column also need extra space. Body
+    # offset slides down accordingly so they don't overlap.
+    has_linebreak = "\n" in (label or "")
+    is_long = len(label or "") > 40  # narrow aside (~3in) wraps past ~30 chars
+    if has_linebreak:
+        label_h = 0.62
+        body_offset = 0.84
+    elif is_long:
+        label_h = 0.78
+        body_offset = 1.00
+    else:
+        label_h = 0.36
+        body_offset = 0.52
+
     _add_text(slide, label,
               left=content_left, top=top + 0.12,
-              width=content_w, height=0.36,
+              width=content_w, height=label_h,
               size=13, color_rgb=accent_rgb,
               font=branding.MONO_FONT, bold=True)
 
     if body:
         _add_text(slide, body,
-                  left=content_left, top=top + 0.52,
-                  width=content_w, height=max(0.20, height - 0.60),
+                  left=content_left, top=top + body_offset,
+                  width=content_w, height=max(0.20, height - body_offset - 0.10),
                   size=12, color_rgb=INK_RGB, font=branding.SANS_FONT)
