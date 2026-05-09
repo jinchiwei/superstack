@@ -862,12 +862,13 @@ def main() -> None:
 
     state = _read_state(args.scope)
 
+    path_date = args.date.replace("-", "")
     if args.output:
         out = Path(args.output)
     else:
-        out_dir = Path("results") / f"{args.date}_{args.scope}"
+        out_dir = Path("results") / f"{path_date}_{args.scope}"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out = out_dir / f"scorecard_{args.date}.xlsx"
+        out = out_dir / f"scorecard_{path_date}.xlsx"
 
     out.parent.mkdir(parents=True, exist_ok=True)
 

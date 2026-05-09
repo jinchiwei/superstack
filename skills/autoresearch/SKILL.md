@@ -206,7 +206,7 @@ If this is the first autoresearch session in the project (no `exp/` or `results/
 ```bash
 "$SKILL_DIR/bin/init-project"
 # Then write the session dashboard
-TODAY=$(date -u +%Y-%m-%d)
+TODAY=$(date -u +%Y%m%d)
 "$SKILL_DIR/bin/session-readme" init \
   --scope-slug "$SCOPE_SLUG" \
   --scope-text "$SCOPE_TEXT" \
@@ -399,7 +399,7 @@ Read the highest-priority candidate from `state.candidate_queue` where status=pe
 Before running the experiment, compute the standard `results/` and `exp/` paths for this iteration and export them so the candidate's command can write outputs there.
 
 ```bash
-TODAY=$(date -u +%Y-%m-%d)
+TODAY=$(date -u +%Y%m%d)
 SCOPE_SLUG=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .scope_slug)
 
 # Candidate slug: short, filename-safe ID for this candidate (e.g. its axes condensed).

@@ -52,10 +52,10 @@ The skill writes per-iteration outputs into a date+scope+candidate hierarchy in 
 ```
 <project>/
   exp/                                          (gitignored, raw artifacts)
-    YYYY-MM-DD_<scope>/
+    YYYYMMDD_<scope>/
       iter-NN_<candidate>/                      checkpoints, big logs
   results/                                      (committed, synthesized)
-    YYYY-MM-DD_<scope>/
+    YYYYMMDD_<scope>/
       README.md                                 session dashboard (axes, metrics table)
       iter-NN_<candidate>/
         summary.md                              required: per-iter blurb
@@ -63,7 +63,7 @@ The skill writes per-iteration outputs into a date+scope+candidate hierarchy in 
   docs/
     _build_pptx.py / _build_docx.py / _build_pdf.py   templates dropped by init-project
     runs/
-      YYYY-MM-DD_<scope>/SESSION_REPORT.{pptx,docx,pdf}   produced at termination
+      YYYYMMDD_<scope>/SESSION_REPORT.{pptx,docx,pdf}   produced at termination
 ```
 
 Each iteration's command receives two env vars from the skill:

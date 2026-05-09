@@ -5,8 +5,8 @@
 # Init-mode: creates the README with header + scope + axes + empty table.
 #
 # Usage:
-#   session-readme init --scope-slug <s> --scope-text <t> --target <m> --axes-json <j> [--date <YYYY-MM-DD>]
-#   session-readme append --scope-slug <s> --iter <N> --candidate-slug <c> --status <s> --metric <m> [--date <YYYY-MM-DD>]
+#   session-readme init --scope-slug <s> --scope-text <t> --target <m> --axes-json <j> [--date <YYYYMMDD>]
+#   session-readme append --scope-slug <s> --iter <N> --candidate-slug <c> --status <s> --metric <m> [--date <YYYYMMDD>]
 set -euo pipefail
 
 mode="${1:-}"; shift || true
@@ -32,7 +32,7 @@ done
 
 [[ -z "$scope" ]] && { echo "session-readme: --scope-slug required" >&2; exit 2; }
 
-date_str="${date_override:-$(date -u +%Y-%m-%d)}"
+date_str="${date_override:-$(date -u +%Y%m%d)}"
 session_dir="results/${date_str}_${scope}"
 readme="${session_dir}/README.md"
 mkdir -p "$session_dir"

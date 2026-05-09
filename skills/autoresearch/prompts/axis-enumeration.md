@@ -45,8 +45,8 @@ The full Cartesian product of axes is the worst-case search space. Keep it under
 
 **Output-path convention:**
 The autoresearch skill organizes outputs as:
-- `results/<YYYY-MM-DD>_<scope_slug>/iter-<NN>_<candidate-slug>/` — synthesized outputs (figures, summary.md, csv) — committed
-- `exp/<YYYY-MM-DD>_<scope_slug>/iter-<NN>_<candidate-slug>/` — raw artifacts (checkpoints, large logs) — gitignored
+- `results/<YYYYMMDD>_<scope_slug>/iter-<NN>_<candidate-slug>/` — synthesized outputs (figures, summary.md, csv) — committed
+- `exp/<YYYYMMDD>_<scope_slug>/iter-<NN>_<candidate-slug>/` — raw artifacts (checkpoints, large logs) — gitignored
 
 When you write the per-iteration experiment command in SKILL.md Step 3, your candidate scripts MUST honor two env vars exported by the skill:
 - `$AUTORESEARCH_OUT_RESULTS` — the results dir for this iteration (always exists when the script runs)

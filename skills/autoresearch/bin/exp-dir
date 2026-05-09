@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # bin/exp-dir — print (and mkdir -p) the exp/ dir for an autoresearch iteration.
-# Path: <cwd>/exp/<YYYY-MM-DD>_<scope-slug>/iter-<NN>_<candidate-slug>/
+# Path: <cwd>/exp/<YYYYMMDD>_<scope-slug>/iter-<NN>_<candidate-slug>/
 # Mirrors results-dir but under exp/ (intended for raw, gitignored artifacts).
 #
 # Usage:
-#   exp-dir --scope-slug <s> --iter <N> --candidate-slug <c> [--date <YYYY-MM-DD>] [--no-create]
+#   exp-dir --scope-slug <s> --iter <N> --candidate-slug <c> [--date <YYYYMMDD>] [--no-create]
 set -euo pipefail
 
 scope=""
@@ -31,7 +31,7 @@ done
   exit 2
 }
 
-date_str="${date_override:-$(date -u +%Y-%m-%d)}"
+date_str="${date_override:-$(date -u +%Y%m%d)}"
 iter_padded=$(printf "%02d" "$iter")
 slug2="iter-${iter_padded}_${candidate}"
 dir="exp/${date_str}_${scope}/${slug2}"

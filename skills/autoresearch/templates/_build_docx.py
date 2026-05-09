@@ -255,8 +255,9 @@ def main():
     p.add_argument("--scope", required=True)
     args = p.parse_args()
 
-    session = _read_session(args.date, args.scope)
-    out_dir = Path("results") / f"{args.date}_{args.scope}"
+    path_date = args.date.replace("-", "")
+    session = _read_session(path_date, args.scope)
+    out_dir = Path("results") / f"{path_date}_{args.scope}"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "SESSION_REPORT.docx"
 

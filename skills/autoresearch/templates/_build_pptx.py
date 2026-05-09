@@ -744,7 +744,8 @@ def main():
                    help="Output pptx path. Default: results/<date>_<scope>/SESSION_REPORT.pptx")
     args = p.parse_args()
 
-    session_root = Path("results") / f"{args.date}_{args.scope}"
+    path_date = args.date.replace("-", "")
+    session_root = Path("results") / f"{path_date}_{args.scope}"
     if not session_root.is_dir():
         raise SystemExit(f"No session at {session_root}")
 
