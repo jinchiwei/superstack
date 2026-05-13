@@ -30,6 +30,100 @@ User asks to make slides from markdown for a research talk, lab meeting, confere
 - Bullets (`-` lists) render as bulleted lines on the slide
 - Paragraphs render as body prose
 
+## Research-deck markdown recipe
+
+A well-shaped markdown source dispatches to the rich layouts automatically (figure-with-aside, cards-triple, conclusions). A poorly-shaped one falls through to bullet-only `content-text`. The patterns below produce manuscript-prep / talk-grade research decks reliably.
+
+### Frontmatter — populate everything
+
+```yaml
+---
+title: "<paper-style title>"
+eyebrow: "<PROJECT · STAGE · YEAR>"   # small caps tag above title
+subtitle: "<one-line orientation>"
+name: "<Author Name>"                  # renders in turquoise on the cover
+org: "<Lab / Affiliation>"
+date: "YYYY-MM-DD"
+---
+```
+
+### Section dividers — one `# H1` per arc
+
+`# H1` auto-emits a navy section-break slide colored via keyword classifier (Background → turquoise, Methods → deeppink, Results → amber/gold, Discussion → blueviolet, etc). Use one H1 per logical arc (Background → New analyses → Framing → Next steps). Don't use H1 for ordinary content.
+
+### Figure slides — DO NOT mix `### H3` cards with images
+
+The auto-inferrer dispatches `figure-with-aside` only when the chunk has exactly one image, no tables, no `### H3` cards, and a non-empty lede or body. **If you add `### Label` blocks to a figure slide, the cards-grid layout eats the image.** Right pattern:
+
+```markdown
+## My finding — one-line takeaway
+
+Short lede paragraph (50-500 chars) framing the test.
+
+![alt text](figures/local_relpath.png)
+
+- **Headline number:** β = X.XX, p = Y.YY — interpretation
+- **Sample size:** n = 268 / 285 with caveat
+- **Verdict:** one-sentence conclusion
+```
+
+Wide panel composites (aspect ≥ 1.8) auto-route to `figure-with-aside-horizontal`; squarer figures route to `figure-with-aside` (figure left, aside card right). The score-based dispatch admits caption lengths up to ~1000 chars; keep the lede focused.
+
+### Stats slides — `### H3` IS the card
+
+For "3-4 short factual blocks" slides (cohort tables, conclusions, definitions), use H3 as the card label and let the body follow:
+
+```markdown
+## Where we are — RSNA 2026 abstract status
+
+Optional lede sentence.
+
+### FW–severity gradient
+Whole-brain β = **+0.0091, p < 0.0001**. Slope p<0.05 in **11/11 regions**.
+
+### APOE4 modulation
+Carrier × CDR-SB interaction in **11/11 regions**. Whole-brain β = **+0.0054, p = 0.033**.
+
+### Longitudinal × APOE4
+AD cingulate β(time × APOE4) = **−0.0084, p = 0.0042**.
+```
+
+Each H3 becomes one card; 2-4 H3s dispatch to `cards-triple` (flat full-width row), 3+ with longer bodies to `cards-grid`, mixed long-and-short to `cards-heterogeneous`. **Never write `### cards`** as a literal marker — that produces a card labeled "cards".
+
+### Bullet-only slides → conclusions / cards-triple
+
+A slide with 2-5 plain bullets and no images/tables/cards auto-promotes to `cards-triple` so it doesn't render as sparse text. Bullets in the shape `**Label:** body` or `**Label** — body` get split into card label + body; plain bullets become body-only rows. Closing/Next-steps slides with bullet shape under a closing-section H1 (Conclusions / Next steps) auto-pick the `conclusions` layout (dark navy bg + per-card accent).
+
+### Tables-only slides
+
+A slide with a markdown table and no image dispatches to `table-with-takeaway`. Trailing prose / lede gets promoted to the dark accent callout footer.
+
+### Image paths — relative to the markdown file
+
+Stage figures in a sibling `figures/` directory next to the deck markdown and reference via relative paths (`![](figures/foo.png)`). Absolute paths can fail to be detected by the planner — observed empirically. The renderer chdirs to the markdown's directory before resolving images.
+
+### Institutional logos on the title slide (multi-affiliation users)
+
+Cover frontmatter only renders the byline; institutional logos need a post-build python-pptx pass. Pattern (UCSF + Cal example for paired-affiliation labs):
+
+```python
+from pathlib import Path
+from pptx import Presentation
+from pptx.util import Inches, Emu
+
+REF_DIR = Path.home() / "arcadia" / "reference"
+prs = Presentation("deck.pptx")
+slide = prs.slides[0]
+H = Inches(0.9); GAP = Inches(0.25)
+# Scale primary logo +40% if its asset has heavy canvas padding
+targets = [(REF_DIR / "primary-logo.png", Emu(int(H * 1.40))),
+           (REF_DIR / "secondary-logo.png", H)]
+# ... place lower-right, vertical-center aligned ...
+prs.save("deck.pptx")
+```
+
+Full helper with positioning math is documented per-user (institutional logo PNG paths vary by lab). Default position: paired block in lower-right, ~0.5 in from slide right + bottom edges, vertically center-aligned.
+
 ## Slide masters available (Python API)
 
 `new_presentation()`, `add_title_slide`, `add_content_slide`, `add_section_divider`, `add_big_number_slide`, `add_two_column_slide`, `add_quote_slide`, `add_end_slide`. See `build.py` for signatures. v1's main() only auto-uses title + content + end; specialized masters are callable from custom Python.
