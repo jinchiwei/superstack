@@ -52,9 +52,11 @@ from branding_xlsx import (  # type: ignore
     _write_header_row, _write_body_row,
     _write_winner_row, _write_deferred_row,
     _write_warning_row, _write_headline_row,
+    _apply_callout_style,
     _set_tab_color, _set_col_widths, _auto_col_widths,
     _freeze_header, _build_title_bar,
     add_glyph_to_cell,
+    resolve_tab_color,
 )
 
 # ---------------------------------------------------------------------------
@@ -63,7 +65,7 @@ from branding_xlsx import (  # type: ignore
 from md_parser import (  # type: ignore
     parse_markdown,
     MARKER_WINNER, MARKER_DEFERRED, MARKER_WARNING, MARKER_HEADLINE,
-    SheetSpec, TableSpec, ProseBlock,
+    SheetSpec, TableSpec, ProseBlock, CalloutBlock,
 )
 
 # ---------------------------------------------------------------------------
@@ -91,9 +93,13 @@ def _build_sheet(
 ) -> None:
     """Render one SheetSpec into a new worksheet."""
     ws = wb.create_sheet(spec.name)
-    _set_tab_color(ws)
+    if spec.tab_color:
+        _set_tab_color(ws, resolve_tab_color(spec.tab_color))
+    else:
+        _set_tab_color(ws)
 
     current_row = 1
+    last_table_n_cols = 1  # tracks col span for a CalloutBlock to span across
 
     # Title bar (row 1)
     if with_title_bar:
@@ -109,6 +115,7 @@ def _build_sheet(
         if isinstance(block, TableSpec):
             n_cols = len(block.headers)
             max_cols_seen = max(max_cols_seen, n_cols)
+            last_table_n_cols = n_cols
 
             # Header row
             _write_header_row(ws, current_row, block.headers)
@@ -178,6 +185,33 @@ def _build_sheet(
                 from branding_xlsx import _apply_body_style
                 _apply_body_style(c)
                 current_row += 1
+
+        elif isinstance(block, CalloutBlock):
+            # Dark takeaway callout spanning the most-recent table's columns.
+            n_cols = max(last_table_n_cols, 1)
+            max_cols_seen = max(max_cols_seen, n_cols)
+            # Render as a rich-text-style cell: "**LABEL:** body" in one cell.
+            # openpyxl doesn't do mixed bold/regular within a single .value
+            # without inline rich text on shared strings; for simplicity we
+            # build a single string and rely on the dark callout fill + the
+            # leading "LABEL:" prefix to signal emphasis.
+            display = f"{block.label.upper()}: {block.text}" if block.label else block.text
+            c = ws.cell(row=current_row, column=1, value=display)
+            _apply_callout_style(c)
+            if n_cols > 1:
+                ws.merge_cells(
+                    start_row=current_row, start_column=1,
+                    end_row=current_row, end_column=n_cols,
+                )
+                # Apply fill to all spanned cells so the merge looks unified
+                for col in range(2, n_cols + 1):
+                    side_cell = ws.cell(row=current_row, column=col)
+                    _apply_callout_style(side_cell)
+            # Slightly taller row to fit wrapping callout text
+            row_dim = ws.row_dimensions[current_row]
+            if row_dim.height is None or row_dim.height < 32:
+                row_dim.height = 32
+            current_row += 1
 
     # Retrospectively fill the title bar now we know max_cols_seen
     if with_title_bar:

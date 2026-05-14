@@ -203,3 +203,129 @@ class TestMarkerDetection:
         table = sheets["Experiment Status"].tables[0]
         # Row 1: plain ResNet18 row
         assert table.rows[1][0].marker is None
+
+
+# ---------------------------------------------------------------------------
+# Sheet-level directives (tab colors)
+# ---------------------------------------------------------------------------
+
+class TestTabColor:
+    def test_tab_color_named(self):
+        md = """# Headline
+
+<!-- tab: deeppink -->
+
+| col | val |
+|-----|-----|
+| a   | 1   |
+"""
+        result = parse_markdown(md)
+        assert len(result.sheets) == 1
+        assert result.sheets[0].tab_color == "deeppink"
+
+    def test_tab_color_hex_with_hash(self):
+        md = """# H
+
+<!-- tab: #ff1493 -->
+
+| a | b |
+|---|---|
+| 1 | 2 |
+"""
+        result = parse_markdown(md)
+        assert result.sheets[0].tab_color == "#ff1493"
+
+    def test_no_tab_directive_leaves_default(self):
+        md = """# H
+
+| a | b |
+|---|---|
+| 1 | 2 |
+"""
+        result = parse_markdown(md)
+        assert result.sheets[0].tab_color is None
+
+    def test_tab_directive_not_consumed_as_prose(self):
+        """The directive line should be stripped, not appear in prose blocks."""
+        md = """# H
+
+<!-- tab: amber -->
+
+Some body text.
+
+| a | b |
+|---|---|
+| 1 | 2 |
+"""
+        result = parse_markdown(md)
+        sheet = result.sheets[0]
+        assert sheet.tab_color == "amber"
+        for prose in sheet.prose:
+            assert "tab:" not in prose.text
+
+
+# ---------------------------------------------------------------------------
+# Callout blocks (`> **Label:** ...`)
+# ---------------------------------------------------------------------------
+
+from md_parser import CalloutBlock
+
+
+class TestCallouts:
+    def test_takeaway_callout_after_table(self):
+        md = """# Results
+
+| Virus | AUC |
+|-------|-----|
+| RSV   | 0.7 |
+
+> **Takeaway:** Pooled classifier is the most defensible single number.
+"""
+        result = parse_markdown(md)
+        sheet = result.sheets[0]
+        callouts = [b for b in sheet.blocks if isinstance(b, CalloutBlock)]
+        assert len(callouts) == 1
+        assert callouts[0].label == "Takeaway"
+        assert "defensible" in callouts[0].text
+
+    def test_multiline_callout(self):
+        md = """# Results
+
+| a | b |
+|---|---|
+| 1 | 2 |
+
+> **Note:** Line one.
+> Continuation line two.
+> Continuation line three.
+"""
+        result = parse_markdown(md)
+        callout = [b for b in result.sheets[0].blocks if isinstance(b, CalloutBlock)][0]
+        assert callout.label == "Note"
+        assert "Line one." in callout.text
+        assert "Continuation line two." in callout.text
+        assert "Continuation line three." in callout.text
+
+    def test_callout_appears_after_table_in_block_order(self):
+        md = """# Results
+
+| a | b |
+|---|---|
+| 1 | 2 |
+
+> **Takeaway:** body.
+"""
+        blocks = parse_markdown(md).sheets[0].blocks
+        assert isinstance(blocks[0], TableSpec)
+        assert isinstance(blocks[1], CalloutBlock)
+
+    def test_plain_blockquote_without_bold_label_is_prose(self):
+        """`> just a quote` (no bold prefix) should not become a callout."""
+        md = """# H
+
+> just a regular quote without a label
+"""
+        result = parse_markdown(md)
+        sheet = result.sheets[0]
+        callouts = [b for b in sheet.blocks if isinstance(b, CalloutBlock)]
+        assert len(callouts) == 0

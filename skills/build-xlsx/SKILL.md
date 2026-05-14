@@ -113,13 +113,49 @@ Example:
 
 All colors come from `~/arcadia/superstack/skills/_shared/branding.py`. Styling helpers come from `skills/_shared/branding_xlsx.py`. FA icons come from `skills/_shared/icons/`.
 
+## Sheet-level directives
+
+### Tab color (`<!-- tab: <color> -->`)
+
+Place an HTML comment as the first non-blank line *after* an H1 to set that sheet's tab color:
+
+```markdown
+# Headline
+
+<!-- tab: turquoise -->
+
+| ... |
+```
+
+Accepts named colors (`turquoise`, `deeppink`, `amber`, `blueviolet`, `ink`, `grey`) and aliases (`pink`, `yellow`, `violet`, `purple`, `dark`, `gray`). Raw hex also accepted: `#FF1493` or `FF1493`. Unrecognised input falls back to turquoise.
+
+Useful for visual hierarchy across sheets — e.g. turquoise = headline, deeppink = detail, amber = reference, blueviolet = methodology.
+
+### Takeaway callouts (`> **Takeaway:** ...`)
+
+A blockquote with a bold prefix is rendered as a dark merged-cell callout below the most recent table:
+
+```markdown
+| Virus | AUROC |
+|-------|------:|
+| Pooled | 0.851 |
+| RSV    | 0.733 |
+
+> **Takeaway:** Pooled "Other Viral" at AUC 0.851 is the most defensible single number. Per-virus AUROCs are reported for completeness but N is insufficient for individual deployment claims.
+```
+
+The callout spans the width of the table above it. The prefix label (`Takeaway`, `Note`, `Headline`, anything) is shown in uppercase before the body. Multi-line callouts continue while subsequent lines start with `> `.
+
+Use one per table to mirror the `table-with-takeaway` layout in `build-pptx`.
+
 ## Limitations (v1)
 
 - No chart support
 - No formula support
-- No merged-cell control beyond the title bar row
+- Cell merging only used internally for title bar + callouts (not user-controllable)
 - Each H1 produces exactly one sheet (H2+ headings are ignored structurally)
 - Multiple tables in one H1 section are stacked sequentially on the same sheet
+- Callouts are styled as single-cell text — no rich-text bold-prefix rendering within the cell
 
 ## Relationship to autoresearch
 

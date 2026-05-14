@@ -158,6 +158,18 @@ def _apply_title_bar_style(cell) -> None:
     cell.alignment = _align()
 
 
+def _apply_callout_style(cell, *, accent_hex: str = TURQUOISE) -> None:
+    """Dark ink fill, white text. For takeaway callout below a table.
+
+    Accent color is used for the bold prefix (e.g. "Takeaway:") if the
+    caller wants to highlight it, but at the cell level we just style
+    the full row dark; the caller can apply rich text separately if needed.
+    """
+    cell.fill = _fill(INK)
+    cell.font = _font(WHITE, size=11)
+    cell.alignment = _align(horizontal="left", vertical="center", wrap=True)
+
+
 # ---------------------------------------------------------------------------
 # Row-level helpers (write values + style in one call)
 # ---------------------------------------------------------------------------
@@ -218,6 +230,47 @@ def _write_headline_row(ws, row_num: int, values: list, *, col_offset: int = 1) 
 def _set_tab_color(ws, color_hex: str = TURQUOISE) -> None:
     """Set the sheet tab color."""
     ws.sheet_properties.tabColor = color_hex
+
+
+# Named tab colors recognised by `<!-- tab: <name> -->` markdown directive.
+# Maps name → hex (without leading #). Add more here as needed.
+TAB_COLORS = {
+    "turquoise":   TURQUOISE,
+    "deeppink":    DEEPPINK,
+    "pink":        DEEPPINK,
+    "amber":       AMBER,
+    "yellow":      AMBER,
+    "blueviolet":  BLUEVIOLET,
+    "violet":      BLUEVIOLET,
+    "purple":      BLUEVIOLET,
+    "ink":         INK,
+    "dark":        INK,
+    "grey":        DEFERRED_GREY,
+    "gray":        DEFERRED_GREY,
+}
+
+
+def resolve_tab_color(name_or_hex: str) -> str:
+    """Resolve a tab-color spec to a 6-char hex string.
+
+    Accepts:
+      - Named colors: "turquoise", "deeppink", "amber", "blueviolet", "ink", ...
+      - Hex with leading #: "#ff1493"
+      - Hex without #: "ff1493"
+    Returns a 6-char uppercase hex string (no #). Falls back to TURQUOISE
+    if the input is unrecognised.
+    """
+    s = (name_or_hex or "").strip().lstrip("#").lower()
+    if not s:
+        return TURQUOISE
+    if s in TAB_COLORS:
+        return TAB_COLORS[s]
+    # Accept raw hex (3 or 6 chars)
+    if len(s) == 6 and all(c in "0123456789abcdef" for c in s):
+        return s.upper()
+    if len(s) == 3 and all(c in "0123456789abcdef" for c in s):
+        return "".join(c * 2 for c in s).upper()
+    return TURQUOISE
 
 
 def _set_col_widths(ws, widths: list[float]) -> None:

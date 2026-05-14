@@ -13,6 +13,18 @@ Marker syntax (bracket prefix at the start of a cell value):
 The marker label is stripped from the rendered text; only the rest of the
 cell content is kept.
 
+Sheet-level directives (per H1 section):
+  <!-- tab: <color> -->        on the first line after an H1 heading sets
+                                that sheet's tab color. Accepts named colors
+                                (turquoise / deeppink / amber / blueviolet /
+                                ink / grey) or raw hex (#FFC0CB or FFC0CB).
+
+Inline blocks within an H1 section:
+  > **Takeaway:** <text>       blockquote with bold-prefixed leader renders
+                                as a dark merged-cell callout below the most
+                                recent table. Multi-line callouts continue
+                                while subsequent lines start with `> `.
+
 Public API:
   parse_markdown(text: str) -> ParseResult
 """
@@ -77,12 +89,26 @@ class ProseBlock:
 
 
 @dataclass
+class CalloutBlock:
+    """A dark merged-cell takeaway/note callout, rendered below the most
+    recent table (or full-width if no table precedes it).
+
+    `label` is the bold prefix (e.g. 'Takeaway') extracted from `> **Label:**`;
+    `text` is the rest of the blockquote body, with successive `> ` lines
+    joined by spaces.
+    """
+    label: str
+    text: str
+
+
+@dataclass
 class SheetSpec:
     """All content for one sheet (one H1 → one sheet)."""
     name: str                               # sheet name (H1 text, max 31 chars)
+    tab_color: Optional[str] = None         # hex (no #) for tab color; None = default
     tables: list[TableSpec] = field(default_factory=list)
     prose: list[ProseBlock] = field(default_factory=list)
-    # blocks in order (TableSpec | ProseBlock) — preserves relative ordering
+    # blocks in order (TableSpec | ProseBlock | CalloutBlock) — preserves ordering
     blocks: list = field(default_factory=list)
 
 
@@ -214,6 +240,18 @@ def parse_markdown(text: str) -> ParseResult:
             _flush_prose("\n".join(prose_buffer))
         prose_buffer = []
 
+    # Regexes for sheet-level directives + callouts
+    tab_directive_re = re.compile(r"^\s*<!--\s*tab\s*:\s*([^>\s]+)\s*-->\s*$",
+                                   re.IGNORECASE)
+    callout_lead_re = re.compile(r"^>\s*\*\*([^*:]+):\*\*\s*(.*)$")
+    callout_cont_re = re.compile(r"^>\s*(.*)$")
+
+    def _flush_callout(label: str, text: str):
+        if current_sheet is None:
+            return
+        cb = CalloutBlock(label=label.strip(), text=text.strip())
+        current_sheet.blocks.append(cb)
+
     while i < len(lines):
         line = lines[i]
 
@@ -226,6 +264,16 @@ def parse_markdown(text: str) -> ParseResult:
             current_sheet = SheetSpec(name=sheet_name)
             sheets.append(current_sheet)
             i += 1
+            # Peek: if next non-blank line is a `<!-- tab: <color> -->` directive,
+            # consume it and set the sheet's tab color.
+            j = i
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines):
+                m = tab_directive_re.match(lines[j])
+                if m:
+                    current_sheet.tab_color = m.group(1)
+                    i = j + 1
             continue
 
         # Skip H2+ headings (only H1 creates sheets)
@@ -245,6 +293,26 @@ def parse_markdown(text: str) -> ParseResult:
                 table_buffer.append(lines[i])
                 i += 1
             _flush_table()
+            continue
+
+        # Callout block: `> **<Label>:** <text>` (optionally multi-line with `> ...`)
+        lead_m = callout_lead_re.match(line)
+        if lead_m:
+            _flush_table()
+            _flush_prose_buffer()
+            label = lead_m.group(1)
+            text_parts = [lead_m.group(2).strip()]
+            i += 1
+            while i < len(lines):
+                cont_m = callout_cont_re.match(lines[i])
+                if cont_m:
+                    cont_text = cont_m.group(1).strip()
+                    if cont_text:
+                        text_parts.append(cont_text)
+                    i += 1
+                else:
+                    break
+            _flush_callout(label, " ".join(p for p in text_parts if p))
             continue
 
         # Blank line: separates blocks
