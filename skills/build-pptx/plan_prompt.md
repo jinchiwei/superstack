@@ -281,23 +281,20 @@ construct, you probably want a different named layout instead.
 
 #### When to use freeform
 
-The named layouts (`content-text`, `cards-grid`, `content-text-image`,
-`content-image-only`, `cards-heterogeneous`, `three-pillars`,
-`stat-callouts-right`, `bg-flip`, `timeline`) cover most slides. Reach for
-`freeform` only when:
+**Expressive mode (default):** Reach for `freeform` whenever a custom
+composition serves the slide better than a named layout — which is often.
+Named layouts remain the fast floor for trivially-shaped slides (a plain
+bullet list, a single figure with a caption, a simple table). Prefer freeform
+when the slide has visual structure worth designing: stat arrangements, color
+zones, paired figure+commentary with custom geometry, connectors/arrows,
+big-number focal slides, or anything that would lose its point inside a
+template. Honor the theme (`ON_DARK`, `CANVAS_BG_RGB`, `THEME_RGBS`).
 
-- The slide pairs a chart with stat tiles in a layout the named
-  `stat-callouts-right` doesn't quite fit (e.g., 3 stats with custom
-  arrangement, or a callout chip annotating a specific data point)
-- The content needs a custom geometry (e.g., big number with two
-  smaller flanking annotations)
-- You need a connector or arrow between elements (named layouts don't
-  draw arbitrary lines)
-- The slide is genuinely bespoke and forcing it into a named template
-  would lose the point
+**Strict mode:** Never emit `freeform`. Use named layouts only.
 
-Don't use `freeform` for slides that fit a named layout — determinism
-and consistency are easier with named layouts.
+In both modes, a freeform slide must stay inside the body region the chrome
+hands you (`body_l`, `body_top`, `body_w`, `body_h`) and use only the sandbox
+API.
 
 #### Worked examples
 
@@ -367,7 +364,82 @@ as `\n` and double quotes as `\"`. Example minified for one line:
 Multi-line code is fine — just keep it as a single JSON string with
 embedded `\n`.
 
+## Design principles
+
+These principles shape *how* you choose and fill layouts. They apply most
+strongly in **expressive mode** (the default), where you have latitude to
+design slides. In **strict mode** you ignore the freeform bias below and pick
+named layouts only (see the rubric).
+
+### Mode awareness
+
+- **expressive (default):** Bias toward *guided freeform* for any slide whose
+  point benefits from a custom composition. Named layouts are a fast floor for
+  trivially-shaped slides (a plain bullet list, a single figure, a simple
+  table). When in doubt and the content has visual structure, design it with
+  `freeform`. A deck may also carry a **theme** (see below) — honor its canvas
+  and palette.
+- **strict:** Never emit `freeform` or `composition`. Pick the best-fitting
+  named layout for every slide. This is the proven, brand-locked path.
+
+### The theme (expressive only)
+
+The deck is rendered with one theme. The renderer paints the theme's canvas
+on freeform slides and inverts chrome text on dark canvases automatically. In
+your freeform snippets:
+
+- `ON_DARK` (bool) — true when the canvas is dark; use `WHITE_RGB` for primary
+  text and light tints for secondary text.
+- `CANVAS_BG_RGB` — the canvas color (already painted for you on freeform
+  slides; use it if you draw panels that should blend).
+- `THEME_RGBS` / `THEME_HEXES` — the theme's **supplementary hues** (uncapped).
+  Use them freely *in addition to* the brand-4 accents to add variety, color
+  zones, data-series colors, and depth. There is no limit on how many you use.
+- The brand-4 accents (`TURQUOISE_RGB`, `DEEPPINK_RGB`, `AMBER_RGB`,
+  `BLUEVIOLET_RGB`) remain available and lead the palette.
+
+Fonts never change: `MONO_FONT` (Geist Mono) for structural elements, headings,
+numbers, labels; `SANS_FONT` (Geist) for reading prose.
+
+### Anti-patterns — avoid these
+
+- **Text-only slides.** A wall of bullets is the most common bland failure.
+  Give content visual structure: cards, columns, a stat row, a figure, color
+  zones. If a slide is only prose, ask whether it should be a freeform layout
+  with hierarchy instead.
+- **Centered body text.** Left-align body copy and bullets. Centering is for
+  big numbers, single statements, and section breaks only.
+- **Accent line directly under the title.** The chrome already provides the
+  title treatment; do not draw a decorative rule immediately beneath it.
+- **Uniform gray everything.** Use the theme palette to create emphasis and
+  grouping. Flat brand color zones beat undifferentiated gray.
+- **Cramped margins.** Respect generous whitespace; keep to the body region.
+- **More than ~2 type sizes competing for attention** on one slide. Establish
+  one clear focal hierarchy.
+- **Drop shadows, gradients on shapes, Office-theme fills.** Stay flat — always
+  use `_add_flat_shape`, never raw `add_shape`.
+
+### Composition guidance (what good looks like)
+
+- Establish a clear focal point per slide (the headline number, the key figure,
+  the one-sentence claim).
+- Group related items into cards or columns; use color to signal grouping.
+- Pair a visual (figure / chart / big number) with a tight aside instead of
+  prose-only.
+- Use the theme's supplementary hues for secondary data, sub-labels, and
+  accent zones so the deck feels designed, not templated.
+- Keep one consistent left margin and a predictable vertical rhythm.
+
 ## Decision rubric
+
+**First, honor the mode.**
+
+- In **strict mode**, choose exclusively from the named layouts. Never select
+  `freeform` or `composition`. Apply the per-kind rules below.
+- In **expressive mode**, apply the Design principles above: bias toward
+  guided `freeform` for slides with visual structure, and fall back to named
+  layouts for trivially-shaped slides. The per-kind rules below still describe
+  when each named layout is the right floor.
 
 **Layout selection priority (apply in order):**
 
