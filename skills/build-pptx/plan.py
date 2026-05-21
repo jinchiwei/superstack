@@ -111,6 +111,8 @@ class Plan:
     version: int = 1
     deck_md_hash: str = ""    # sha256 of the source markdown for staleness check
     shake_seed: str | None = None
+    mode: str = "expressive"  # "expressive" (themed+guided-freeform) | "strict" (rules-based, revert path)
+    theme: str | None = None  # name of the chosen theme (expressive only); None in strict
     slides: list[SlideEntry] = field(default_factory=list)
 
     def to_json(self, *, indent: int = 2) -> str:
@@ -124,6 +126,10 @@ class Plan:
         data = json.loads(s)
         slides_raw = data.pop("slides", [])
         slides = [SlideEntry(**e) for e in slides_raw]
+        # Drop any unknown top-level keys so a future sidecar can't crash an
+        # older Plan; known fields fall back to dataclass defaults if absent.
+        known = {"version", "deck_md_hash", "shake_seed", "mode", "theme"}
+        data = {k: v for k, v in data.items() if k in known}
         return cls(slides=slides, **data)
 
 

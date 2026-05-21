@@ -200,7 +200,8 @@ def _preprocess_plan(plan) -> list:
 
 
 def render_from_plan(*, md_path: Path, plan, output_path: Path,
-                     no_cover: bool = False, no_end: bool = False) -> None:
+                     no_cover: bool = False, no_end: bool = False,
+                     theme=None) -> None:
     """Render markdown + Plan into pptx at output_path.
 
     The Plan dictates layout choice per slide; markdown supplies the actual

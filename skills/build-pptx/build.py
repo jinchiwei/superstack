@@ -1245,6 +1245,18 @@ def main() -> int:
             "sidecar, but informs inline plan generation when no sidecar exists)."
         ),
     )
+    ap.add_argument(
+        "--mode",
+        dest="mode",
+        choices=["expressive", "strict"],
+        default=None,
+        help=(
+            "Deck construction mode. 'expressive' (default): themed + "
+            "guided-freeform, Anthropic-pptx aesthetic. 'strict': rules-based "
+            "named-layout behavior, the revert path. If omitted, an existing "
+            "sidecar's recorded mode wins; otherwise defaults to expressive."
+        ),
+    )
     args = ap.parse_args()
 
     if args.no_plan:
@@ -1286,6 +1298,27 @@ def main() -> int:
     # Merge with existing
     final_plan = merge_with_existing(default_plan, existing_plan)
 
+    # Resolve effective mode: explicit flag > existing sidecar > default.
+    effective_mode = (
+        args.mode
+        or (existing_plan.mode if existing_plan else None)
+        or "expressive"
+    )
+    final_plan.mode = effective_mode
+
+    # Resolve theme (expressive only). Freeze the chosen theme name in the plan
+    # so re-renders are deterministic.
+    theme = None
+    if effective_mode == "expressive":
+        try:
+            from expressive import resolve_theme
+            theme = resolve_theme(final_plan)
+        except ModuleNotFoundError:
+            theme = None  # themes.py not present yet (pre-Task-2)
+        final_plan.theme = theme.name if theme else None
+    else:
+        final_plan.theme = None
+
     # --use-blocks enforcement
     _BLOCK_KINDS = {"composition", "freeform"}
     use_blocks = getattr(args, "use_blocks", "auto")
@@ -1316,7 +1349,7 @@ def main() -> int:
     from render import render_from_plan
     render_from_plan(
         md_path=md_path, plan=final_plan, output_path=output_path,
-        no_cover=args.no_cover, no_end=args.no_end,
+        no_cover=args.no_cover, no_end=args.no_end, theme=theme,
     )
     print(f"wrote {output_path}")
     return 0
