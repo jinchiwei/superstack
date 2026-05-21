@@ -1257,6 +1257,9 @@ def main() -> int:
             "sidecar's recorded mode wins; otherwise defaults to expressive."
         ),
     )
+    ap.add_argument("--qa", action="store_true",
+                    help="after rendering, emit per-slide PNGs for visual "
+                         "inspection (requires LibreOffice + poppler)")
     args = ap.parse_args()
 
     if args.no_plan:
@@ -1358,6 +1361,16 @@ def main() -> int:
         no_cover=args.no_cover, no_end=args.no_end, theme=theme,
     )
     print(f"wrote {output_path}")
+    if args.qa:
+        from qa import render_to_images
+        qa_dir = output_path.with_suffix("").parent / (output_path.stem + "_qa")
+        try:
+            pngs = render_to_images(output_path, qa_dir)
+            print(f"QA images ({len(pngs)}):")
+            for p in pngs:
+                print(f"  {p}")
+        except RuntimeError as e:
+            print(f"QA skipped: {e}", file=sys.stderr)
     return 0
 
 

@@ -21,6 +21,8 @@ User asks to make slides from markdown for a research talk, lab meeting, confere
 - `--no-cover` — suppress title slide
 - `--no-end` — suppress closing "Thanks" slide
 - `--use-blocks=auto|never|always` — control when `composition`/`freeform` layouts are admissible (default: `auto`)
+- `--mode=expressive|strict` — deck construction mode (default: `expressive`). See [Construction modes](#construction-modes).
+- `--qa` — after rendering, emit per-slide PNGs for visual inspection. See [Visual QA loop](#visual-qa-loop---qa).
 
 ## Markdown format
 
@@ -327,6 +329,34 @@ For a section divider, you must set `accent_hex`:
   "content_hash": "..."
 }
 ```
+
+## Construction modes
+
+`--mode` controls the overall deck aesthetic:
+
+- **`expressive`** (default) — themed + guided-freeform, Anthropic-pptx aesthetic. A theme is auto-picked (seeded by `shake_seed`, so a `--shake` reroll can pick a fresh one) and frozen into the sidecar as `"theme"`. Supplementary hues are uncapped — the theme can range beyond the four canonical brand colors.
+- **`strict`** — rules-based named-layout behavior; the revert path. Use to fall back to the deterministic v4 dispatch without theming.
+
+If `--mode` is omitted, an existing sidecar's recorded mode wins; otherwise it defaults to `expressive`. The resolved mode is frozen in the sidecar, so replays stay deterministic.
+
+## Visual QA loop (`--qa`)
+
+`--qa` renders the deck, then converts it to one PNG per slide under `<output>_qa/` (e.g. `talk.pptx` → `talk_qa/slide-1.png`, ...). The pipeline is pptx → PDF (LibreOffice headless) → per-slide PNGs (poppler `pdftoppm`); python-pptx cannot rasterize, so we shell out.
+
+The agent driving the loop should:
+1. **Read each PNG** under `<output>_qa/`.
+2. Check it against the **Design principles / anti-patterns** in `plan_prompt.md` and theme cohesion (consistent accent use, hierarchy, no crowding/overflow).
+3. **Edit the `.layout.json` sidecar** to fix any issues, then re-run (`python build.py --input ... --output ... --qa`).
+4. Repeat until the slides pass. Determinism holds — fixes are frozen in the sidecar, so a re-render reproduces the corrected deck.
+
+### Dependencies
+
+- **LibreOffice** (`soffice`) — `brew install --cask libreoffice` on mac.
+- **poppler** (`pdftoppm`) — `brew install poppler` on mac.
+
+If either is missing, `--qa` prints `QA skipped: <actionable message>` to stderr and the build still succeeds.
+
+On a no-sudo cluster (FAC/SCS), use an extracted LibreOffice AppImage placed in a **non-home** location — home dirs are quota-limited and the AppImage tree is ~1GB, so pick roomy scratch/project space interactively. Then put its `program/` dir on `PATH` or extend `_SOFFICE_CANDIDATES` in `qa.py`. Get `pdftoppm` via `conda install -c conda-forge poppler` or a cluster module. Alternatively, generate the `.pptx` on the cluster and `scp` it to a mac for QA.
 
 ## Branding source of truth
 
