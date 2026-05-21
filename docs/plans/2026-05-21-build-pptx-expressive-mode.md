@@ -996,6 +996,15 @@ no `libreoffice` package for linux-64 or osx). Routes that work without root (mo
   ./LibreOffice-*.AppImage --appimage-extract
   # soffice is then at: ./squashfs-root/program/soffice
   ```
+  **Location matters — do NOT use the home dir.** The extracted tree is
+  ~700MB–1GB and cluster home dirs are usually small quota'd NFS. The setup
+  must be an **interactive step** (document this in SKILL.md, not a hardcoded
+  path): Claude inspects the cluster for roomy non-home space (e.g. `/scratch`,
+  group/project space, `$TMPDIR`), checks free space (`df -h`, quota), proposes
+  a specific location outside home, and asks the user to confirm — or asks the
+  user to name a path. Download + extract there, then either export
+  `<location>/squashfs-root/program` onto `PATH` or extend
+  `_SOFFICE_CANDIDATES` in `qa.py` to point at it.
 - **poppler / pdftoppm:** this half *is* conda-installable —
   `conda install -c conda-forge poppler` (or `module load poppler`).
 - **Zero-install alternative:** generate decks on the cluster, `scp` the `.pptx`
