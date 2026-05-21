@@ -587,7 +587,7 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
     title_color   = WHITE_RGB if is_dark else INK_RGB
     # Light off-white for lede; light muted for footer — both legible on dark.
     lede_color    = _rgb("#94A3B8") if is_dark else MUTED_RGB
-    footer_color  = RULE_RGB if is_dark else MUTED_RGB
+    footer_color  = lede_color  # match original body_text_dim (#94A3B8 on dark)
     rule_color    = _rgb("#1A2D50") if is_dark else RULE_RGB
 
     # Left accent bar
