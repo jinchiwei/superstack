@@ -570,19 +570,25 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
                 accent: RGBColor,
                 title_present: bool, title_wraps: bool,
                 use_side_by_side: bool,
-                dark_bg: bool = False) -> tuple[float, float, float, float, float]:
+                dark_bg: bool = False,
+                on_dark: bool = False) -> tuple[float, float, float, float, float]:
     """Draw the standard content-slide chrome: left bar, title, hairline,
     lede (when not side-by-side), and footer.
 
-    When dark_bg=True the title flips to white and lede/footer flip to a
-    light dim grey for legibility on DARK_BG_RGB backgrounds.
+    When dark_bg (or on_dark — the expressive-theme alias) is True the title
+    flips to white and lede/footer flip to a light dim grey for legibility on
+    a dark canvas. The accent bar / hairline stay on the accent color so they
+    read on either canvas.
 
     Returns (body_top, body_h, body_l, body_w, body_bottom) geometry tuple
     so each layout can position its body content correctly.
     """
-    title_color   = WHITE_RGB if dark_bg else INK_RGB
-    body_text_dim = _rgb("#94A3B8") if dark_bg else MUTED_RGB
-    rule_color    = _rgb("#1A2D50") if dark_bg else RULE_RGB
+    is_dark = dark_bg or on_dark
+    title_color   = WHITE_RGB if is_dark else INK_RGB
+    # Light off-white for lede; light muted for footer — both legible on dark.
+    lede_color    = _rgb("#94A3B8") if is_dark else MUTED_RGB
+    footer_color  = RULE_RGB if is_dark else MUTED_RGB
+    rule_color    = _rgb("#1A2D50") if is_dark else RULE_RGB
 
     # Left accent bar
     _add_rect(slide, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)
@@ -607,7 +613,7 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
         lede_h = min(1.0, max(0.40, est_h))
         _add_text(slide, lede, left=0.50, top=subtitle_top, width=12.30,
                   height=lede_h,
-                  size=13, color_rgb=body_text_dim, font=branding.SANS_FONT)
+                  size=13, color_rgb=lede_color, font=branding.SANS_FONT)
     else:
         lede_h = 0.40
 
@@ -633,6 +639,6 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
     if footer_parts:
         _add_text(slide, "  ·  ".join(footer_parts),
                   left=0.50, top=7.12, width=12.30, height=0.30,
-                  size=9, color_rgb=body_text_dim, font=branding.MONO_FONT)
+                  size=9, color_rgb=footer_color, font=branding.MONO_FONT)
 
     return body_top, body_h, body_l, body_w, body_bottom

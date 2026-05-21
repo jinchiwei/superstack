@@ -1319,14 +1319,8 @@ def main() -> int:
     # so re-renders are deterministic.
     theme = None
     if effective_mode == "expressive":
-        # TODO(task-2): remove this ModuleNotFoundError guard once themes.py
-        # exists; after that, import/resolve errors should propagate, not be
-        # silently swallowed into an unthemed render.
-        try:
-            from expressive import resolve_theme
-            theme = resolve_theme(final_plan)
-        except ModuleNotFoundError:
-            theme = None  # themes.py not present yet (pre-Task-2)
+        from expressive import resolve_theme
+        theme = resolve_theme(final_plan)
         final_plan.theme = theme.name if theme else None
     else:
         final_plan.theme = None

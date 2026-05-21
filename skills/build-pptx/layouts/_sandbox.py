@@ -207,11 +207,19 @@ def build_safe_globals(
     body_l: float,
     body_w: float,
     body_bottom: float,
+    theme_hexes: list[str] | None = None,
+    canvas_bg_hex: str | None = None,
+    on_dark: bool = False,
 ) -> dict:
     """Return a constrained globals dict for exec()ing a freeform snippet.
 
     The dict exposes exactly the drawing primitives, colour constants, and
     geometry values that a freeform snippet needs.  No escape hatches.
+
+    In expressive mode an optional theme palette is injected: THEME_HEXES /
+    THEME_RGBS (supplementary hues), CANVAS_BG_RGB (full-bleed canvas), and
+    ON_DARK (whether the canvas is dark). These are data only — they add no
+    new callables and so cannot serve as escape hatches.
     """
     accent_rgb = _rgb(accent_hex)
 
@@ -239,6 +247,11 @@ def build_safe_globals(
         "RULE_RGB": RULE_RGB,
         "DARK_BG_RGB": DARK_BG_RGB,
         "PAPER_RGB": PAPER_RGB,
+        # Theme palette (expressive mode) — data only, no callables
+        "THEME_HEXES": list(theme_hexes or []),
+        "THEME_RGBS": [_rgb(h) for h in (theme_hexes or [])],
+        "CANVAS_BG_RGB": _rgb(canvas_bg_hex) if canvas_bg_hex else None,
+        "ON_DARK": on_dark,
         # Drawing primitives
         "_add_rect": _add_rect,
         "_add_text": _add_text,
@@ -282,6 +295,9 @@ def run(
     body_l: float,
     body_w: float,
     body_bottom: float,
+    theme_hexes: list[str] | None = None,
+    canvas_bg_hex: str | None = None,
+    on_dark: bool = False,
 ) -> None:
     """Validate and execute a freeform snippet inside a constrained namespace.
 
@@ -298,5 +314,8 @@ def run(
         body_l=body_l,
         body_w=body_w,
         body_bottom=body_bottom,
+        theme_hexes=theme_hexes,
+        canvas_bg_hex=canvas_bg_hex,
+        on_dark=on_dark,
     )
     exec(code, safe_globals)  # noqa: S102 — intentional, validated above

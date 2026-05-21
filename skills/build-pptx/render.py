@@ -241,6 +241,9 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
 
     # Walk plan slides; track current section accent
     current_accent = branding.TURQUOISE
+    # Expressive themes may reorder which brand-4 accent leads.
+    if theme is not None and theme.accent_order:
+        current_accent = theme.accent_order[0]
     footer_kwargs = {
         "name": deck_name, "org": deck_org,
         "deck_title": deck_title, "date": deck_date,
@@ -252,6 +255,16 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
 
     for entry in processed_slides:
         params = entry.params or {}
+
+        # Inject the resolved theme into freeform slides only. This dict is
+        # added by the renderer, never by the planner, and is not persisted.
+        if theme is not None and entry.kind == "freeform":
+            params = dict(params)
+            params["_theme"] = {
+                "on_dark": theme.on_dark,
+                "bg_hex": theme.bg_hex,
+                "supplementary": list(theme.supplementary),
+            }
 
         if entry.kind == "section-divider":
             label = params.get("label", "")
