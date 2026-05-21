@@ -6,7 +6,7 @@ mode a theme may supply a dark canvas + supplementary hues."""
 from __future__ import annotations
 
 from layouts._common import (
-    _add_chrome, _add_rect, _add_text, DEEPPINK_RGB,
+    _add_chrome, _add_rect, _add_text, _rgb, DEEPPINK_RGB,
 )
 from layouts._sandbox import run as run_sandboxed, SandboxError
 import branding
@@ -30,9 +30,11 @@ def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict) -> None:
     theme_hexes = theme.get("supplementary") or []
 
     # Paint the full-bleed canvas FIRST so chrome + snippet draw on top.
-    if on_dark and canvas_bg_hex:
+    # Any non-white canvas (dark OR tinted) gets painted; on_dark separately
+    # drives chrome text inversion (handled by _add_chrome below).
+    if canvas_bg_hex and canvas_bg_hex.upper() != "#FFFFFF":
         _add_rect(slide, left=0, top=0, width=13.333, height=7.5,
-                  fill_rgb=_to_rgb(canvas_bg_hex))
+                  fill_rgb=_rgb(canvas_bg_hex))
 
     title_wraps = len(title) > 30
 
@@ -76,8 +78,3 @@ def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict) -> None:
                   width=body_w, height=0.5,
                   size=12, color_rgb=DEEPPINK_RGB,
                   font=branding.MONO_FONT, bold=True)
-
-
-def _to_rgb(hex_str: str):
-    from layouts._common import _rgb
-    return _rgb(hex_str)

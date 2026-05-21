@@ -62,11 +62,15 @@ def test_resolve_theme_honors_frozen_name():
     assert resolve_theme(Plan(mode="expressive", theme="forest")).name == "forest"
 
 
-def test_freeform_dark_canvas_renders_without_error(tmp_path):
-    """A freeform slide under a dark theme paints a bg and runs the snippet."""
+def _render_freeform_and_find_canvas(tmp_path, theme_name: str, expected_bg_hex: str):
+    """Render a freeform slide under the given theme, open the output pptx, and
+    return True iff a full-bleed (~13.33in x 7.5in) shape with a solid fill of
+    expected_bg_hex (e.g. '14141C') is found on the content slide."""
     import render as render_mod
     from plan import Plan, SlideEntry
     from themes import get_theme
+    from pptx import Presentation
+    from pptx.util import Inches
 
     md = tmp_path / "deck.md"
     md.write_text(
@@ -78,7 +82,7 @@ def test_freeform_dark_canvas_renders_without_error(tmp_path):
             "_add_text(slide, 'hi', left=body_l, top=body_top, width=4, "
             "height=1, size=20, color_rgb=WHITE_RGB if ON_DARK else INK_RGB, "
             "font=MONO_FONT)")
-    plan = Plan(mode="expressive", theme="midnight", slides=[
+    plan = Plan(mode="expressive", theme=theme_name, slides=[
         SlideEntry(slide_id="h1-results/h2-headline", kind="freeform",
                    params={"title": "Headline", "lede": "Lede.",
                            "section_label": "Results", "code": code}),
@@ -86,6 +90,43 @@ def test_freeform_dark_canvas_renders_without_error(tmp_path):
     out = tmp_path / "out.pptx"
     render_mod.render_from_plan(
         md_path=md, plan=plan, output_path=out,
-        theme=get_theme("midnight"),
+        theme=get_theme(theme_name),
     )
     assert out.exists() and out.stat().st_size > 0
+
+    prs = Presentation(str(out))
+    # Content slide is the freeform one (title cover is first, end last).
+    full_w, full_h = 13.333, 7.5
+    tol = Inches(0.1)
+    target = expected_bg_hex.upper().lstrip("#")
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            try:
+                if int(shape.fill.type) != 1:  # MSO_FILL.SOLID
+                    continue
+                rgb = str(shape.fill.fore_color.rgb).upper()
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if rgb != target:
+                continue
+            if (abs(shape.width - Inches(full_w)) <= tol
+                    and abs(shape.height - Inches(full_h)) <= tol):
+                return True
+    return False
+
+
+def test_freeform_dark_canvas_is_painted(tmp_path):
+    """A freeform slide under a DARK theme (midnight, #14141C) paints a
+    full-bleed canvas rect filled with the theme bg."""
+    assert _render_freeform_and_find_canvas(tmp_path, "midnight", "14141C"), (
+        "expected a full-bleed 13.33x7.5in rect filled #14141C on the slide"
+    )
+
+
+def test_freeform_tinted_canvas_is_painted(tmp_path):
+    """A freeform slide under a TINTED light theme (bone, #F6F4EE) paints a
+    full-bleed canvas rect filled with the theme bg. This FAILS before Fix 1
+    (paint was gated on on_dark) and PASSES after."""
+    assert _render_freeform_and_find_canvas(tmp_path, "bone", "F6F4EE"), (
+        "expected a full-bleed 13.33x7.5in rect filled #F6F4EE on the slide"
+    )
