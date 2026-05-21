@@ -189,7 +189,7 @@ def merge_with_existing(new_plan: Plan, existing_plan: Plan | None) -> Plan:
     Slides removed from the markdown drop from the merged plan automatically
     because we only iterate new_plan.slides.
 
-    deck_md_hash and shake_seed come from new_plan."""
+    deck_md_hash, shake_seed, mode and theme come from new_plan."""
     if existing_plan is None:
         return new_plan
     by_id = {e.slide_id: e for e in existing_plan.slides}
@@ -203,6 +203,8 @@ def merge_with_existing(new_plan: Plan, existing_plan: Plan | None) -> Plan:
     return Plan(version=new_plan.version,
                 deck_md_hash=new_plan.deck_md_hash,
                 shake_seed=new_plan.shake_seed,
+                mode=new_plan.mode,
+                theme=new_plan.theme,
                 slides=merged_slides)
 
 

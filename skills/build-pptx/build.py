@@ -1298,18 +1298,30 @@ def main() -> int:
     # Merge with existing
     final_plan = merge_with_existing(default_plan, existing_plan)
 
-    # Resolve effective mode: explicit flag > existing sidecar > default.
-    effective_mode = (
-        args.mode
-        or (existing_plan.mode if existing_plan else None)
-        or "expressive"
-    )
+    # Mode is user intent and must survive a --shake reroll (strict is the
+    # deliberate revert path), so read it from any existing sidecar even when
+    # shaking. Theme still rerolls on shake.
+    prior_mode = None
+    if sidecar_path.exists():
+        try:
+            prior_mode = Plan.from_json(
+                sidecar_path.read_text(encoding="utf-8")).mode
+        except Exception:
+            prior_mode = None
+
+    # Resolve effective mode: explicit flag > prior sidecar mode > default.
+    # prior_mode already covers the non-shake case (it reads the same sidecar
+    # existing_plan came from), so the existing_plan.mode term is redundant.
+    effective_mode = args.mode or prior_mode or "expressive"
     final_plan.mode = effective_mode
 
     # Resolve theme (expressive only). Freeze the chosen theme name in the plan
     # so re-renders are deterministic.
     theme = None
     if effective_mode == "expressive":
+        # TODO(task-2): remove this ModuleNotFoundError guard once themes.py
+        # exists; after that, import/resolve errors should propagate, not be
+        # silently swallowed into an unthemed render.
         try:
             from expressive import resolve_theme
             theme = resolve_theme(final_plan)
