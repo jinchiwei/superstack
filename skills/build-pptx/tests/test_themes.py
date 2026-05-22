@@ -31,6 +31,12 @@ def test_pick_theme_none_seed_returns_a_theme():
     assert isinstance(pick_theme(None), Theme)
 
 
+def test_pick_theme_reaches_multiple_themes():
+    import uuid
+    names = {pick_theme(uuid.uuid4().hex).name for _ in range(200)}
+    assert len(names) >= 2
+
+
 def test_get_theme_by_name():
     name = next(iter(THEMES))
     assert get_theme(name).name == name
