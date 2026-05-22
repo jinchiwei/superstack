@@ -28,7 +28,6 @@ from palette import LIGHT
 from ._common import (
     _add_chrome,
     _set_bg,
-    WHITE_RGB,
 )
 from .blocks.figure import render as _figure
 from .blocks.left_accent_card import render as _left_accent_card
@@ -54,7 +53,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -65,6 +64,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     # ── Weight-based 2:1 split ───────────────────────────────────────────────

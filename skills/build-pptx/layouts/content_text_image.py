@@ -20,7 +20,6 @@ from ._common import (
     _render_paragraph_block,
     _set_bg,
     _strip_html,
-    WHITE_RGB,
 )
 
 
@@ -77,7 +76,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -88,6 +87,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=use_side_by_side,
+        on_dark=palette.on_dark,
     )
 
     if use_side_by_side:
@@ -100,7 +100,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         _render_paragraph_block(slide, items=side_items, left=body_l,
                                 top=body_top, width=text_w, height=body_h,
                                 accent_rgb=accent_rgb, size=13,
-                                distribute=True)
+                                distribute=True, text_color=palette.text_rgb)
         _render_media_block(slide, images=images, tables=tables,
                             left=media_l, top=body_top,
                             width=media_w, height=body_h,
@@ -119,7 +119,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             cap_h = min(1.6, max(0.4, est_h + 0.10))
             _render_paragraph_block(slide, items=body, left=body_l, top=cursor,
                                     width=body_w, height=cap_h,
-                                    accent_rgb=accent_rgb, size=13)
+                                    accent_rgb=accent_rgb, size=13,
+                                    text_color=palette.text_rgb)
             cursor += cap_h + 0.15
         _render_media_block(slide, images=images, tables=tables,
                             left=body_l, top=cursor,

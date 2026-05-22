@@ -37,10 +37,8 @@ from ._common import (
     _add_rect,
     _add_text,
     _set_bg,
-    WHITE_RGB,
     PAPER_RGB,
     INK_RGB,
-    MUTED_RGB,
 )
 from .blocks.figure import render as _figure
 
@@ -55,17 +53,26 @@ def _aside_top_accent_card(
     slide, *,
     left: float, top: float, width: float, height: float,
     params: dict, accent_rgb: RGBColor,
+    surface_rgb: RGBColor | None = None,
+    text_rgb: RGBColor | None = None,
 ) -> None:
     """Render a card with a TOP accent stripe (vs the side-rail variant).
 
     params: {"label": str, "body": str, "icon": str|None}
+
+    surface_rgb / text_rgb: optional palette overrides for the card fill and
+    body text. None falls back to today's PAPER_RGB / INK_RGB so existing
+    callers are byte-identical.
     """
     label = (params.get("label") or "").strip()
     body  = (params.get("body") or "").strip()
 
+    card_fill = surface_rgb if surface_rgb is not None else PAPER_RGB
+    body_color = text_rgb if text_rgb is not None else INK_RGB
+
     # Card background
     _add_rect(slide, left=left, top=top, width=width, height=height,
-              fill_rgb=PAPER_RGB)
+              fill_rgb=card_fill)
 
     # Top accent stripe — full-width, signals horizontal flow
     _add_rect(slide, left=left, top=top,
@@ -89,7 +96,7 @@ def _aside_top_accent_card(
             left=left + _ASIDE_PAD_LEFT, top=body_top,
             width=width - 2 * _ASIDE_PAD_LEFT,
             height=top + height - body_top - 0.10,
-            size=_ASIDE_BODY_SZ, color_rgb=INK_RGB,
+            size=_ASIDE_BODY_SZ, color_rgb=body_color,
             font=branding.SANS_FONT,
         )
 
@@ -114,7 +121,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -125,6 +132,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     # ── Vertical split — adaptive to aside content length ──────────────────
@@ -170,4 +178,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         width=body_w, height=aside_h,
         params=aside,
         accent_rgb=accent_rgb,
+        surface_rgb=palette.surface_rgb,
+        text_rgb=palette.text_rgb,
     )

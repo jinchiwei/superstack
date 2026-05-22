@@ -44,9 +44,6 @@ from ._common import (
     _add_text,
     _estimate_paragraph_height,
     _set_bg,
-    WHITE_RGB,
-    PAPER_RGB,
-    INK_RGB,
 )
 
 
@@ -81,7 +78,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -92,6 +89,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     n = len(cards)
@@ -129,7 +127,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
 
         # Card background
         _add_rect(slide, left=body_l, top=cur_top,
-                  width=body_w, height=c_h, fill_rgb=PAPER_RGB)
+                  width=body_w, height=c_h, fill_rgb=palette.surface_rgb)
 
         # Top-left partial stripe (mono-weight — no primary differentiation)
         _add_rect(slide, left=body_l, top=cur_top,
@@ -168,6 +166,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
                   left=body_l + _PAD_LEFT, top=cur_top + body_top_off,
                   width=body_w - 2 * _PAD_LEFT,
                   height=c_h - body_top_off - _PAD_BOT,
-                  size=_BODY_SIZE, color_rgb=INK_RGB, font=branding.SANS_FONT)
+                  size=_BODY_SIZE, color_rgb=palette.text_rgb,
+                  font=branding.SANS_FONT)
 
         cur_top = cur_top + c_h + gutter
