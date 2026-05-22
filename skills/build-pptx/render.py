@@ -232,6 +232,11 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
 
     prs = new_presentation()
 
+    # Cover, section dividers, and end slide adopt the theme's canvas color when
+    # the theme is dark, so they match the content slides instead of the
+    # hardcoded navy. Light/strict -> None -> navy default (preserves parity).
+    cover_bg = palette.canvas_rgb if palette.on_dark else None
+
     # Cover
     if not no_cover:
         add_title_slide(
@@ -240,6 +245,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
             title=deck_title,
             subtitle=str(meta.get("subtitle", "")),
             name=deck_name, org=deck_org, date=deck_date,
+            bg_rgb=cover_bg,
         )
 
     # Walk plan slides; track current section accent
@@ -276,6 +282,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
                 prs, label=label,
                 accent_color_hex=current_accent,
                 name=deck_name, org=deck_org, deck_title=deck_title,
+                bg_rgb=cover_bg,
             )
             continue
 
@@ -303,7 +310,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
 
     # End slide
     if not no_end:
-        add_end_slide(prs, message="Thanks", contact=deck_name)
+        add_end_slide(prs, message="Thanks", contact=deck_name, bg_rgb=cover_bg)
 
     prs.save(str(output_path))
     _os.chdir(_orig_cwd)

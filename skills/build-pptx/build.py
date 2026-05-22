@@ -81,11 +81,12 @@ def new_presentation() -> "Presentation":
 
 
 def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
-                    name: str = "", org: str = "", date: str = ""):
-    """Title slide: navy bg, left double-rail (turquoise + deeppink), bottom amber hairline.
+                    name: str = "", org: str = "", date: str = "", bg_rgb=None):
+    """Title slide: dark bg (theme canvas if bg_rgb given, else navy), left
+    double-rail (turquoise + deeppink), bottom amber hairline.
     Eyebrow turquoise, title white, name turquoise, org deeppink, date dim, all Geist Mono."""
     s = _blank(prs)
-    _set_bg(s, DARK_BG_RGB)
+    _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
 
     # Left double-rail
     _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
@@ -237,9 +238,11 @@ def add_content_slide(prs, *, title: str, body_paragraphs: list[str],
 
 def add_section_divider(prs, *, label: str, index: int = 0,
                         accent_color_hex: str | None = None,
-                        name: str = "", org: str = "", deck_title: str = ""):
-    """Section divider: navy bg + full-height left colorblock + DMG-style top
-    title block + bottom footer (name turquoise · org deeppink · deck muted).
+                        name: str = "", org: str = "", deck_title: str = "",
+                        bg_rgb=None):
+    """Section divider: dark bg (theme canvas if bg_rgb given, else navy) +
+    full-height left colorblock + DMG-style top title block + bottom footer
+    (name turquoise · org deeppink · deck muted).
 
     Color comes from `accent_color_hex` if provided, else from
     branding.pick_section_color(index) cycling.
@@ -247,7 +250,7 @@ def add_section_divider(prs, *, label: str, index: int = 0,
     bg_hex = accent_color_hex or branding.pick_section_color(index)
     accent = _rgb(bg_hex)
     s = _blank(prs)
-    _set_bg(s, DARK_BG_RGB)
+    _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
 
     # Full-height left colorblock (results_overview style)
     _add_rect(s, left=0, top=0, width=0.6, height=7.5, fill_rgb=accent)
@@ -348,11 +351,12 @@ def add_quote_slide(prs, *, quote: str, attribution: str = ""):
     return s
 
 
-def add_end_slide(prs, *, message: str = "Thanks", contact: str = ""):
-    """End slide: mirror title slide. Navy bg, left double-rail, bottom amber hairline.
+def add_end_slide(prs, *, message: str = "Thanks", contact: str = "", bg_rgb=None):
+    """End slide: mirror title slide. Dark bg (theme canvas if bg_rgb given, else
+    navy), left double-rail, bottom amber hairline.
     Big white "Thanks" centered, contact in dim mono below."""
     s = _blank(prs)
-    _set_bg(s, DARK_BG_RGB)
+    _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
 
     # Left double-rail (mirror of title)
     _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
