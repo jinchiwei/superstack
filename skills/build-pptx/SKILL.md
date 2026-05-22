@@ -334,7 +334,7 @@ For a section divider, you must set `accent_hex`:
 
 `--mode` controls the overall deck aesthetic:
 
-- **`expressive`** (default) — themed + guided-freeform, Anthropic-pptx aesthetic. A theme is auto-picked (seeded by `shake_seed`, so a `--shake` reroll can pick a fresh one) and frozen into the sidecar as `"theme"`. Supplementary hues are uncapped — the theme can range beyond the four canonical brand colors.
+- **`expressive`** (default) — the planner DESIGNS each slide freely (freeform-first, Anthropic-pptx aesthetic), with NO deterministic layout-selection rubric. The only hard constraints are the brand lock: fonts (Geist / Geist Mono) and the color palette (brand-4 accents + the theme's supplementary hues). Named layouts are optional tools the planner may use when content cleanly fits one; everything else is its call. A theme is auto-picked (seeded by `shake_seed`, so a `--shake` reroll can pick a fresh one) and frozen into the sidecar as `"theme"`. Supplementary hues are uncapped.
 - **`strict`** — rules-based named-layout behavior; the revert path. Use to fall back to the deterministic v4 dispatch without theming.
 
 If `--mode` is omitted, an existing sidecar's recorded mode wins; otherwise it defaults to `expressive`. The resolved mode is frozen in the sidecar, so replays stay deterministic.

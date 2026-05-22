@@ -373,14 +373,22 @@ named layouts only (see the rubric).
 
 ### Mode awareness
 
-- **expressive (default):** Bias toward *guided freeform* for any slide whose
-  point benefits from a custom composition. Named layouts are a fast floor for
-  trivially-shaped slides (a plain bullet list, a single figure, a simple
-  table). When in doubt and the content has visual structure, design it with
-  `freeform`. A deck may also carry a **theme** (see below) — honor its canvas
-  and palette.
+- **expressive (default):** You DESIGN each slide for impact. You have full
+  latitude over layout, composition, and emphasis — there is no template
+  checklist to satisfy and no deterministic selection rubric to follow.
+  Default to `freeform` (compose the slide yourself) guided by the design
+  principles below and the deck's theme. Reach for a named layout only when the
+  content maps cleanly onto one (a real data table → `table-with-takeaway`; a
+  lone figure + caption → `content-text-image`) — named layouts are tools you
+  may use, not a quota to fill. **The ONLY hard constraints are the brand
+  lock:** fonts never change (Geist Mono for structural elements, Geist for
+  prose) and every color stays within the brand-4 accents + the active theme's
+  supplementary palette. Everything else — arrangement, hierarchy, color zones,
+  whitespace — is your call. (Do not use `bg-flip` in expressive; its fixed
+  navy canvas ignores the theme.)
 - **strict:** Never emit `freeform` or `composition`. Pick the best-fitting
-  named layout for every slide. This is the proven, brand-locked path.
+  named layout for every slide via the deterministic rubric below. This is the
+  proven, template-locked path.
 
 ### The theme (expressive only)
 
@@ -432,16 +440,14 @@ numbers, labels; `SANS_FONT` (Geist) for reading prose.
 
 ## Decision rubric
 
-**First, honor the mode.**
+**This rubric governs STRICT mode only.** In **expressive mode**, ignore the
+deterministic selection rules below — design each slide freely per *Mode
+awareness* and *Design principles* above (freeform-first; named layouts only
+when they cleanly fit; the only hard constraints are brand fonts + the accent
+palette). The rules below exist solely to keep STRICT mode deterministic,
+template-locked, and consistent across decks.
 
-- In **strict mode**, choose exclusively from the named layouts. Never select
-  `freeform` or `composition`. Apply the per-kind rules below.
-- In **expressive mode**, apply the Design principles above: bias toward
-  guided `freeform` for slides with visual structure, and fall back to named
-  layouts for trivially-shaped slides. The per-kind rules below still describe
-  when each named layout is the right floor.
-
-**Layout selection priority (apply in order):**
+**Strict-mode layout selection priority (apply in order):**
 
 1. **Named layouts first.** Try the 14 named layouts (`conclusions`, `content-text`, `content-text-image`, `content-image-only`, `cards-grid`, `cards-heterogeneous`, `three-pillars`, `stat-callouts-right`, `bg-flip`, `timeline`, `stats-with-takeaway`, `figure-with-aside`, `cards-with-takeaway`, `table-with-takeaway`). These are deterministic, brand-locked, and consistent across decks.
    - For closing slides (titles matching takeaways/conclusions/summary/next steps/key findings), prefer `conclusions` — its dark bg and rotating accents are designed for visual impact at deck close.
