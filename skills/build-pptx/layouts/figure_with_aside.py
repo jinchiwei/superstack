@@ -81,6 +81,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         width=fig_w, height=body_h,
         params={"image_path": image, "alt": alt},
         accent_rgb=accent_rgb,
+        muted_rgb=palette.muted_rgb,
     )
 
     # ── Left-accent card (right) ──────────────────────────────────────────────
@@ -91,4 +92,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         width=aside_w, height=body_h,
         params=aside,
         accent_rgb=accent_rgb,
+        surface_rgb=palette.surface_rgb,
+        text_rgb=palette.text_rgb,
     )

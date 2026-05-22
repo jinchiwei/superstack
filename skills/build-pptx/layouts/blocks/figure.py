@@ -23,10 +23,16 @@ from ._base import (
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           muted_rgb: RGBColor | None = None) -> None:
     image_path_str = params.get("image_path", "")
     caption = params.get("caption", "")
     alt = params.get("alt", "")
+
+    # Placeholder + caption are secondary text — palette override falls back to
+    # today's DIM (placeholder/error) and MUTED (caption) colors.
+    placeholder_color = muted_rgb if muted_rgb is not None else DIM_RGB
+    caption_color = muted_rgb if muted_rgb is not None else MUTED_RGB
 
     caption_h = 0.28 if caption else 0.0
     img_h = max(0.3, height - caption_h - (0.08 if caption else 0.0))
@@ -38,7 +44,7 @@ def render(slide, *, left: float, top: float, width: float, height: float,
         placeholder = alt or image_path_str or "[figure]"
         _add_text(slide, f"[{placeholder}]",
                   left=left, top=top, width=width, height=img_h,
-                  size=10, color_rgb=DIM_RGB, font=branding.MONO_FONT)
+                  size=10, color_rgb=placeholder_color, font=branding.MONO_FONT)
     else:
         try:
             aspect = _get_image_aspect(img_path)
@@ -68,11 +74,11 @@ def render(slide, *, left: float, top: float, width: float, height: float,
         except Exception as e:
             _add_text(slide, f"[image error: {e}]",
                       left=left, top=top, width=width, height=img_h,
-                      size=9, color_rgb=DIM_RGB, font=branding.MONO_FONT)
+                      size=9, color_rgb=placeholder_color, font=branding.MONO_FONT)
 
     if caption:
         caption_top = top + img_h + 0.04
         _add_text(slide, caption,
                   left=left, top=caption_top, width=width, height=caption_h,
-                  size=9, color_rgb=MUTED_RGB, font=branding.MONO_FONT,
+                  size=9, color_rgb=caption_color, font=branding.MONO_FONT,
                   italic=True)

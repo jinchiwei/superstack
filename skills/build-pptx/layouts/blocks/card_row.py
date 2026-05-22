@@ -25,7 +25,9 @@ def _hex_to_rgb(hex_str: str) -> _RGBColor:
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           surface_rgb: RGBColor | None = None,
+           text_rgb: RGBColor | None = None) -> None:
     cards = params.get("cards", [])
     if not cards:
         return
@@ -60,4 +62,6 @@ def render(slide, *, left: float, top: float, width: float, height: float,
             accent_rgb=card_accent_rgb,
             icon_path=icon_path,
             dark_bg=dark_bg,
+            surface_rgb=surface_rgb,
+            text_rgb=text_rgb,
         )

@@ -23,15 +23,21 @@ from ._base import (
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           surface_rgb: RGBColor | None = None,
+           text_rgb: RGBColor | None = None) -> None:
     label = str(params.get("label", ""))
     body = str(params.get("body", ""))
     icon_name = params.get("icon")
     icon_path_str = params.get("icon_path")
 
+    # Card bg / body text — palette overrides fall back to today's PAPER/INK.
+    card_fill = surface_rgb if surface_rgb is not None else PAPER_RGB
+    body_color = text_rgb if text_rgb is not None else INK_RGB
+
     # Paper bg
     _add_rect(slide, left=left, top=top, width=width, height=height,
-              fill_rgb=PAPER_RGB)
+              fill_rgb=card_fill)
 
     # Left vertical accent stripe
     stripe_w = 0.06
@@ -85,4 +91,4 @@ def render(slide, *, left: float, top: float, width: float, height: float,
         _add_text(slide, body,
                   left=content_left, top=top + body_offset,
                   width=content_w, height=max(0.20, height - body_offset - 0.10),
-                  size=12, color_rgb=INK_RGB, font=branding.SANS_FONT)
+                  size=12, color_rgb=body_color, font=branding.SANS_FONT)

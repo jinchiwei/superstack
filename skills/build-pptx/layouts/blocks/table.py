@@ -14,7 +14,9 @@ from ._base import _add_table
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           surface_rgb: RGBColor | None = None,
+           text_rgb: RGBColor | None = None) -> None:
     raw_rows = params.get("rows", [])
     if not raw_rows:
         return
@@ -28,4 +30,6 @@ def render(slide, *, left: float, top: float, width: float, height: float,
         left=left, top=top,
         width=width, max_height=height,
         header_rgb=accent_rgb,
+        surface_rgb=surface_rgb,
+        text_rgb=text_rgb,
     )

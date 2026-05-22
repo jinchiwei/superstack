@@ -464,10 +464,25 @@ def _get_image_aspect(path: Path) -> float:
 
 
 def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
-               width: float, max_height: float, header_rgb: RGBColor) -> float:
-    """Draw a table with a colored header row. Returns bottom y."""
+               width: float, max_height: float, header_rgb: RGBColor,
+               surface_rgb: RGBColor | None = None,
+               text_rgb: RGBColor | None = None) -> float:
+    """Draw a table with a colored header row. Returns bottom y.
+
+    surface_rgb / text_rgb: optional palette overrides for the data-row cell
+    fills and the data-cell text. When None (the default), the colors fall
+    back to today's behavior — alternating PAPER_RGB / WHITE_RGB row fills with
+    INK_RGB text — so existing callers are byte-for-byte unchanged. The header
+    row keeps its accent fill + white text regardless, since accent reads on
+    any canvas.
+    """
     if not rows:
         return top
+    # On a dark theme both alternating row fills collapse to the single
+    # surface tint; on light they stay PAPER/WHITE.
+    row_fill_even = surface_rgb if surface_rgb is not None else PAPER_RGB
+    row_fill_odd = surface_rgb if surface_rgb is not None else WHITE_RGB
+    data_text = text_rgb if text_rgb is not None else INK_RGB
     n_rows = len(rows)
     n_cols = max(len(r) for r in rows)
     row_h = min(0.5, max_height / max(n_rows, 1))
@@ -488,8 +503,8 @@ def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
                 bold = True
                 size = 12
             else:
-                cell.fill.fore_color.rgb = PAPER_RGB if i % 2 == 0 else WHITE_RGB
-                color = INK_RGB
+                cell.fill.fore_color.rgb = row_fill_even if i % 2 == 0 else row_fill_odd
+                color = data_text
                 font_name = branding.SANS_FONT
                 bold = False
                 size = 12

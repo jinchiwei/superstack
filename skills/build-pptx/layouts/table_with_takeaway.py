@@ -81,6 +81,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             width=body_w, height=table_h,
             params={"rows": rows},
             accent_rgb=accent_rgb,
+            surface_rgb=palette.surface_rgb,
+            text_rgb=palette.text_rgb,
         )
 
     # ── Accent callout ────────────────────────────────────────────────────────

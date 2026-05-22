@@ -22,16 +22,25 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           surface_rgb: RGBColor | None = None,
+           text_rgb: RGBColor | None = None,
+           muted_rgb: RGBColor | None = None) -> None:
     value = str(params.get("value", ""))
     label = str(params.get("label", ""))
     sub = str(params.get("sub", ""))
     icon_name = params.get("icon")
     icon_path_str = params.get("icon_path")
 
+    # Tile bg + secondary text — palette overrides fall back to today's
+    # PAPER / MUTED / DIM colors. (The big value stays on the brand accent.)
+    tile_fill = surface_rgb if surface_rgb is not None else PAPER_RGB
+    label_color = muted_rgb if muted_rgb is not None else MUTED_RGB
+    sub_color = muted_rgb if muted_rgb is not None else DIM_RGB
+
     # Background (paper)
     _add_rect(slide, left=left, top=top, width=width, height=height,
-              fill_rgb=PAPER_RGB)
+              fill_rgb=tile_fill)
 
     # Build accent hex for icon color
     accent_hex = _rgb_to_hex(accent_rgb)
@@ -83,7 +92,7 @@ def render(slide, *, left: float, top: float, width: float, height: float,
         _add_text(slide, label,
                   left=left + 0.10, top=label_top,
                   width=width - 0.20, height=label_h,
-                  size=12, color_rgb=MUTED_RGB, font=branding.SANS_FONT,
+                  size=12, color_rgb=label_color, font=branding.SANS_FONT,
                   align=PP_ALIGN.CENTER)
 
         if sub:
@@ -91,7 +100,7 @@ def render(slide, *, left: float, top: float, width: float, height: float,
             _add_text(slide, sub,
                       left=left + 0.10, top=sub_top,
                       width=width - 0.20, height=0.26,
-                      size=10, color_rgb=DIM_RGB, font=branding.MONO_FONT,
+                      size=10, color_rgb=sub_color, font=branding.MONO_FONT,
                       align=PP_ALIGN.CENTER)
 
 

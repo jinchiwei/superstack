@@ -80,3 +80,77 @@ def test_color_heavy_named_layout_dark_canvas(tmp_path, kind, params):
     render_mod.render_from_plan(md_path=md, plan=plan, output_path=out,
                                 theme=get_theme("midnight"))
     assert "14141C" in _full_bleed_fill_hexes(out)
+
+
+def _all_shape_fill_hexes(pptx_path):
+    """Every solid-fill shape hex across all slides."""
+    prs = Presentation(str(pptx_path))
+    out = []
+    for s in prs.slides:
+        for sh in s.shapes:
+            try:
+                if int(sh.fill.type) == 1:
+                    out.append(str(sh.fill.fore_color.rgb))
+            except Exception:
+                pass
+    return out
+
+
+def test_stats_with_takeaway_inner_tiles_themed_dark(tmp_path):
+    md = tmp_path / "deck.md"
+    md.write_text("---\ntitle: T\n---\n\n# A\n\nbody\n", encoding="utf-8")
+    params = {
+        "title": "Results",
+        "lede": "summary",
+        "stats": [
+            {"value": "0.91", "label": "Internal AUC", "sub": "5-seed mean"},
+            {"value": "0.88", "label": "External AUC", "sub": "held-out"},
+        ],
+        "callout": {"text": "key takeaway", "tone": "dark"},
+    }
+    plan = Plan(mode="expressive", theme="midnight", slides=[
+        SlideEntry(slide_id="h1-a", kind="stats-with-takeaway", params=params),
+    ])
+    out = tmp_path / "stats.pptx"
+    render_mod.render_from_plan(md_path=md, plan=plan, output_path=out,
+                                theme=get_theme("midnight"))
+    fills = _all_shape_fill_hexes(out)
+    # No light PAPER surface remains on the inner stat tiles under a dark deck.
+    assert "FAFAFC" not in fills
+
+
+def test_table_with_takeaway_inner_table_themed_dark(tmp_path):
+    md = tmp_path / "deck.md"
+    md.write_text("---\ntitle: T\n---\n\n# A\n\nbody\n", encoding="utf-8")
+    params = {
+        "title": "Data",
+        "lede": "summary",
+        "rows": [
+            ["Model", "AUC", "N"],
+            ["A", "0.91", "120"],
+            ["B", "0.88", "98"],
+        ],
+        "callout": {"text": "key takeaway", "tone": "dark"},
+    }
+    plan = Plan(mode="expressive", theme="midnight", slides=[
+        SlideEntry(slide_id="h1-a", kind="table-with-takeaway", params=params),
+    ])
+    out = tmp_path / "table.pptx"
+    render_mod.render_from_plan(md_path=md, plan=plan, output_path=out,
+                                theme=get_theme("midnight"))
+    # Table cells are not shapes, so scan cell fills directly.
+    prs = Presentation(str(out))
+    cell_hexes = []
+    for s in prs.slides:
+        for sh in s.shapes:
+            if not sh.has_table:
+                continue
+            for row in sh.table.rows:
+                for cell in row.cells:
+                    try:
+                        if int(cell.fill.type) == 1:
+                            cell_hexes.append(str(cell.fill.fore_color.rgb))
+                    except Exception:
+                        pass
+    # No light PAPER alternating-row fill remains under a dark deck.
+    assert "FAFAFC" not in cell_hexes
