@@ -67,6 +67,11 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         _add_rect(slide, left=0.50, top=hairline_top, width=12.30, height=0.005,
                   fill_rgb=accent_rgb)
 
+    # Route lede/footer text through the theme on dark themes; fall back to the
+    # module-level constants otherwise (this layout is always-dark).
+    lede_color = palette.muted_rgb if palette.on_dark else _LEDE_RGB
+    footer_color = palette.muted_rgb if palette.on_dark else _FOOTER_RGB
+
     # ── Lede ────────────────────────────────────────────────────────────────────
     if lede:
         est_h = _estimate_paragraph_height(lede, width=12.30, size=13,
@@ -74,7 +79,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         lede_h = min(1.0, max(0.40, est_h))
         _add_text(slide, lede, left=0.50, top=subtitle_top, width=12.30,
                   height=lede_h,
-                  size=13, color_rgb=_LEDE_RGB, font=branding.SANS_FONT)
+                  size=13, color_rgb=lede_color, font=branding.SANS_FONT)
     else:
         lede_h = 0.40
 
@@ -117,4 +122,4 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     if footer_parts:
         _add_text(slide, "  ·  ".join(footer_parts),
                   left=0.50, top=7.12, width=12.30, height=0.30,
-                  size=9, color_rgb=_FOOTER_RGB, font=branding.MONO_FONT)
+                  size=9, color_rgb=footer_color, font=branding.MONO_FONT)

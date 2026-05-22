@@ -125,6 +125,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_wraps=title_wraps,
         use_side_by_side=False,
         dark_bg=True,            # flip title white, lede/footer to light dim grey
+        palette=palette,
     )
 
     if not cards:
@@ -179,6 +180,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             width=body_w, height=row_h,
             params={"cards": row_cards, "dark_bg": True},
             accent_rgb=accent_rgb,  # row-level accent is section color; per-card overrides win
+            surface_rgb=palette.surface_rgb if palette.on_dark else None,
+            text_rgb=palette.text_rgb if palette.on_dark else None,
         )
 
     # ── Accent callout ───────────────────────────────────────────────────────

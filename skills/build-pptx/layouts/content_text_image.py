@@ -88,6 +88,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_wraps=title_wraps,
         use_side_by_side=use_side_by_side,
         on_dark=palette.on_dark,
+        palette=palette,
     )
 
     if use_side_by_side:

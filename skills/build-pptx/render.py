@@ -273,6 +273,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
                 "on_dark": theme.on_dark,
                 "bg_hex": theme.bg_hex,
                 "supplementary": list(theme.supplementary),
+                "surface": "#" + str(palette.surface_rgb),
             }
 
         if entry.kind == "section-divider":

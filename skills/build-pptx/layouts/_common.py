@@ -615,7 +615,8 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
                 title_present: bool, title_wraps: bool,
                 use_side_by_side: bool,
                 dark_bg: bool = False,
-                on_dark: bool = False) -> tuple[float, float, float, float, float]:
+                on_dark: bool = False,
+                palette=None) -> tuple[float, float, float, float, float]:
     """Draw the standard content-slide chrome: left bar, title, hairline,
     lede (when not side-by-side), and footer.
 
@@ -630,9 +631,14 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
     is_dark = dark_bg or on_dark
     title_color   = WHITE_RGB if is_dark else INK_RGB
     # Light off-white for lede; light muted for footer — both legible on dark.
-    lede_color    = _rgb("#94A3B8") if is_dark else MUTED_RGB
+    if palette is not None and palette.on_dark:
+        # Theme-derived chrome on dark themes (no hardcoded navy/slate).
+        lede_color = palette.muted_rgb
+        rule_color = palette.rule_rgb
+    else:
+        lede_color = _rgb("#94A3B8") if is_dark else MUTED_RGB
+        rule_color = _rgb("#1A2D50") if is_dark else RULE_RGB
     footer_color  = lede_color  # match original body_text_dim (#94A3B8 on dark)
-    rule_color    = _rgb("#1A2D50") if is_dark else RULE_RGB
 
     # Left accent bar
     _add_rect(slide, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)

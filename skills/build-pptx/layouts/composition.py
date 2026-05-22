@@ -100,6 +100,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
         use_side_by_side=False,
         dark_bg=dark_bg,
         on_dark=palette.on_dark,
+        palette=palette,
     )
 
     rows = params.get("rows", [])

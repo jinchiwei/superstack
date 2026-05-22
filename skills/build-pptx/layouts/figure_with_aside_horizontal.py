@@ -133,6 +133,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_wraps=title_wraps,
         use_side_by_side=False,
         on_dark=palette.on_dark,
+        palette=palette,
     )
 
     # ── Vertical split — adaptive to aside content length ──────────────────

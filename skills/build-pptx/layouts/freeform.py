@@ -29,6 +29,7 @@ def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict, palette=LIGH
     on_dark = bool(theme.get("on_dark"))
     canvas_bg_hex = theme.get("bg_hex")
     theme_hexes = theme.get("supplementary") or []
+    surface_hex = theme.get("surface")
 
     # Paint the full-bleed canvas FIRST so chrome + snippet draw on top.
     # Any non-white canvas (dark OR tinted) gets painted; on_dark separately
@@ -46,6 +47,7 @@ def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict, palette=LIGH
         title_wraps=title_wraps,
         use_side_by_side=False,
         on_dark=on_dark,
+        palette=palette,
     )
 
     if not code.strip():
@@ -63,7 +65,7 @@ def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict, palette=LIGH
             body_top=body_top, body_h=body_h,
             body_l=body_l, body_w=body_w, body_bottom=body_bottom,
             theme_hexes=theme_hexes, canvas_bg_hex=canvas_bg_hex,
-            on_dark=on_dark,
+            on_dark=on_dark, surface_hex=surface_hex,
         )
     except SandboxError as e:
         _add_text(slide,

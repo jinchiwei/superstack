@@ -56,7 +56,7 @@ def _section_divider_render(slide, *, params, accent_rgb, footer_kwargs, palette
     org = footer_kwargs.get("org", "")
     deck_title = footer_kwargs.get("deck_title", "")
 
-    _set_bg(slide, DARK_BG_RGB)
+    _set_bg(slide, palette.canvas_rgb if palette and palette.on_dark else DARK_BG_RGB)
     _add_rect(slide, left=0, top=0, width=0.6, height=7.5, fill_rgb=accent)
     _add_rect(slide, left=0.85, top=0.7, width=0.18, height=0.45, fill_rgb=accent)
 
