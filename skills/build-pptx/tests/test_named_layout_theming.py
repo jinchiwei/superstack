@@ -56,3 +56,27 @@ def test_content_text_named_layout_paints_dark_canvas(tmp_path):
     render_mod.render_from_plan(md_path=md, plan=plan, output_path=out,
                                 theme=get_theme("midnight"))
     assert "14141C" in _full_bleed_fill_hexes(out)
+
+
+import pytest
+
+
+@pytest.mark.parametrize("kind,params", [
+    ("three-pillars", {"title": "T", "pillars": [
+        {"label": "A", "body": "x"}, {"label": "B", "body": "y"},
+        {"label": "C", "body": "z"}]}),
+    ("stat-callouts-right", {"title": "T", "stats": [
+        {"value": "1", "label": "a"}, {"value": "2", "label": "b"}]}),
+    ("timeline", {"title": "T", "milestones": [
+        {"label": "A", "body": "x"}, {"label": "B", "body": "y"}]}),
+])
+def test_color_heavy_named_layout_dark_canvas(tmp_path, kind, params):
+    md = tmp_path / "deck.md"
+    md.write_text("---\ntitle: T\n---\n\n# A\n\nbody\n", encoding="utf-8")
+    plan = Plan(mode="expressive", theme="midnight", slides=[
+        SlideEntry(slide_id="h1-a", kind=kind, params=params),
+    ])
+    out = tmp_path / f"{kind}.pptx"
+    render_mod.render_from_plan(md_path=md, plan=plan, output_path=out,
+                                theme=get_theme("midnight"))
+    assert "14141C" in _full_bleed_fill_hexes(out)

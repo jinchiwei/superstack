@@ -13,8 +13,6 @@ from ._common import (
     _add_chrome,
     _add_text,
     _set_bg,
-    INK_RGB,
-    WHITE_RGB,
 )
 
 # Visual constants
@@ -45,7 +43,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -56,6 +54,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     if not milestones:
@@ -120,7 +119,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             slide, milestone.get("label", ""),
             left=text_l, top=label_top,
             width=item_w, height=_LABEL_H,
-            size=_LABEL_SIZE, color_rgb=INK_RGB,
+            size=_LABEL_SIZE, color_rgb=palette.text_rgb,
             font=branding.MONO_FONT, bold=True,
         )
 
@@ -139,6 +138,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             slide, milestone.get("body", ""),
             left=text_l, top=body_text_top,
             width=item_w, height=min(_BODY_H, remaining_h),
-            size=_BODY_SIZE, color_rgb=INK_RGB,
+            size=_BODY_SIZE, color_rgb=palette.text_rgb,
             font=branding.SANS_FONT,
         )

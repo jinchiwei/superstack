@@ -16,9 +16,6 @@ from ._common import (
     _get_image_aspect,
     _set_bg,
     DIM_RGB,
-    INK_RGB,
-    MUTED_RGB,
-    WHITE_RGB,
 )
 
 # Width budget for the image column (inches)
@@ -44,7 +41,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -55,6 +52,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     # ── Image on left ──────────────────────────────────────────────────────────
@@ -120,5 +118,5 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             slide, stat.get("label", ""),
             left=stats_l, top=tile_top + value_h,
             width=stats_w, height=label_h,
-            size=12, color_rgb=MUTED_RGB, font=branding.SANS_FONT,
+            size=12, color_rgb=palette.muted_rgb, font=branding.SANS_FONT,
         )

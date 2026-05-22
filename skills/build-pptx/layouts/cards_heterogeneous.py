@@ -22,9 +22,6 @@ from ._common import (
     _add_text,
     _estimate_paragraph_height,
     _set_bg,
-    WHITE_RGB,
-    PAPER_RGB,
-    INK_RGB,
 )
 
 # Stripe heights: primary card gets a thicker accent stripe to differentiate it.
@@ -41,6 +38,7 @@ def _render_stacked_rows(
     body_l: float,
     body_w: float,
     accent_rgb: RGBColor,
+    palette=LIGHT,
 ) -> None:
     """Render primary + secondaries as full-width stacked rows, vertically centered."""
     cards = [primary] + list(secondary_cards)
@@ -84,7 +82,7 @@ def _render_stacked_rows(
 
         # Card background
         _add_rect(slide, left=body_l, top=cur_top,
-                  width=body_w, height=c_h, fill_rgb=PAPER_RGB)
+                  width=body_w, height=c_h, fill_rgb=palette.surface_rgb)
 
         if is_primary:
             # Primary card: full-width top stripe — the dominant accent element.
@@ -133,7 +131,7 @@ def _render_stacked_rows(
         _add_text(slide, c_body,
                   left=body_l + 0.18, top=cur_top + body_top_offset,
                   width=body_w - 0.36, height=c_h - body_top_offset - _PAD_BOT,
-                  size=body_size, color_rgb=INK_RGB, font=branding.SANS_FONT)
+                  size=body_size, color_rgb=palette.text_rgb, font=branding.SANS_FONT)
 
         cur_top += c_h + gutter
 
@@ -162,7 +160,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -173,6 +171,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     # --- Count gate ---
@@ -186,6 +185,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             body_l=body_l,
             body_w=body_w,
             accent_rgb=accent_rgb,
+            palette=palette,
         )
         return
 
@@ -214,7 +214,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     card_top = body_top + (body_h - card_h) / 2.0
 
     _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=card_h,
-              fill_rgb=PAPER_RGB)
+              fill_rgb=palette.surface_rgb)
     _add_rect(slide, left=body_l, top=card_top, width=primary_w, height=_STRIPE_STD,
               fill_rgb=accent_rgb)
 
@@ -242,7 +242,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
               size=15, color_rgb=accent_rgb, font=branding.MONO_FONT, bold=True)
     _add_text(slide, p_body, left=body_l + 0.18, top=card_top + 0.80,
               width=primary_w - 0.36, height=card_h - 0.90,
-              size=13, color_rgb=INK_RGB, font=branding.SANS_FONT)
+              size=13, color_rgb=palette.text_rgb, font=branding.SANS_FONT)
 
     # --- Secondary cards stacked vertically ---
     n = max(1, len(secondary_cards))
@@ -261,4 +261,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             height=sec_h,
             accent_rgb=accent_rgb,
             icon_path=card.get("icon"),
+            surface_rgb=palette.surface_rgb,
+            text_rgb=palette.text_rgb,
         )

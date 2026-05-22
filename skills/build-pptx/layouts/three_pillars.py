@@ -15,9 +15,6 @@ from ._common import (
     _add_rect,
     _add_text,
     _set_bg,
-    WHITE_RGB,
-    PAPER_RGB,
-    INK_RGB,
     TURQUOISE_RGB,
     DEEPPINK_RGB,
     AMBER_RGB,
@@ -59,7 +56,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, WHITE_RGB)
+    _set_bg(slide, palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -70,6 +67,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         title_present=title_present,
         title_wraps=title_wraps,
         use_side_by_side=False,
+        on_dark=palette.on_dark,
     )
 
     # Compute column geometry
@@ -91,6 +89,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             width=col_w,
             height=body_h,
             accent_rgb=color,
+            surface_rgb=palette.surface_rgb,
+            text_rgb=palette.text_rgb,
         )
 
         # Arrow connector between columns (except after last)
