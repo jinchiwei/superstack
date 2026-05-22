@@ -154,3 +154,102 @@ def test_table_with_takeaway_inner_table_themed_dark(tmp_path):
                         pass
     # No light PAPER alternating-row fill remains under a dark deck.
     assert "FAFAFC" not in cell_hexes
+
+
+def _table_cell_fill_hexes(pptx_path):
+    """Every table-cell solid-fill hex across all slides."""
+    prs = Presentation(str(pptx_path))
+    cell_hexes = []
+    for s in prs.slides:
+        for sh in s.shapes:
+            if not sh.has_table:
+                continue
+            for row in sh.table.rows:
+                for cell in row.cells:
+                    try:
+                        if int(cell.fill.type) == 1:
+                            cell_hexes.append(str(cell.fill.fore_color.rgb))
+                    except Exception:
+                        pass
+    return cell_hexes
+
+
+def test_table_striping_preserved_under_light(tmp_path):
+    """Under no theme (LIGHT/strict), table rows keep alternating FAFAFC/FFFFFF.
+
+    Regression for the block-helper theming break: the delegating renderer
+    used to pass palette.surface_rgb unconditionally, collapsing the two
+    distinct PAPER/WHITE row fills into one under LIGHT. Gating on
+    palette.on_dark restores the striping. This FAILS on pre-fix code
+    (only FAFAFC present) and PASSES after.
+    """
+    md = tmp_path / "deck.md"
+    md.write_text("---\ntitle: T\n---\n\n# A\n\nbody\n", encoding="utf-8")
+    params = {
+        "title": "Data",
+        "lede": "summary",
+        "rows": [
+            ["Model", "AUC", "N"],
+            ["A", "0.91", "120"],
+            ["B", "0.88", "98"],
+            ["C", "0.85", "77"],
+        ],
+        "callout": {"text": "key takeaway", "tone": "dark"},
+    }
+    plan = Plan(mode="strict", slides=[
+        SlideEntry(slide_id="h1-a", kind="table-with-takeaway", params=params),
+    ])
+    out = tmp_path / "out.pptx"
+    render_mod.render_from_plan(md_path=md, plan=plan, output_path=out, theme=None)
+    cell_hexes = _table_cell_fill_hexes(out)
+    # Striping preserved: both alternating data-row fills present.
+    assert "FAFAFC" in cell_hexes
+    assert "FFFFFF" in cell_hexes
+
+
+def _run_color_for_text(pptx_path, needle):
+    """Font color hex of the first run whose text contains ``needle``."""
+    prs = Presentation(str(pptx_path))
+    for s in prs.slides:
+        for sh in s.shapes:
+            if not sh.has_text_frame:
+                continue
+            for para in sh.text_frame.paragraphs:
+                for run in para.runs:
+                    if needle in (run.text or ""):
+                        try:
+                            return str(run.font.color.rgb)
+                        except Exception:
+                            return None
+    return None
+
+
+def test_stat_tile_sub_distinct_from_label_under_light(tmp_path):
+    """Under no theme (LIGHT/strict), stat-tile label (MUTED #555560) and
+    sub (DIM #888888) stay distinct colors.
+
+    Regression for the block-helper theming break: the delegating renderer
+    used to pass palette.muted_rgb unconditionally, collapsing both into
+    #555560 under LIGHT. Gating on palette.on_dark restores the distinct
+    DIM sub color. FAILS on pre-fix code (no 888888), PASSES after.
+    """
+    md = tmp_path / "deck.md"
+    md.write_text("---\ntitle: T\n---\n\n# A\n\nbody\n", encoding="utf-8")
+    params = {
+        "title": "Results",
+        "lede": "summary",
+        "stats": [
+            {"value": "0.91", "label": "Internal AUC", "sub": "5-seed mean"},
+            {"value": "0.88", "label": "External AUC", "sub": "held-out"},
+        ],
+        "callout": {"text": "key takeaway", "tone": "dark"},
+    }
+    plan = Plan(mode="strict", slides=[
+        SlideEntry(slide_id="h1-a", kind="stats-with-takeaway", params=params),
+    ])
+    out = tmp_path / "out.pptx"
+    render_mod.render_from_plan(md_path=md, plan=plan, output_path=out, theme=None)
+    # Sub text keeps its distinct DIM color (#888888); label stays MUTED
+    # (#555560). Pre-fix the sub collapsed to the label's #555560.
+    assert _run_color_for_text(out, "5-seed mean") == "888888"
+    assert _run_color_for_text(out, "Internal AUC") == "555560"

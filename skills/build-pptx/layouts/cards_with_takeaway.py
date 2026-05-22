@@ -86,6 +86,12 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     if homogeneous_icons:
         cards = [{**c, "icon": None} for c in cards]
 
+    # Theme block-helper colors only on dark palettes. Under a light/strict
+    # palette, pass None so the block helpers fall back to their exact
+    # original (possibly distinct) constants — preserving byte parity.
+    _surf = palette.surface_rgb if palette.on_dark else None
+    _text = palette.text_rgb if palette.on_dark else None
+
     # ── Cards row ────────────────────────────────────────────────────────────
     if cards:
         _card_row(
@@ -94,8 +100,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             width=body_w, height=cards_h,
             params={"cards": cards},
             accent_rgb=accent_rgb,
-            surface_rgb=palette.surface_rgb,
-            text_rgb=palette.text_rgb,
+            surface_rgb=_surf,
+            text_rgb=_text,
         )
 
     # ── Accent callout ───────────────────────────────────────────────────────

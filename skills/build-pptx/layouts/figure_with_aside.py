@@ -74,6 +74,13 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     fig_w = available_w * (2 / total_weight)
     aside_w = available_w * (1 / total_weight)
 
+    # Theme block-helper colors only on dark palettes. Under a light/strict
+    # palette, pass None so the block helpers fall back to their exact
+    # original (possibly distinct) constants — preserving byte parity.
+    _surf = palette.surface_rgb if palette.on_dark else None
+    _text = palette.text_rgb if palette.on_dark else None
+    _muted = palette.muted_rgb if palette.on_dark else None
+
     # ── Figure (left) ────────────────────────────────────────────────────────
     _figure(
         slide,
@@ -81,7 +88,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         width=fig_w, height=body_h,
         params={"image_path": image, "alt": alt},
         accent_rgb=accent_rgb,
-        muted_rgb=palette.muted_rgb,
+        muted_rgb=_muted,
     )
 
     # ── Left-accent card (right) ──────────────────────────────────────────────
@@ -92,6 +99,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         width=aside_w, height=body_h,
         params=aside,
         accent_rgb=accent_rgb,
-        surface_rgb=palette.surface_rgb,
-        text_rgb=palette.text_rgb,
+        surface_rgb=_surf,
+        text_rgb=_text,
     )

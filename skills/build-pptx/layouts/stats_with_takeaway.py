@@ -92,6 +92,14 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     if homogeneous_icons:
         stats = [{**s, "icon": None} for s in stats]
 
+    # Theme block-helper colors only on dark palettes. Under a light/strict
+    # palette, pass None so the block helpers fall back to their exact
+    # original (possibly distinct) constants — preserving byte parity
+    # (e.g. the distinct MUTED label / DIM sub colors in stat tiles).
+    _surf = palette.surface_rgb if palette.on_dark else None
+    _text = palette.text_rgb if palette.on_dark else None
+    _muted = palette.muted_rgb if palette.on_dark else None
+
     # ── Stat tiles grid ──────────────────────────────────────────────────────
     # n=1..4 → 1 row; n=5..8 → 2 rows so each tile stays readable.
     n = max(len(stats), 1)
@@ -128,9 +136,9 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             width=tile_w, height=tile_row_h,
             params=stat,
             accent_rgb=accent_rgb,
-            surface_rgb=palette.surface_rgb,
-            text_rgb=palette.text_rgb,
-            muted_rgb=palette.muted_rgb,
+            surface_rgb=_surf,
+            text_rgb=_text,
+            muted_rgb=_muted,
         )
 
     # ── Accent callout ───────────────────────────────────────────────────────
