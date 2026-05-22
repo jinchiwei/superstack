@@ -267,15 +267,26 @@ def _blank(prs):
 def _add_card(slide, *, label: str, body: str, left: float, top: float,
               width: float, height: float, accent_rgb: RGBColor,
               icon_path: Path | None = None,
-              dark_bg: bool = False) -> None:
+              dark_bg: bool = False,
+              surface_rgb: RGBColor | None = None,
+              text_rgb: RGBColor | None = None) -> None:
     """A bordered tile (paper bg + thin accent top stripe) with label + body.
 
     On dark_bg, fill flips to a dark navy (#1A2D50, slightly lighter than
     DARK_BG_RGB so the card reads as raised) and body text flips to white.
     The accent stripe + label color stay the brand accent for vivid contrast.
+
+    surface_rgb / text_rgb: optional palette overrides for the card fill and
+    the body/description text. When None (the default), the colors fall back
+    to today's behavior — PAPER_RGB / INK_RGB on a light canvas, or the
+    dark_bg flips (#1A2D50 / WHITE_RGB) when dark_bg is True — so existing
+    callers are byte-for-byte unchanged. The accent stripe + label stay on
+    accent_rgb regardless, since accent reads on any canvas.
     """
-    card_fill = _rgb("#1A2D50") if dark_bg else PAPER_RGB
-    body_text_color = WHITE_RGB if dark_bg else INK_RGB
+    card_fill = surface_rgb if surface_rgb is not None else (
+        _rgb("#1A2D50") if dark_bg else PAPER_RGB)
+    body_text_color = text_rgb if text_rgb is not None else (
+        WHITE_RGB if dark_bg else INK_RGB)
     _add_rect(slide, left=left, top=top, width=width, height=height,
               fill_rgb=card_fill)
     _add_rect(slide, left=left, top=top, width=width, height=0.06,
