@@ -7,6 +7,8 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Inches, Pt
 
+from palette import LIGHT
+
 from ._common import (
     _add_chrome,
     _add_text,
@@ -28,7 +30,7 @@ _BODY_SIZE   = 11          # body font size (pt)
 _AXIS_OFFSET_FRAC = 0.38   # axis sits at body_top + body_h * this fraction
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a horizontal-timeline content slide.
 
     params keys:

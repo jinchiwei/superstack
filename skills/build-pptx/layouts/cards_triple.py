@@ -35,6 +35,8 @@ import branding
 from pptx.dml.color import RGBColor
 from pptx.util import Inches, Pt
 
+from palette import LIGHT
+
 from ._common import (
     _add_card,
     _add_chrome,
@@ -59,7 +61,7 @@ _PAD_LEFT        = 0.18
 _PAD_BOT         = 0.20
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render N flat stacked cards (no hierarchy).
 
     params keys:

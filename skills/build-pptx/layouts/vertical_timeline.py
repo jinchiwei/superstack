@@ -36,6 +36,8 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Inches, Pt
 
+from palette import LIGHT
+
 from ._common import (
     _add_chrome,
     _add_rect,
@@ -63,7 +65,7 @@ _BODY_SIZE       = 12
 _PALETTE_CYCLE = [TURQUOISE_RGB, DEEPPINK_RGB, AMBER_RGB, BLUEVIOLET_RGB]
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a vertical-timeline content slide.
 
     params keys:

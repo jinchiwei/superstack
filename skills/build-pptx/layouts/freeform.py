@@ -5,6 +5,7 @@ mode a theme may supply a dark canvas + supplementary hues."""
 
 from __future__ import annotations
 
+from palette import LIGHT
 from layouts._common import (
     _add_chrome, _add_rect, _add_text, _rgb, DEEPPINK_RGB,
 )
@@ -12,7 +13,7 @@ from layouts._sandbox import run as run_sandboxed, SandboxError
 import branding
 
 
-def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb, footer_kwargs: dict, palette=LIGHT) -> None:
     """params:
         title:         str
         lede:          str

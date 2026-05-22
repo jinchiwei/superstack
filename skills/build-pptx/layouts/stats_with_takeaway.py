@@ -33,6 +33,8 @@ from __future__ import annotations
 import branding
 from pptx.dml.color import RGBColor
 
+from palette import LIGHT
+
 from ._common import (
     _add_chrome,
     _set_bg,
@@ -42,7 +44,7 @@ from .blocks.stat_tile import render as _stat_tile
 from .blocks.accent_callout import render as _accent_callout
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a stats-with-takeaway slide.
 
     params keys:

@@ -6,6 +6,8 @@ import branding
 from pptx.dml.color import RGBColor
 from pptx.util import Inches, Pt
 
+from palette import LIGHT
+
 from ._common import (
     _add_rect,
     _add_text,
@@ -28,7 +30,7 @@ _LEDE_RGB = _rgb("#C8C8D2")
 _FOOTER_RGB = _rgb("#888888")
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a dark-background (bg-flip) content slide.
 
     params keys — same shape as content-text:

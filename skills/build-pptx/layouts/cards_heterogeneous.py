@@ -13,6 +13,8 @@ import branding
 from pptx.dml.color import RGBColor
 from pptx.util import Inches, Pt
 
+from palette import LIGHT
+
 from ._common import (
     _add_card,
     _add_chrome,
@@ -136,7 +138,7 @@ def _render_stacked_rows(
         cur_top += c_h + gutter
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a heterogeneous-cards slide.
 
     params keys:

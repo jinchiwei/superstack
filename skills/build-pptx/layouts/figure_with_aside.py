@@ -23,6 +23,8 @@ from __future__ import annotations
 import branding
 from pptx.dml.color import RGBColor
 
+from palette import LIGHT
+
 from ._common import (
     _add_chrome,
     _set_bg,
@@ -32,7 +34,7 @@ from .blocks.figure import render as _figure
 from .blocks.left_accent_card import render as _left_accent_card
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a figure-with-aside slide.
 
     params keys:

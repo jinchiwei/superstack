@@ -44,6 +44,8 @@ from pathlib import Path
 
 from pptx.dml.color import RGBColor
 
+from palette import LIGHT
+
 from ._common import (
     _add_chrome,
     _set_bg,
@@ -56,7 +58,7 @@ from .blocks import BLOCKS
 
 
 def render(slide, *, params: dict, accent_rgb: RGBColor,
-           footer_kwargs: dict) -> None:
+           footer_kwargs: dict, palette=LIGHT) -> None:
     title = params.get("title", "")
     lede = params.get("lede", "")
     dark_bg = bool(params.get("dark_bg", False))

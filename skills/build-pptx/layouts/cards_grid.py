@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pptx.dml.color import RGBColor
 
+from palette import LIGHT
+
 from ._common import (
     _add_card,
     _add_chrome,
@@ -13,7 +15,7 @@ from ._common import (
 )
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a cards-grid content slide.
 
     params keys:

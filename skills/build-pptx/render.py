@@ -213,6 +213,9 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
         add_title_slide, add_section_divider, add_end_slide, new_presentation,
     )
 
+    from palette import palette_for_theme
+    palette = palette_for_theme(theme)
+
     loaded = load_markdown(str(md_path))
     meta = loaded["meta"]
     today = dt.date.today().isoformat()
@@ -296,7 +299,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
         s = prs.slides.add_slide(prs.slide_layouts[6])
         renderer = catalog.get(entry.kind)
         renderer(s, params=params, accent_rgb=_rgb(accent_hex),
-                 footer_kwargs=footer_kwargs)
+                 footer_kwargs=footer_kwargs, palette=palette)
 
     # End slide
     if not no_end:

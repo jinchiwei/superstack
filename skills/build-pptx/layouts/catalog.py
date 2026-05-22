@@ -33,7 +33,7 @@ REGISTRY = {
 }
 
 
-def _section_divider_render(slide, *, params, accent_rgb, footer_kwargs):
+def _section_divider_render(slide, *, params, accent_rgb, footer_kwargs, palette=None):
     """Wrapper that renders the section-divider chrome onto a pre-created slide.
 
     The caller (render.py) adds a blank slide first; we draw on it here.

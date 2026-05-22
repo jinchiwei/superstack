@@ -7,6 +7,8 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Inches, Pt
 
+from palette import LIGHT
+
 from ._common import (
     _add_card,
     _add_chrome,
@@ -36,7 +38,7 @@ def _pillar_color(color_role: str | None, accent_rgb: RGBColor) -> RGBColor:
     return _ROLE_FALLBACK.get(color_role, accent_rgb)
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a three-pillars content slide.
 
     params keys:

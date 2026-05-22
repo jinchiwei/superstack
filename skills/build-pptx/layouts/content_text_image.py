@@ -11,6 +11,8 @@ from pathlib import Path
 
 from pptx.dml.color import RGBColor
 
+from palette import LIGHT
+
 from ._common import (
     _add_chrome,
     _estimate_paragraph_height,
@@ -39,7 +41,7 @@ def _normalize_tables(tables: list) -> list:
     return tables
 
 
-def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict) -> None:
+def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, palette=LIGHT) -> None:
     """Render a text+image content slide.
 
     params keys:
