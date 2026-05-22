@@ -456,7 +456,7 @@ When picking a named layout for a slide, prefer in this order:
 
 2. **Content semantics** drive the choice when structure is ambiguous:
    - Title (case-insensitive substring) matches "takeaways", "conclusions", "conclusion", "summary", "next steps", "key findings", "closing", "final thoughts" → `conclusions`
-   - Title contains "Key", "Takeaway", "Critical", "Bottom line" (and does NOT match the `conclusions` auto-fire above) → `bg-flip`
+   - Title contains "Key", "Takeaway", "Critical", "Bottom line" (and does NOT match the `conclusions` auto-fire above) → `bg-flip` **(strict mode only)**. In **expressive mode do NOT select `bg-flip`** — it paints a fixed navy canvas that ignores the deck theme. Use `conclusions` for closing emphasis, or `content-text` for a themed statement slide, instead.
    - Title or body has 3 explicit comparisons (e.g., "Trial · Real-world · Practice") → `three-pillars`
    - Body has chart + ≥2 numeric headlines → `stat-callouts-right`
    - Body has 2-5 standalone metric numbers + one summary sentence → `stats-with-takeaway`

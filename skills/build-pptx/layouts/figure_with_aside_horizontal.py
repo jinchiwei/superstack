@@ -178,6 +178,6 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         width=body_w, height=aside_h,
         params=aside,
         accent_rgb=accent_rgb,
-        surface_rgb=palette.surface_rgb,
-        text_rgb=palette.text_rgb,
+        surface_rgb=palette.surface_rgb if palette.on_dark else None,
+        text_rgb=palette.text_rgb if palette.on_dark else None,
     )

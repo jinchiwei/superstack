@@ -78,12 +78,16 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
         except Exception as e:
             _add_text(slide, f"[image: {image_path.name}: {e}]",
                       left=img_l, top=img_t, width=img_w, height=0.5,
-                      size=10, color_rgb=DIM_RGB, font=branding.MONO_FONT)
+                      size=10,
+                      color_rgb=(palette.muted_rgb if palette.on_dark else DIM_RGB),
+                      font=branding.MONO_FONT)
     else:
         # Placeholder box when image not available
         _add_text(slide, "[chart placeholder]",
                   left=img_l, top=img_t, width=img_w, height=body_h,
-                  size=11, color_rgb=DIM_RGB, font=branding.MONO_FONT)
+                  size=11,
+                  color_rgb=(palette.muted_rgb if palette.on_dark else DIM_RGB),
+                  font=branding.MONO_FONT)
 
     # ── Stats on right ─────────────────────────────────────────────────────────
     if not stats:
