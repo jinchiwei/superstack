@@ -51,6 +51,24 @@ DARK_BG_RGB    = _rgb(branding.DARK_BG)
 PAPER_RGB      = _rgb(branding.PAPER)
 
 
+def _text_on(fill_rgb: RGBColor) -> RGBColor:
+    """Pick INK_RGB or WHITE_RGB — whichever has higher WCAG contrast on the
+    given fill color. Keeps text legible on bright accent fills (turquoise,
+    amber, deeppink -> dark text) and dark fills (blueviolet, navy -> white)."""
+    h = str(fill_rgb)
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+    def _lin(c: float) -> float:
+        c = c / 255.0
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    lum = 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+    ink_lum = 0.0072  # luminance of INK (#14141C)
+    contrast_white = (1.0 + 0.05) / (lum + 0.05)
+    contrast_ink = (lum + 0.05) / (ink_lum + 0.05)
+    return INK_RGB if contrast_ink >= contrast_white else WHITE_RGB
+
+
 # === Parse constants ===
 _DEFLIST_LABEL_MAX_LEN = 80   # bold prefix qualifies as definition label
 _DEFLIST_BODY_MAX_LEN  = 350  # too-long body suggests prose, not a card
@@ -498,7 +516,7 @@ def _add_table(slide, *, rows: list[list[str]], left: float, top: float,
             cell.fill.solid()
             if i == 0:
                 cell.fill.fore_color.rgb = header_rgb
-                color = WHITE_RGB
+                color = _text_on(header_rgb)
                 font_name = branding.MONO_FONT
                 bold = True
                 size = 12
