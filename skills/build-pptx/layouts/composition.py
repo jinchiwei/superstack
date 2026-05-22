@@ -39,8 +39,7 @@ Per-row accent override:
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import inspect
 
 from pptx.dml.color import RGBColor
 
@@ -50,11 +49,30 @@ from ._common import (
     _add_chrome,
     _set_bg,
     _rgb,
-    WHITE_RGB,
     DARK_BG_RGB,
 )
 
 from .blocks import BLOCKS
+
+
+_PALETTE_KW = ("surface_rgb", "text_rgb", "muted_rgb")
+
+
+def _accepted_palette_kwargs(renderer) -> set:
+    """Which palette override kwargs (surface_rgb/text_rgb/muted_rgb) the
+    given block renderer accepts. Cached on the function object."""
+    cached = getattr(renderer, "_pptx_palette_kw", None)
+    if cached is None:
+        try:
+            params = inspect.signature(renderer).parameters
+        except (TypeError, ValueError):
+            params = {}
+        cached = {k for k in _PALETTE_KW if k in params}
+        try:
+            renderer._pptx_palette_kw = cached
+        except (AttributeError, TypeError):
+            pass
+    return cached
 
 
 def render(slide, *, params: dict, accent_rgb: RGBColor,
@@ -66,7 +84,10 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    _set_bg(slide, DARK_BG_RGB if dark_bg else WHITE_RGB)
+    # Legacy params-driven dark_bg forces DARK_BG_RGB; otherwise the canvas
+    # follows the deck palette (palette.canvas_rgb == WHITE_RGB under LIGHT,
+    # so strict renders are byte-identical).
+    _set_bg(slide, DARK_BG_RGB if dark_bg else palette.canvas_rgb)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
@@ -78,6 +99,7 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
         title_wraps=title_wraps,
         use_side_by_side=False,
         dark_bg=dark_bg,
+        on_dark=palette.on_dark,
     )
 
     rows = params.get("rows", [])
@@ -85,12 +107,12 @@ def render(slide, *, params: dict, accent_rgb: RGBColor,
         return
 
     _layout_rows(slide, rows, body_top, body_l, body_w, body_h, accent_rgb,
-                 dark_bg=dark_bg)
+                 dark_bg=dark_bg, palette=palette)
 
 
 def _layout_rows(slide, rows: list, body_top: float, body_l: float,
                  body_w: float, body_h: float, accent_rgb: RGBColor,
-                 dark_bg: bool = False) -> None:
+                 dark_bg: bool = False, palette=LIGHT) -> None:
     """Allocate vertical space, then dispatch each row's blocks."""
     n_rows = len(rows)
     gutter = 0.20
@@ -125,7 +147,7 @@ def _layout_rows(slide, rows: list, body_top: float, body_l: float,
                                left=body_l, top=y,
                                width=body_w, height=h,
                                accent_rgb=row_accent,
-                               dark_bg=dark_bg)
+                               dark_bg=dark_bg, palette=palette)
 
         y += h + gutter
 
@@ -133,13 +155,24 @@ def _layout_rows(slide, rows: list, body_top: float, body_l: float,
 def _layout_row_blocks(slide, blocks: list, *, left: float, top: float,
                        width: float, height: float,
                        accent_rgb: RGBColor,
-                       dark_bg: bool = False) -> None:
+                       dark_bg: bool = False, palette=LIGHT) -> None:
     """Allocate horizontal space for blocks in a row, then render each."""
     n_blocks = len(blocks)
     gutter = 0.20
 
     total_weight = sum(b.get("weight", 1) for b in blocks) or 1
     available_w = max(0.1, width - gutter * max(0, n_blocks - 1))
+
+    # Theme block-helper colors only on dark palettes. Under a light/strict
+    # palette pass None so each block falls back to its exact original
+    # (possibly distinct/alternating) constants — preserving byte parity.
+    _palette_kwargs = {}
+    if palette.on_dark:
+        _palette_kwargs = {
+            "surface_rgb": palette.surface_rgb,
+            "text_rgb": palette.text_rgb,
+            "muted_rgb": palette.muted_rgb,
+        }
 
     x = left
     for block in blocks:
@@ -155,11 +188,17 @@ def _layout_row_blocks(slide, blocks: list, *, left: float, top: float,
                 bparams_eff = dict(bparams) if dark_bg else bparams
                 if dark_bg and "dark_bg" not in bparams_eff:
                     bparams_eff["dark_bg"] = True
+                # Forward only the palette overrides this block accepts; gated
+                # on on_dark above so light/strict passes nothing (None).
+                accepted = _accepted_palette_kwargs(renderer)
+                extra = {k: v for k, v in _palette_kwargs.items()
+                         if k in accepted}
                 renderer(slide,
                          left=x, top=top,
                          width=bw, height=height,
                          params=bparams_eff,
-                         accent_rgb=accent_rgb)
+                         accent_rgb=accent_rgb,
+                         **extra)
             except Exception as exc:
                 # Graceful degradation: render an error placeholder
                 from ._common import _add_text, DIM_RGB

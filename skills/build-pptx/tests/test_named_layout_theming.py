@@ -253,3 +253,28 @@ def test_stat_tile_sub_distinct_from_label_under_light(tmp_path):
     # (#555560). Pre-fix the sub collapsed to the label's #555560.
     assert _run_color_for_text(out, "5-seed mean") == "888888"
     assert _run_color_for_text(out, "Internal AUC") == "555560"
+
+
+def test_composition_paints_dark_canvas(tmp_path):
+    md = tmp_path / "deck.md"
+    md.write_text("---\ntitle: T\n---\n\n# A\n\nbody\n", encoding="utf-8")
+    params = {
+        "title": "Composed",
+        "lede": "summary",
+        "rows": [
+            {
+                "weight": 1,
+                "blocks": [
+                    {"kind": "paragraph", "weight": 1,
+                     "params": {"items": ["first line", "second line"]}},
+                ],
+            },
+        ],
+    }
+    plan = Plan(mode="expressive", theme="midnight", slides=[
+        SlideEntry(slide_id="h1-a", kind="composition", params=params),
+    ])
+    out = tmp_path / "out.pptx"
+    render_mod.render_from_plan(md_path=md, plan=plan, output_path=out,
+                                theme=get_theme("midnight"))
+    assert "14141C" in _full_bleed_fill_hexes(out)

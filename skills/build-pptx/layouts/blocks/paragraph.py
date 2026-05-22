@@ -13,7 +13,8 @@ from ._base import _render_paragraph_block
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           text_rgb: RGBColor | None = None) -> None:
     items_raw = params.get("items", [])
     size = params.get("size", 14)
     bullets = params.get("bullets", False)
@@ -33,6 +34,8 @@ def render(slide, *, left: float, top: float, width: float, height: float,
     if not items:
         return
 
+    # text_rgb defaults to None → _render_paragraph_block falls back to its
+    # original INK_RGB, so light/strict renders are byte-identical.
     _render_paragraph_block(
         slide,
         items=items,
@@ -40,4 +43,5 @@ def render(slide, *, left: float, top: float, width: float, height: float,
         accent_rgb=accent_rgb,
         size=size,
         distribute=True,
+        text_color=text_rgb,
     )

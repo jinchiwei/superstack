@@ -17,9 +17,16 @@ from ._base import (
 
 
 def render(slide, *, left: float, top: float, width: float, height: float,
-           params: dict, accent_rgb: RGBColor) -> None:
+           params: dict, accent_rgb: RGBColor,
+           text_rgb: RGBColor | None = None,
+           muted_rgb: RGBColor | None = None) -> None:
     text = str(params.get("text", ""))
     attribution = str(params.get("attribution", ""))
+
+    # Palette overrides fall back to today's INK / MUTED constants when None,
+    # keeping light/strict renders byte-identical.
+    quote_color = text_rgb if text_rgb is not None else INK_RGB
+    attr_color = muted_rgb if muted_rgb is not None else MUTED_RGB
 
     attr_h = 0.28 if attribution else 0.0
     attr_gap = 0.10 if attribution else 0.0
@@ -37,7 +44,7 @@ def render(slide, *, left: float, top: float, width: float, height: float,
             f"“{text}”",
             left=quote_left, top=top,
             width=width - 0.20, height=quote_h,
-            size=16, color_rgb=INK_RGB,
+            size=16, color_rgb=quote_color,
             font=branding.SANS_FONT, italic=True,
         )
 
@@ -47,6 +54,6 @@ def render(slide, *, left: float, top: float, width: float, height: float,
             f"— {attribution}",
             left=quote_left, top=top + quote_h + attr_gap,
             width=width - 0.22, height=attr_h,
-            size=12, color_rgb=MUTED_RGB,
+            size=12, color_rgb=attr_color,
             font=branding.MONO_FONT, align=PP_ALIGN.RIGHT,
         )
