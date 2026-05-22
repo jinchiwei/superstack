@@ -49,7 +49,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_wraps = len(title) > 30 if title_present else False
 
     # ── Background ──────────────────────────────────────────────────────────────
-    _set_bg(slide, DARK_BG_RGB)
+    # Theme canvas on dark themes (matches the deck), else navy.
+    _set_bg(slide, palette.canvas_rgb if palette.on_dark else DARK_BG_RGB)
 
     # ── Left accent bar ─────────────────────────────────────────────────────────
     _add_rect(slide, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent_rgb)

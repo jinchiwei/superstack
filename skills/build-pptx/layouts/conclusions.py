@@ -112,8 +112,8 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     title_present = bool(title)
     title_wraps = len(title) > 30 if title_present else False
 
-    # Dark navy background
-    _set_bg(slide, DARK_BG_RGB)
+    # Dark background: theme canvas on dark themes (matches the deck), else navy.
+    _set_bg(slide, palette.canvas_rgb if palette.on_dark else DARK_BG_RGB)
 
     body_top, body_h, body_l, body_w, body_bottom = _add_chrome(
         slide,
