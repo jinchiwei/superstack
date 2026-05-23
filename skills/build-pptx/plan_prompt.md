@@ -237,6 +237,7 @@ Drawing primitives:
 - `_add_table(slide, *, rows, left, top, width, max_height, header_rgb)` — accent-headered table
 - `_render_paragraph_block(slide, *, items, left, top, width, height, accent_rgb, size=14, distribute=False)` — bullet/paragraph block
 - `_add_flat_shape(slide, shape_type, *, left, top, width, height, fill_rgb)` — autoshape (arrow, oval, triangle, etc.) with **flat brand-color** fill, no gradient, no outline, no shadow. Use this for any non-rectangle shape — never call `slide.shapes.add_shape` directly, or you'll inherit the Office theme's blue gradient + drop shadow.
+- `_fit_image(slide, path, *, left, top, max_w, max_h)` — drop a figure into a box, scaled to fit preserving aspect and centered. Reads the image's native aspect automatically (no need to know its pixel size), so it never overflows or distorts. **Use this for every figure on a freeform slide** — e.g. figure in a left region + an accent-bar aside on the right.
 - `_rgb(hex_str)` — convert "#xxxxxx" to RGBColor
 
 Geometry helpers:

@@ -69,6 +69,29 @@ def _text_on(fill_rgb: RGBColor) -> RGBColor:
     return INK_RGB if contrast_ink >= contrast_white else WHITE_RGB
 
 
+def _fit_image(slide, path, *, left, top, max_w, max_h):
+    """Add an image scaled to fit the (left, top, max_w, max_h) box (inches),
+    preserving aspect ratio and centered within the box. Reads the image's
+    native aspect from the placed shape, so callers never need to know its
+    pixel dimensions — the robust way to drop a figure into a freeform slide
+    without overflow/clipping. Returns the picture shape."""
+    pic = slide.shapes.add_picture(str(path), Inches(left), Inches(top))
+    try:
+        aspect = pic.width / pic.height
+    except (ZeroDivisionError, TypeError):
+        aspect = 1.0
+    box_aspect = max_w / max_h
+    if box_aspect > aspect:          # box wider than image -> bound by height
+        h = max_h; w = h * aspect
+    else:                            # bound by width
+        w = max_w; h = w / aspect
+    pic.width = Inches(w)
+    pic.height = Inches(h)
+    pic.left = Inches(left + (max_w - w) / 2.0)
+    pic.top = Inches(top + (max_h - h) / 2.0)
+    return pic
+
+
 # === Parse constants ===
 _DEFLIST_LABEL_MAX_LEN = 80   # bold prefix qualifies as definition label
 _DEFLIST_BODY_MAX_LEN  = 350  # too-long body suggests prose, not a card
