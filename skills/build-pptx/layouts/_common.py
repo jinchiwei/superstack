@@ -52,10 +52,20 @@ PAPER_RGB      = _rgb(branding.PAPER)
 
 
 def _text_on(fill_rgb: RGBColor) -> RGBColor:
-    """Pick INK_RGB or WHITE_RGB — whichever has higher WCAG contrast on the
-    given fill color. Keeps text legible on bright accent fills (turquoise,
-    amber, deeppink -> dark text) and dark fills (blueviolet, navy -> white)."""
-    h = str(fill_rgb)
+    """Pick INK_RGB or WHITE_RGB for text on the given fill color.
+
+    Brand accents use explicit, hand-tuned choices (deeppink/blueviolet read
+    better with light text; turquoise/amber with dark text) — these override
+    the generic WCAG pick because deeppink sits right on the luminance knife's
+    edge. Any non-brand fill (e.g. a theme's supplementary hue) falls back to
+    whichever of INK/WHITE has the higher WCAG contrast."""
+    h = str(fill_rgb).upper()
+    # Explicit brand-accent overrides
+    if h in (str(TURQUOISE_RGB).upper(), str(AMBER_RGB).upper()):
+        return INK_RGB
+    if h in (str(DEEPPINK_RGB).upper(), str(BLUEVIOLET_RGB).upper()):
+        return WHITE_RGB
+
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
     def _lin(c: float) -> float:
