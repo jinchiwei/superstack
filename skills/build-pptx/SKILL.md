@@ -202,14 +202,29 @@ Run these in order whenever you need to (re)generate the sidecar:
    - Derive a stable `slide_id` via `plan.derive_slide_ids_from_chunks`
    - Compute `content_hash = plan.hash_text(chunk_html)`
    - Note H1 (carries forward) and H2 (per-slide)
-4. **Decide a layout `kind` per slide.** Most slides should be one of
-   the 13 named kinds (`content-text`, `cards-grid`, `content-text-image`,
-   `content-image-only`, `cards-heterogeneous`, `three-pillars`,
-   `stat-callouts-right`, `bg-flip`, `timeline`, `stats-with-takeaway`,
-   `figure-with-aside`, `cards-with-takeaway`, `table-with-takeaway`).
-   Reach for `composition` only when 2+ structurally distinct chunks can't
-   fit one named layout. Reach for `freeform` ONLY when no named layout
-   AND no composition fits — see the decision rubric in `plan_prompt.md`.
+4. **Decide a layout `kind` per slide — this depends on the mode.**
+
+   **Expressive mode (the default).** You DESIGN each slide. Default to
+   `freeform` and compose the slide yourself (Anthropic-pptx aesthetic),
+   guided by the design principles and the deck's theme in `plan_prompt.md`'s
+   construction-modes section. There is **no named-layout-first rubric** and
+   no "freeform as last resort" rule in expressive — that is strict-mode
+   guidance and does NOT apply here. The 13 named kinds are optional tools you
+   may reach for when a slide's content maps cleanly onto one (a real data
+   table → `table-with-takeaway`; a lone figure → freeform with `_fit_image`);
+   otherwise compose freely. The ONLY hard constraints are the brand lock:
+   fonts (Geist / Geist Mono) and the color palette (brand-4 accents + the
+   theme's supplementary hues). **If a deck comes out looking like plain named
+   layouts in expressive mode, you skipped the design step — that is the bug.**
+
+   **Strict mode (`--mode=strict`).** Use the named-layout-first priority
+   below: most slides should be one of the 13 named kinds (`content-text`,
+   `cards-grid`, `content-text-image`, `content-image-only`,
+   `cards-heterogeneous`, `three-pillars`, `stat-callouts-right`, `bg-flip`,
+   `timeline`, `stats-with-takeaway`, `figure-with-aside`,
+   `cards-with-takeaway`, `table-with-takeaway`). Reach for `composition` only
+   when 2+ structurally distinct chunks can't fit one named layout, and
+   `freeform` ONLY when no named layout AND no composition fits.
 5. **For `freeform` slides, write the python snippet.** Use ONLY the
    sandbox API documented in `plan_prompt.md`. Important constraints:
    - No `import`, no dunder access, no `try`/`with`, no
@@ -245,18 +260,22 @@ Run these in order whenever you need to (re)generate the sidecar:
    `python build.py --input <input.md> --output <output.pptx>`
    The renderer reads the sidecar you just wrote and renders.
 
-### Layout selection priority
+### Layout selection priority (STRICT MODE ONLY)
+
+> This priority and the "When to use `freeform`" guidance below apply to
+> **strict mode**. In **expressive** (the default) you design freeform-first —
+> see step 4 above and `plan_prompt.md`'s construction-modes section.
 
 Apply in this order:
 1. **Named layouts first** (all 13 of them — see catalog above). Deterministic, brand-locked, consistent.
 2. **`composition` as fallback** — only when the slide has 2+ structurally distinct content chunks that no single named layout captures.
 3. **`freeform` as last resort** — only for genuinely bespoke geometry (custom arrows, unusual stat arrangements) that no named layout and no reasonable composition can express.
 
-A deck that reaches for `composition` or `freeform` on most slides is drifting from brand. Stick to named layouts.
+A strict deck that reaches for `composition` or `freeform` on most slides is drifting from brand. Stick to named layouts.
 
-### When to use `freeform` vs named layouts
+### When to use `freeform` vs named layouts (strict mode)
 
-Default to named layouts. Reach for `freeform` only for slides where:
+In strict mode, default to named layouts. Reach for `freeform` only for slides where:
 - A chart pairs with stat callouts in a way `stat-callouts-right` doesn't
   capture (custom positions, non-uniform tiles, annotation arrows)
 - 3 things compare side-by-side with arrows or connectors
