@@ -22,6 +22,20 @@ Composition, hierarchy, zones, big numbers, diagrams, arrows, figure placement, 
 
 When a slide centers on a figure, **the figure IS the slide** — it must be readable and command major presence, roughly **half the canvas or more**. A reader should be able to read its axes and trend from across a room. **Never shrink a figure to a thumbnail to make room for stats or text.** If you have stats/text to show alongside, make the figure large and keep the supporting text compact — a slim stat strip, a short caption, a verdict tile — fit around the figure, not the other way around. A figure crammed into a corner while stat chips eat the top half is a failure: invert it (figure dominant, stats secondary). Use `_fit_image` with generous `max_w`/`max_h` so the figure fills its zone.
 
+## Visual polish — catch these yourself
+
+These are baseline craft, not extras. Get them right while designing:
+
+- **Even spacing / breathing room.** Distribute stacked elements evenly across their zone — don't bunch everything at the top and squish the rest at the bottom. Vertically center a lone block; evenly space a stack. Leave padding inside filled zones and cards (text must not touch edges).
+- **No squished or clipped text.** Size boxes generously; if text is long, reduce font before letting it clip or collide. A giant number must fit its box (widen the box / drop the size — never let it truncate).
+- **Figures dominate** (see above) and are readable.
+- **Contrast holds** (amber → ink text; light text only on dark/strong fills).
+- **Section colors match** divider ↔ its content.
+
+## Self-QA is MANDATORY — do not deliver a deck you haven't looked at
+
+After rendering, you MUST rasterize every slide to PNG (`--qa`, or `soffice --convert-to pdf` then `pdftoppm`) and **visually inspect each one**. Fix, before handing it over: thumbnail/cramped figures, squished or unevenly-spaced text, text touching or overflowing its box, clipped numbers, low-contrast text, mismatched section accents, empty bands. Iterate render → look → fix until each slide is clean. Catching these is your responsibility — the user should not have to point at slide N and tell you a figure is tiny or text is squished. If you skipped the visual pass, you are not done.
+
 ## Mechanics
 
 Sandbox API + primitives are in `plan_prompt.md` (freeform section) and `_sandbox.py`. To author: run `build.py --plan-only --shake` for correct `slide_id`/`content_hash`, then rewrite each content slide entry to `{"kind": "freeform", "params": {"title", "lede": "", "section_label": "", "code": "<your handcrafted design>"}}`, keep section-dividers, render WITHOUT `--shake`. Use `--qa` to emit per-slide PNGs and iterate visually. Precompute geometry in Python; emit flat primitive calls; `ast.parse` each snippet. Re-apply institutional logos to the cover after rendering.
