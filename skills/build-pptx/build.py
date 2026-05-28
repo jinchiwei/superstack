@@ -84,7 +84,7 @@ def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
                     name: str = "", org: str = "", date: str = "", bg_rgb=None):
     """Title slide: dark bg (theme canvas if bg_rgb given, else navy), left
     double-rail (turquoise + deeppink).
-    Eyebrow turquoise, title white, name turquoise, org deeppink, amber rule + amber date, all Geist Mono."""
+    Eyebrow turquoise, title white, name turquoise, org deeppink, gray rule + amber date, all Geist Mono."""
     s = _blank(prs)
     _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
 
@@ -118,8 +118,8 @@ def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
                   size=16, color_rgb=DEEPPINK_RGB, font=branding.MONO_FONT, bold=True)
         cursor_top += 0.45
 
-    # Amber hairline rule above the date (brand accent on the cover)
-    _add_rect(s, left=1.3, top=cursor_top + 0.1, width=4.0, height=0.02, fill_rgb=AMBER_RGB)
+    # Gray hairline rule above the date
+    _add_rect(s, left=1.3, top=cursor_top + 0.1, width=4.0, height=0.02, fill_rgb=RULE_RGB)
     if date:
         _add_text(s, date, left=1.3, top=cursor_top + 0.25, width=11, height=0.3,
                   size=12, color_rgb=AMBER_RGB, font=branding.MONO_FONT)
