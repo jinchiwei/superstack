@@ -679,6 +679,8 @@ After the final summary is written, invoke any project-local doc builders to pro
 
 A regression test in `tests/test_build_pptx.py` verifies the synthesizer emits H1 dividers + dense content slides — do not break it.
 
+**Author the expressive freeform plan yourself — don't stop at the shell-out.** build-pptx now runs an expressive-freeform composer by default, so the non-interactive shell-out already produces a deterministic floor of designed freeform slides (never bare named layouts). But that floor is generic. When you (the autoresearch agent) are in the loop, do better: after the shell-out writes the `.layout.json` sidecar, treat the composer's freeform `code` as a *starting scaffold* and author a bespoke expressive plan per slide — read build-pptx's `plan_prompt.md` expressive section for the freeform sandbox API + aesthetic, then design each content slide's geometry (figure placement, card grids, stat callouts, accent dividers) to fit that slide's actual content, and write the refined entries back into the sidecar before the final render. This yields a genuinely hand-designed session deck rather than the deterministic default.
+
 ```bash
 SESSION_DATE=$("$SKILL_DIR/bin/state-read" --slug "$slug" --path .session_started_at | cut -dT -f1)
 [[ -z "$SESSION_DATE" || "$SESSION_DATE" == "null" ]] && SESSION_DATE=$(date -u +%Y-%m-%d)

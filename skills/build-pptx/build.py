@@ -1324,6 +1324,34 @@ def main() -> int:
     effective_mode = args.mode or prior_mode or "expressive"
     final_plan.mode = effective_mode
 
+    # Expressive-freeform composer (Option B): the no-agent floor.
+    # In expressive mode, rewrite freshly-INFERRED content slides into designed
+    # freeform layouts so that even raw `python build.py` (no agent in the loop)
+    # emits Anthropic-aesthetic freeform slides rather than named layouts.
+    #
+    # Gate (preserve agent-authored sidecars): only rewrite slides whose
+    # content_hash is NOT present in the existing sidecar — i.e. slides that
+    # came fresh from _infer_default_plan this run, never entries that
+    # merge_with_existing carried over from an agent-authored existing plan.
+    # When there is no existing sidecar, every content slide is eligible.
+    # Strict mode skips the composer entirely (named layouts, unchanged).
+    if effective_mode == "expressive":
+        from expressive_compose import compose_expressive_plan
+        if existing_plan is not None:
+            existing_hashes = {
+                s.content_hash for s in existing_plan.slides if s.content_hash
+            }
+            only_ids = {
+                s.slide_id
+                for s in final_plan.slides
+                if s.content_hash not in existing_hashes
+            }
+        else:
+            only_ids = None  # no sidecar → all content slides eligible
+        compose_expressive_plan(
+            final_plan.slides, md_dir=md_path.parent, only_ids=only_ids
+        )
+
     # Resolve theme (expressive only). Freeze the chosen theme name + seed in
     # the plan so re-renders are deterministic, and --shake rerolls.
     theme = None
