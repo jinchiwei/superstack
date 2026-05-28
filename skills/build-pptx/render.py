@@ -253,6 +253,21 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
     # Expressive themes may reorder which brand-4 accent leads.
     if theme is not None and theme.accent_order:
         current_accent = theme.accent_order[0]
+
+    # Section accent cycles the brand-4 by section ORDER (turquoise →
+    # deeppink → amber → blueviolet) instead of by keyword — so consecutive
+    # sections are visually distinct instead of nearly all turquoise. Each
+    # distinct section label maps to its first-seen index; a divider and the
+    # content slides beneath it share that index → one color per section.
+    _section_seen: list[str] = []
+
+    def _section_accent(label: str) -> str:
+        if not label:
+            return current_accent
+        if label not in _section_seen:
+            _section_seen.append(label)
+        return branding.pick_section_color(_section_seen.index(label))
+
     footer_kwargs = {
         "name": deck_name, "org": deck_org,
         "deck_title": deck_title, "date": deck_date,
@@ -278,7 +293,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
 
         if entry.kind == "section-divider":
             label = params.get("label", "")
-            current_accent = _accent_for_section(label)
+            current_accent = _section_accent(label)
             add_section_divider(
                 prs, label=label,
                 accent_color_hex=current_accent,
@@ -289,7 +304,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
 
         # Update accent if the entry indicates a new section
         if "section_label" in params:
-            current_accent = _accent_for_section(params["section_label"])
+            current_accent = _section_accent(params["section_label"])
 
         accent_override = params.get("accent_override")
         if accent_override:

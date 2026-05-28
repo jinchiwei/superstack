@@ -204,18 +204,25 @@ Run these in order whenever you need to (re)generate the sidecar:
    - Note H1 (carries forward) and H2 (per-slide)
 4. **Decide a layout `kind` per slide — this depends on the mode.**
 
-   **Expressive mode (the default).** You DESIGN each slide. Default to
-   `freeform` and compose the slide yourself (Anthropic-pptx aesthetic),
-   guided by the design principles and the deck's theme in `plan_prompt.md`'s
-   construction-modes section. There is **no named-layout-first rubric** and
-   no "freeform as last resort" rule in expressive — that is strict-mode
-   guidance and does NOT apply here. The 13 named kinds are optional tools you
-   may reach for when a slide's content maps cleanly onto one (a real data
-   table → `table-with-takeaway`; a lone figure → freeform with `_fit_image`);
-   otherwise compose freely. The ONLY hard constraints are the brand lock:
-   fonts (Geist / Geist Mono) and the color palette (brand-4 accents + the
-   theme's supplementary hues). **If a deck comes out looking like plain named
-   layouts in expressive mode, you skipped the design step — that is the bug.**
+   **Expressive mode (the default).** You HANDCRAFT each slide. **Read and
+   follow `<skill_dir>/bespoke_design.md` — it mandates handcrafting every
+   content slide from scratch, following NOTHING except the brand lock (fonts +
+   brand-4 accents + the section-cycled colorbar). No menu, no template, no
+   catalog.** Compose each slide's geometry yourself for its specific content
+   (Anthropic-pptx aesthetic). There is **no named-layout-first rubric** and no "freeform as
+   last resort" rule in expressive — that is strict-mode guidance and does NOT
+   apply here. The 13 named kinds are optional tools you may reach for when a
+   slide's content maps cleanly onto one (a real data table →
+   `table-with-takeaway`); otherwise compose freely. **Do NOT pick from a fixed
+   set of layouts — selecting from a catalog is strict mode with extra options,
+   and it is the exact failure to avoid; handcraft each slide from the
+   primitives for its content.** The ONLY hard constraints are the brand lock:
+   fonts (Geist / Geist Mono) and the color palette (brand-4 accents + theme
+   hues). **If a deck comes out looking like plain named layouts — or like every
+   slide picked the same handful of compositions — you skipped the design step.
+   That is the bug.** The deterministic `expressive_compose.py` composer is the
+   floor for *agentless* renders only; when you (an agent) are building, you
+   design bespoke instead.
 
    **Strict mode (`--mode=strict`).** Use the named-layout-first priority
    below: most slides should be one of the 13 named kinds (`content-text`,
