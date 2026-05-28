@@ -2,7 +2,9 @@
 
 **In expressive mode you HANDCRAFT EVERY content slide individually.** Design each one from scratch, for its own specific content, composing freeform geometry from the sandbox primitives. This is non-negotiable and it is the entire point of expressive mode.
 
-**Follow NOTHING except the brand lock below.** Do not pick from a catalog of layouts. Do not reproduce the named layouts. Do not reuse another slide's composition. There is no menu and there is no template — if there were, you would use `--mode=strict`. Two slides should not share a composition. If you find yourself selecting "the closest layout," stop: that is the failure this document exists to prevent.
+**Follow NOTHING except the brand lock below.** Do not pick from a catalog of layouts. Do not reproduce the named layouts. There is no menu and there is no template — if there were, you would use `--mode=strict`. If you find yourself selecting "the closest layout" instead of designing for the content, stop: that mechanical selection is the failure this document exists to prevent.
+
+Resemblance is fine; *template-following* is not. If two slides end up looking similar because their content is genuinely alike (e.g. two single-statistic findings), that's a natural consequence of letting the composition follow the content — leave it. The line you must not cross is forcing slides into a fixed set of shapes regardless of what they say. Design each one for its content; if that yields some coincidental overlap, fine.
 
 ## The ONLY things you carry across slides (the brand lock)
 
@@ -24,8 +26,8 @@ Sandbox API + primitives are in `plan_prompt.md` (freeform section) and `_sandbo
 
 - Every figure slide is figure-left + bullets-right.
 - Every list is a uniform card grid.
-- The deck reuses two or three compositions across all slides.
-- Any slide maps 1:1 onto a named layout.
+- Slides are forced into a fixed handful of compositions *regardless of their content* (coincidental resemblance between genuinely-similar slides is NOT this — forcing dissimilar content into the same mold is).
+- A slide is picked off the named-layout menu instead of designed.
 - A wall of bullets with no visual hierarchy.
 
 The deterministic `expressive_compose.py` composer is the floor for *agentless* renders only (a cron/pipeline with no LLM). When you — an agent — are building, you handcraft.
