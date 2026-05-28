@@ -54,6 +54,7 @@ from layouts._common import (  # noqa: E402
     _render_media_block,
     _render_paragraph_block,
     _rgb,
+    _text_on,
 )
 
 
@@ -266,6 +267,9 @@ def build_safe_globals(
         "_render_paragraph_block": _render_paragraph_block,
         "_render_media_block": _render_media_block,
         "_rgb": _rgb,
+        # Luminance-based (WCAG) text color for any filled accent zone — pick
+        # ink/white by contrast against the fill instead of hardcoding.
+        "_text_on": _text_on,
         # pptx utilities
         "Inches": Inches,
         "Pt": Pt,

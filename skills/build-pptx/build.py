@@ -83,17 +83,14 @@ def new_presentation() -> "Presentation":
 def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
                     name: str = "", org: str = "", date: str = "", bg_rgb=None):
     """Title slide: dark bg (theme canvas if bg_rgb given, else navy), left
-    double-rail (turquoise + deeppink), bottom amber hairline.
-    Eyebrow turquoise, title white, name turquoise, org deeppink, date dim, all Geist Mono."""
+    double-rail (turquoise + deeppink).
+    Eyebrow turquoise, title white, name turquoise, org deeppink, amber rule + amber date, all Geist Mono."""
     s = _blank(prs)
     _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
 
     # Left double-rail
     _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
     _add_rect(s, left=0.8, top=0, width=0.25, height=7.5, fill_rgb=DEEPPINK_RGB)
-
-    # Bottom amber hairline
-    _add_rect(s, left=0, top=7.44, width=13.333, height=0.06, fill_rgb=AMBER_RGB)
 
     # Auto-shrink title font for long titles so a 3-line wrap doesn't run
     # into the subtitle. 60+ chars at 48pt regularly wraps to 3 lines.
@@ -121,11 +118,11 @@ def add_title_slide(prs, *, eyebrow: str = "", title: str, subtitle: str = "",
                   size=16, color_rgb=DEEPPINK_RGB, font=branding.MONO_FONT, bold=True)
         cursor_top += 0.45
 
-    # Hairline rule (white at low opacity — approximate as RULE_RGB)
-    _add_rect(s, left=1.3, top=cursor_top + 0.1, width=4.0, height=0.005, fill_rgb=RULE_RGB)
+    # Amber hairline rule above the date (brand accent on the cover)
+    _add_rect(s, left=1.3, top=cursor_top + 0.1, width=4.0, height=0.02, fill_rgb=AMBER_RGB)
     if date:
         _add_text(s, date, left=1.3, top=cursor_top + 0.25, width=11, height=0.3,
-                  size=12, color_rgb=DIM_RGB, font=branding.MONO_FONT)
+                  size=12, color_rgb=AMBER_RGB, font=branding.MONO_FONT)
     return s
 
 

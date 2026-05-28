@@ -14,6 +14,12 @@ These three are the complete set of constraints. Everything else is yours to inv
 2. **Accent colors.** Brand-4 only — `TURQUOISE_RGB` / `DEEPPINK_RGB` / `AMBER_RGB` / `BLUEVIOLET_RGB` — plus the theme's `THEME_RGBS`/`SURFACE_RGB`/`CANVAS_BG_RGB` and `INK_RGB`/`WHITE_RGB`. No off-brand hexes. Text on a filled accent zone is `ON_DARK`-aware and amber-aware: white on turquoise/deeppink/blueviolet and on dark canvas; `INK_RGB` on amber (`(INK_RGB if accent_rgb == AMBER_RGB else WHITE_RGB)`).
 3. **Side colorbar cycling.** The left colorbar (and each slide's `accent_rgb`) cycles turquoise → deeppink → amber → blueviolet by section order, handled automatically by the renderer. Use `accent_rgb` as the slide's lead color.
 
+### Contrast is non-negotiable
+
+- **Text on a filled color zone:** pick the text color with **`_text_on(fill)`** (a luminance/WCAG helper exposed in the sandbox) — it returns ink or white for max contrast. Do NOT hardcode (`WHITE` on every fill, or `INK if amber else WHITE`). `_text_on(accent_rgb)`, `_text_on(some_theme_hue)`, etc.
+- **Body text on a surface/card panel must be high-contrast** — `INK_RGB` on light, `WHITE_RGB` on dark (or `_text_on(SURFACE_RGB)`). **Never put primary/body text in a muted/dim gray (`MUTED_RGB`/`DIM_RGB`) on a panel** — it blends into the surface and becomes unreadable. Reserve `MUTED_RGB`/`DIM_RGB` only for *tiny secondary captions on the open canvas* where separation is obvious, never for card body copy.
+- If you can't read it at a glance in the QA render, it fails.
+
 ## Everything else is your design
 
 Composition, hierarchy, zones, big numbers, diagrams, arrows, figure placement, whitespace, asymmetry, callouts — invent it for each slide based on what that slide says. A dominant statistic might become a giant number in a color zone; a two-way contrast might become split panels; a scorecard might become a color-chipped dashboard; a synthesis might become stacked narrative beats. But do not treat those as options to choose from — they are just evidence that the composition follows the content. Design yours.
