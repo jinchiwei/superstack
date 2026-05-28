@@ -71,8 +71,16 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
     )
 
     gutter = 0.20
-    callout_h = max(0.55, body_h / 4)
-    table_h = max(0.50, body_h - callout_h - gutter)
+    # Only reserve space for the callout band when there's actually takeaway
+    # text. An empty callout dict must NOT paint a blank band — the table
+    # takes the full body height instead.
+    has_callout = bool((callout or {}).get("text"))
+    if has_callout:
+        callout_h = max(0.55, body_h / 4)
+        table_h = max(0.50, body_h - callout_h - gutter)
+    else:
+        callout_h = 0.0
+        table_h = body_h
 
     # Theme block-helper colors only on dark palettes. Under a light/strict
     # palette, pass None so the block helpers fall back to their exact
@@ -93,12 +101,13 @@ def render(slide, *, params: dict, accent_rgb: RGBColor, footer_kwargs: dict, pa
             text_rgb=_text,
         )
 
-    # ── Accent callout ────────────────────────────────────────────────────────
-    callout_top = body_top + table_h + gutter
-    _accent_callout(
-        slide,
-        left=body_l, top=callout_top,
-        width=body_w, height=callout_h,
-        params=callout,
-        accent_rgb=accent_rgb,
-    )
+    # ── Accent callout (only when there is takeaway text) ──────────────────────
+    if has_callout:
+        callout_top = body_top + table_h + gutter
+        _accent_callout(
+            slide,
+            left=body_l, top=callout_top,
+            width=body_w, height=callout_h,
+            params=callout,
+            accent_rgb=accent_rgb,
+        )

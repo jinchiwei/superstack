@@ -18,6 +18,10 @@ These three are the complete set of constraints. Everything else is yours to inv
 
 Composition, hierarchy, zones, big numbers, diagrams, arrows, figure placement, whitespace, asymmetry, callouts — invent it for each slide based on what that slide says. A dominant statistic might become a giant number in a color zone; a two-way contrast might become split panels; a scorecard might become a color-chipped dashboard; a synthesis might become stacked narrative beats. But do not treat those as options to choose from — they are just evidence that the composition follows the content. Design yours.
 
+## Figures must dominate
+
+When a slide centers on a figure, **the figure IS the slide** — it must be readable and command major presence, roughly **half the canvas or more**. A reader should be able to read its axes and trend from across a room. **Never shrink a figure to a thumbnail to make room for stats or text.** If you have stats/text to show alongside, make the figure large and keep the supporting text compact — a slim stat strip, a short caption, a verdict tile — fit around the figure, not the other way around. A figure crammed into a corner while stat chips eat the top half is a failure: invert it (figure dominant, stats secondary). Use `_fit_image` with generous `max_w`/`max_h` so the figure fills its zone.
+
 ## Mechanics
 
 Sandbox API + primitives are in `plan_prompt.md` (freeform section) and `_sandbox.py`. To author: run `build.py --plan-only --shake` for correct `slide_id`/`content_hash`, then rewrite each content slide entry to `{"kind": "freeform", "params": {"title", "lede": "", "section_label": "", "code": "<your handcrafted design>"}}`, keep section-dividers, render WITHOUT `--shake`. Use `--qa` to emit per-slide PNGs and iterate visually. Precompute geometry in Python; emit flat primitive calls; `ast.parse` each snippet. Re-apply institutional logos to the cover after rendering.
