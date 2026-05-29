@@ -761,6 +761,11 @@ def main():
         sys.executable, str(build_pptx),
         "--input", str(deck_md),
         "--output", str(out_pptx),
+        # This non-interactive shell-out produces the agentless expressive
+        # FLOOR; build.py's bespoke gate would otherwise abort. The autoresearch
+        # agent is expected to then handcraft the sidecar per bespoke_design.md
+        # and re-render (without this flag) for the final, bespoke deck.
+        "--allow-composed",
     ]
     subprocess.run(cmd, check=True)
     print(f"wrote {out_pptx}")

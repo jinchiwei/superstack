@@ -21,7 +21,7 @@ FIXTURE_SIDECAR = SKILL_DIR / "tests" / "fixture_composition.md.layout.json"
 
 def _run_build(md_path: Path, out_path: Path, extra: list[str] | None = None) -> subprocess.CompletedProcess:
     cmd = [
-        sys.executable, str(BUILD_PY),
+        sys.executable, str(BUILD_PY), "--allow-composed",
         "--input", str(md_path),
         "--output", str(out_path),
     ] + (extra or [])

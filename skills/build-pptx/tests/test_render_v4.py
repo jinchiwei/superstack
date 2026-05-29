@@ -18,7 +18,7 @@ def test_plan_only_writes_sidecar_no_pptx(tmp_path):
     md.write_text(FIXTURE.read_text())
     out = tmp_path / "out.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out),
          "--plan-only"],
         capture_output=True, text=True,
@@ -40,7 +40,7 @@ def test_default_plan_renders_pptx(tmp_path):
     md.write_text(FIXTURE.read_text())
     out = tmp_path / "out.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out)],
         capture_output=True, text=True,
     )
@@ -55,7 +55,7 @@ def test_no_plan_falls_back_to_legacy(tmp_path):
     md.write_text(FIXTURE.read_text())
     out = tmp_path / "out.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out),
          "--no-plan"],
         capture_output=True, text=True,
@@ -75,7 +75,7 @@ def test_shake_regenerates_sidecar(tmp_path):
     sidecar.write_text('{"version": 1, "deck_md_hash": "stale", "shake_seed": null, "slides": []}')
     out = tmp_path / "out.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out),
          "--shake"],
         capture_output=True, text=True,
@@ -97,7 +97,7 @@ def test_smoke_realistic_fixture_in_each_mode(tmp_path):
     # Default mode — sidecar absent
     out_default = tmp_path / "default.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out_default)],
         capture_output=True, text=True,
     )
@@ -108,7 +108,7 @@ def test_smoke_realistic_fixture_in_each_mode(tmp_path):
     # Default mode again — should hit cache (sidecar exists)
     out_cached = tmp_path / "cached.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out_cached)],
         capture_output=True, text=True,
     )
@@ -119,7 +119,7 @@ def test_smoke_realistic_fixture_in_each_mode(tmp_path):
     sidecar_before = sidecar.read_text()
     out_shaken = tmp_path / "shaken.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out_shaken),
          "--shake"],
         capture_output=True, text=True,
@@ -135,7 +135,7 @@ def test_smoke_realistic_fixture_in_each_mode(tmp_path):
     out_plan_only = tmp_path / "plan_only.pptx"
     sidecar.unlink()  # remove sidecar to force fresh write
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out_plan_only),
          "--plan-only"],
         capture_output=True, text=True,
@@ -148,7 +148,7 @@ def test_smoke_realistic_fixture_in_each_mode(tmp_path):
     sidecar.unlink()
     out_legacy = tmp_path / "legacy.pptx"
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY),
+        [sys.executable, str(BUILD_PY), "--allow-composed",
          "--input", str(md), "--output", str(out_legacy),
          "--no-plan"],
         capture_output=True, text=True,
@@ -164,7 +164,7 @@ def test_render_is_deterministic(tmp_path):
     md.write_text(FIXTURE.read_text())
     out1 = tmp_path / "out1.pptx"
     out2 = tmp_path / "out2.pptx"
-    cmd_base = [sys.executable, str(BUILD_PY), "--input", str(md)]
+    cmd_base = [sys.executable, str(BUILD_PY), "--allow-composed", "--input", str(md)]
     for out in (out1, out2):
         proc = subprocess.run(
             cmd_base + ["--output", str(out)],

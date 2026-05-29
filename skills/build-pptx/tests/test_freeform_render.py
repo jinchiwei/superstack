@@ -77,7 +77,7 @@ def test_freeform_runtime_error_renders_chip_not_crashes(tmp_path):
             {"slide_id": "h1-section", "kind": "freeform",
              "params": {"title": "Section", "lede": "Intro.",
                         # Missing required kwarg → TypeError at runtime
-                        "code": "_add_rect(slide)"},
+                        "code": "_add_rect(slide)", "_provenance": "agent"},
              "content_hash": _real_hash},
         ]
     }))
@@ -136,7 +136,8 @@ def test_freeform_validation_error_renders_chip_not_crashes(tmp_path):
              "content_hash": _real_hash2 + "-divider"},
             {"slide_id": "h1-section", "kind": "freeform",
              "params": {"title": "Section", "lede": "Intro.",
-                        "code": "import os\n_add_rect(slide, left=0, top=0, width=1, height=1, fill_rgb=accent_rgb)"},
+                        "code": "import os\n_add_rect(slide, left=0, top=0, width=1, height=1, fill_rgb=accent_rgb)",
+                        "_provenance": "agent"},
              "content_hash": _real_hash2},
         ]
     }))

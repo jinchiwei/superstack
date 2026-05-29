@@ -14,7 +14,7 @@ BUILD_PY = SKILL_DIR / "build.py"
 
 
 def _render(out_path: Path, *extra_args: str) -> None:
-    cmd = [sys.executable, str(BUILD_PY),
+    cmd = [sys.executable, str(BUILD_PY), "--allow-composed",
            "--input", str(FIXTURE),
            "--output", str(out_path),
            *extra_args]
@@ -85,7 +85,7 @@ def test_section_color_cascade(tmp_path):
     """Each content slide's left bar matches its section's expected color."""
     fixture = SKILL_DIR / "tests" / "fixture_sections.md"
     out = tmp_path / "cascade.pptx"
-    cmd = [sys.executable, str(BUILD_PY),
+    cmd = [sys.executable, str(BUILD_PY), "--allow-composed",
            "--input", str(fixture),
            "--output", str(out)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -133,7 +133,7 @@ def test_h1_with_body_does_not_produce_untitled_slide(tmp_path):
     pattern and produced 17 '(untitled)' slides."""
     fixture = SKILL_DIR / "tests" / "fixture_untitled_fix.md"
     out = tmp_path / "untitled-fix.pptx"
-    cmd = [sys.executable, str(BUILD_PY),
+    cmd = [sys.executable, str(BUILD_PY), "--allow-composed",
            "--input", str(fixture),
            "--output", str(out)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -161,7 +161,7 @@ def test_content_slide_has_footer_with_deck_metadata(tmp_path):
     """Content slides should carry a footer with name/org/deck/date."""
     fixture = SKILL_DIR / "tests" / "fixture_realistic.md"
     out = tmp_path / "realistic.pptx"
-    cmd = [sys.executable, str(BUILD_PY),
+    cmd = [sys.executable, str(BUILD_PY), "--allow-composed",
            "--input", str(fixture),
            "--output", str(out)]
     proc = subprocess.run(cmd, capture_output=True, text=True)

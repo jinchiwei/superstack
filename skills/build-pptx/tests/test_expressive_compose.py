@@ -21,7 +21,7 @@ _BLOCK_KINDS = {"freeform", "composition"}
 
 def _build(md, out, *extra):
     proc = subprocess.run(
-        [sys.executable, str(BUILD_PY), "--input", str(md),
+        [sys.executable, str(BUILD_PY), "--allow-composed", "--input", str(md),
          "--output", str(out), *extra],
         capture_output=True, text=True,
     )
@@ -139,7 +139,8 @@ def test_compose_unit_rewrites_named_entry():
                    content_hash="c"),
     ]
     n = compose_expressive_plan(slides)
-    assert n == 1
+    assert n == ["x"]  # returns the list of composed slide_ids (the floor)
+    assert slides[1].params.get("_provenance") == "composer"
     assert slides[0].kind == "section-divider"
     assert slides[1].kind == "freeform"
     assert "code" in slides[1].params

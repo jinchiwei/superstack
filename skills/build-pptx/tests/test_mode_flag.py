@@ -45,13 +45,13 @@ def test_mode_persists_across_shake(tmp_path):
     if not Path(py).exists():
         py = sys.executable
     # First build in strict mode.
-    subprocess.run([py, "build.py", "--input", str(md), "--output",
+    subprocess.run([py, "build.py", "--allow-composed", "--input", str(md), "--output",
                     str(tmp_path / "a.pptx"), "--mode", "strict"],
                    cwd=skill_dir, check=True, capture_output=True)
     sidecar = md.with_suffix(md.suffix + ".layout.json")
     assert json.loads(sidecar.read_text())["mode"] == "strict"
     # Now --shake WITHOUT --mode: mode must remain strict.
-    subprocess.run([py, "build.py", "--input", str(md), "--output",
+    subprocess.run([py, "build.py", "--allow-composed", "--input", str(md), "--output",
                     str(tmp_path / "b.pptx"), "--shake"],
                    cwd=skill_dir, check=True, capture_output=True)
     assert json.loads(sidecar.read_text())["mode"] == "strict"
@@ -72,7 +72,7 @@ def test_theme_frozen_and_persists_across_rerender(tmp_path):
     py = _deepdream_py()
     sidecar = md.with_suffix(md.suffix + ".layout.json")
     # First build (expressive default) freezes a theme + non-null seed.
-    subprocess.run([py, "build.py", "--input", str(md), "--output",
+    subprocess.run([py, "build.py", "--allow-composed", "--input", str(md), "--output",
                     str(tmp_path / "a.pptx")], cwd=skill_dir, check=True,
                    capture_output=True)
     d1 = json.loads(sidecar.read_text())
@@ -81,7 +81,7 @@ def test_theme_frozen_and_persists_across_rerender(tmp_path):
     assert d1["shake_seed"]  # non-null/non-empty now
     t1 = d1["theme"]
     # Plain re-render (no --shake) must keep the SAME frozen theme.
-    subprocess.run([py, "build.py", "--input", str(md), "--output",
+    subprocess.run([py, "build.py", "--allow-composed", "--input", str(md), "--output",
                     str(tmp_path / "b.pptx")], cwd=skill_dir, check=True,
                    capture_output=True)
     d2 = json.loads(sidecar.read_text())
@@ -95,11 +95,11 @@ def test_shake_generates_new_seed(tmp_path):
     md.write_text("---\ntitle: T\n---\n\n# A\n\nsome text here\n", encoding="utf-8")
     py = _deepdream_py()
     sidecar = md.with_suffix(md.suffix + ".layout.json")
-    subprocess.run([py, "build.py", "--input", str(md), "--output",
+    subprocess.run([py, "build.py", "--allow-composed", "--input", str(md), "--output",
                     str(tmp_path / "a.pptx")], cwd=skill_dir, check=True,
                    capture_output=True)
     seed1 = json.loads(sidecar.read_text())["shake_seed"]
-    subprocess.run([py, "build.py", "--input", str(md), "--output",
+    subprocess.run([py, "build.py", "--allow-composed", "--input", str(md), "--output",
                     str(tmp_path / "b.pptx"), "--shake"], cwd=skill_dir,
                    check=True, capture_output=True)
     seed2 = json.loads(sidecar.read_text())["shake_seed"]

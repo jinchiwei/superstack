@@ -44,7 +44,15 @@ After rendering, you MUST rasterize every slide to PNG (`--qa`, or `soffice --co
 
 ## Mechanics
 
-Sandbox API + primitives are in `plan_prompt.md` (freeform section) and `_sandbox.py`. To author: run `build.py --plan-only --shake` for correct `slide_id`/`content_hash`, then rewrite each content slide entry to `{"kind": "freeform", "params": {"title", "lede": "", "section_label": "", "code": "<your handcrafted design>"}}`, keep section-dividers, render WITHOUT `--shake`. Use `--qa` to emit per-slide PNGs and iterate visually. Precompute geometry in Python; emit flat primitive calls; `ast.parse` each snippet. Re-apply institutional logos to the cover after rendering.
+Sandbox API + primitives are in `plan_prompt.md` (freeform section) and `_sandbox.py`. To author: run `build.py --plan-only --shake` for correct `slide_id`/`content_hash`, then rewrite each content slide entry to `{"kind": "freeform", "params": {"title", "lede": "", "section_label": "", "code": "<your handcrafted design>", "_provenance": "agent"}}`, keep section-dividers, render WITHOUT `--shake`. Use `--qa` to emit per-slide PNGs and iterate visually. Precompute geometry in Python; emit flat primitive calls; `ast.parse` each snippet. Re-apply institutional logos to the cover after rendering.
+
+### The enforcement gate — you cannot skip this
+
+`build.py` MECHANICALLY enforces bespoke. The agentless composer stamps every slide it generates with `params["_provenance"] = "composer"`. On a real render (not `--plan-only`), if **any** content slide is still stamped `"composer"`, the build **aborts with a non-zero exit and writes no `.pptx`**, listing the floor slides you still owe. The floor is a hard error, not a warning — because prose guidance here was ignored too many times.
+
+To clear the gate, **handcraft the slide and set `params["_provenance"] = "agent"`** (or delete the key) when you write its `code`. The stamp persists in the sidecar, so you cannot dodge the gate by re-running `build.py` on a floor sidecar — it stays red until each slide is genuinely handcrafted.
+
+`--allow-composed` bypasses the gate and ships the floor. It exists ONLY for non-interactive / cron renders (e.g. the autoresearch shell-out) with no agent in the loop. **If you are an agent reading this, you ARE in the loop — never pass `--allow-composed`; handcraft instead.**
 
 ## You defaulted (failed the bar) if
 

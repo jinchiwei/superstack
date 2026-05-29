@@ -1255,6 +1255,17 @@ def main() -> int:
             "sidecar's recorded mode wins; otherwise defaults to expressive."
         ),
     )
+    ap.add_argument(
+        "--allow-composed", dest="allow_composed", action="store_true",
+        help=(
+            "Permit auto-composed (agentless-FLOOR) freeform slides without "
+            "failing the build. By default an expressive render ABORTS if any "
+            "content slide is still composer-templated rather than handcrafted "
+            "(see bespoke_design.md). Use this flag ONLY for non-interactive / "
+            "cron renders where the deterministic floor is the accepted output; "
+            "an agent in the loop must handcraft each slide instead."
+        ),
+    )
     ap.add_argument("--qa", action="store_true",
                     help="after rendering, emit per-slide PNGs for visual "
                          "inspection (requires LibreOffice + poppler)")
@@ -1329,6 +1340,7 @@ def main() -> int:
     # merge_with_existing carried over from an agent-authored existing plan.
     # When there is no existing sidecar, every content slide is eligible.
     # Strict mode skips the composer entirely (named layouts, unchanged).
+    composed_ids: list[str] = []
     if effective_mode == "expressive":
         from expressive_compose import compose_expressive_plan
         if existing_plan is not None:
@@ -1342,7 +1354,7 @@ def main() -> int:
             }
         else:
             only_ids = None  # no sidecar → all content slides eligible
-        compose_expressive_plan(
+        composed_ids = compose_expressive_plan(
             final_plan.slides, md_dir=md_path.parent, only_ids=only_ids
         )
 
@@ -1395,6 +1407,56 @@ def main() -> int:
 
     if args.plan_only:
         return 0
+
+    # --- Bespoke-enforcement gate (cross-machine; see bespoke_design.md) ----
+    # Expressive mode REQUIRES an agent in the loop to handcraft each content
+    # slide's freeform geometry. `compose_expressive_plan` is only the agentless
+    # FLOOR. If a real render (not --plan-only) still carries composer-floor
+    # slides, abort loudly — unless the caller explicitly opted into the floor
+    # with --allow-composed (cron / non-interactive synth). This is the single
+    # mechanical check that makes "always bespoke" enforceable across machines;
+    # prose guidance in SKILL.md / memory was repeatedly ignored.
+    # Floor = any content slide NOT affirmatively stamped `_provenance=="agent"`.
+    # Requiring an affirmative agent stamp (rather than only catching the
+    # composer stamp) is airtight: it also blocks un-stamped named-layout
+    # leftovers and freshly-inferred slides, not just composer-freeform. The
+    # composer stamps "composer"; inference leaves no stamp; only a handcrafting
+    # agent writes "agent". The stamp persists in the sidecar, so you cannot
+    # dodge the gate by re-running build.py — it stays red until each content
+    # slide is genuinely handcrafted (see bespoke_design.md).
+    floor_ids = [
+        s.slide_id for s in final_plan.slides
+        if s.kind != "section-divider"
+        and (s.params or {}).get("_provenance") != "agent"
+    ]
+    if effective_mode == "expressive" and floor_ids and not args.allow_composed:
+        content_total = sum(
+            1 for s in final_plan.slides if s.kind != "section-divider"
+        )
+        shown = "".join(f"     - {sid}\n" for sid in floor_ids[:12])
+        if len(floor_ids) > 12:
+            shown += f"     ... and {len(floor_ids) - 12} more\n"
+        sys.stderr.write(
+            "\n==================================================================\n"
+            "  BESPOKE NOT SATISFIED — build aborted (no .pptx written)\n"
+            "==================================================================\n"
+            f"  {len(floor_ids)}/{content_total} content slides are NOT handcrafted —\n"
+            "  agentless FLOOR (composer templates or un-stamped layouts).\n\n"
+            "  Expressive mode requires you (the agent) to design each content\n"
+            "  slide's freeform geometry. Recipe (see bespoke_design.md):\n"
+            "    1. build.py --input X.md --output Y.pptx --plan-only --shake\n"
+            "    2. For each content slide_id in the .layout.json sidecar, write\n"
+            "       a bespoke params.code using the sandbox API.\n"
+            "    3. Re-render WITHOUT --shake.\n\n"
+            "  The sidecar has been written for you to edit:\n"
+            f"    {sidecar_path}\n\n"
+            "  Floor slides still needing handcraft:\n"
+            f"{shown}\n"
+            "  Non-interactive / cron render where the floor is acceptable?\n"
+            "  Re-run with --allow-composed to bypass this gate.\n"
+            "==================================================================\n"
+        )
+        return 2
 
     # Render
     from render import render_from_plan

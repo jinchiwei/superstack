@@ -304,12 +304,16 @@ def compose_expressive_plan(slides, *, chunks_by_title=None, md_dir=None,
                      entries that merge_with_existing carried over). When None,
                      every content slide is eligible.
 
-    Returns the number of slides rewritten.
+    Returns the list of slide_ids rewritten (the agentless "floor"). build.py
+    uses this to enforce bespoke: a non-plan-only expressive render with any
+    composed slide fails unless --allow-composed (see bespoke_design.md).
     """
-    n = 0
+    composed = []
     for entry in slides:
         if only_ids is not None and entry.slide_id not in only_ids:
             continue
         if _compose_one(entry):
-            n += 1
-    return n
+            # Stamp provenance so the floor is auditable in the sidecar.
+            entry.params["_provenance"] = "composer"
+            composed.append(entry.slide_id)
+    return composed

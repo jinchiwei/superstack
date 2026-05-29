@@ -33,7 +33,10 @@ If the request is ambiguous, default to generating intro figures and ask the use
 - `--no-end` — suppress closing "Thanks" slide
 - `--use-blocks=auto|never|always` — control when `composition`/`freeform` layouts are admissible (default: `auto`)
 - `--mode=expressive|strict` — deck construction mode (default: `expressive`). See [Construction modes](#construction-modes).
+- `--allow-composed` — bypass the bespoke gate and ship the agentless composer FLOOR. Non-interactive / cron use ONLY (see below). An agent in the loop must NOT pass this — handcraft instead.
 - `--qa` — after rendering, emit per-slide PNGs for visual inspection. See [Visual QA loop](#visual-qa-loop---qa).
+
+> **ENFORCEMENT (expressive mode):** a real render **aborts with a non-zero exit and writes no `.pptx`** if any content slide is still the agentless composer FLOOR (`params._provenance == "composer"`). You MUST handcraft each content slide's freeform `code` and set `params._provenance = "agent"` — see [`bespoke_design.md`](bespoke_design.md). The only escape is `--allow-composed` (cron/non-interactive). This is a hard, cross-machine gate, not advice.
 
 ## Markdown format
 

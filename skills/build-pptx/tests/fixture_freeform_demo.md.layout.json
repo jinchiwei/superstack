@@ -18,7 +18,8 @@
         "code": "chart_w = 7.0\nchart_l = body_l\n_add_rect(slide, left=chart_l, top=body_top, width=chart_w, height=body_h, fill_rgb=PAPER_RGB)\n_add_text(slide, '[chart]', left=chart_l, top=body_top + body_h/2 - 0.2, width=chart_w, height=0.4, size=14, color_rgb=DIM_RGB, font=MONO_FONT, align=PP_ALIGN.CENTER)\nstats = [('0.91', 'Internal AUC'), ('0.85', 'External'), ('0.88', 'Sens@0.5'), ('0.84', 'Spec@0.5')]\nstat_l = body_l + chart_w + 0.30\nstat_w = body_w - chart_w - 0.30\nstat_h = (body_h - 0.45) / 4\nfor i, (value, label) in enumerate(stats):\n    y = body_top + i * (stat_h + 0.15)\n    _add_text(slide, value, left=stat_l, top=y, width=stat_w, height=stat_h * 0.55, size=24, color_rgb=accent_rgb, font=MONO_FONT, bold=True)\n    _add_text(slide, label, left=stat_l, top=y + stat_h * 0.6, width=stat_w, height=stat_h * 0.4, size=12, color_rgb=MUTED_RGB, font=SANS_FONT)",
         "lede": "A chart placeholder on the left, big-number stat tiles on the right.",
         "section_label": "Stat callout",
-        "title": "Stat callout"
+        "title": "Stat callout",
+        "_provenance": "agent"
       },
       "slide_id": "h1-stat-callout"
     },
@@ -38,7 +39,8 @@
         "code": "pillars = [('Trial', 'Controlled', TURQUOISE_RGB), ('Real-world', '?', DEEPPINK_RGB), ('Practice', 'Patient-level', AMBER_RGB)]\nn = len(pillars)\ngutter = 0.20\ncol_w = (body_w - gutter * (n - 1)) / n\nfor i, (label, body_text, color) in enumerate(pillars):\n    x = body_l + i * (col_w + gutter)\n    _add_rect(slide, left=x, top=body_top, width=col_w, height=body_h, fill_rgb=PAPER_RGB)\n    _add_rect(slide, left=x, top=body_top, width=col_w, height=0.06, fill_rgb=color)\n    _add_text(slide, label, left=x + 0.18, top=body_top + 0.18, width=col_w - 0.36, height=0.5, size=15, color_rgb=color, font=MONO_FONT, bold=True)\n    _add_text(slide, body_text, left=x + 0.18, top=body_top + 0.80, width=col_w - 0.36, height=body_h - 1.0, size=13, color_rgb=INK_RGB, font=SANS_FONT)\n    if i < n - 1:\n        arrow_x = x + col_w + gutter / 2 - 0.15\n        _add_flat_shape(slide, MSO_SHAPE.RIGHT_ARROW, left=arrow_x, top=body_top + body_h / 2 - 0.15, width=0.30, height=0.30, fill_rgb=color)",
         "lede": "Side-by-side comparison of three options.",
         "section_label": "Three pillars",
-        "title": "Three pillars with arrows"
+        "title": "Three pillars with arrows",
+        "_provenance": "agent"
       },
       "slide_id": "h1-three-pillars-with-arrows"
     },
@@ -55,10 +57,11 @@
       "content_hash": "4db2d16016cffecb8f3344c0ba4cfdb7e50e38b78f526742ad4e1a807342d6db",
       "kind": "freeform",
       "params": {
-        "code": "_add_text(slide, '0.848', left=body_l, top=body_top + 0.5, width=body_w, height=2.5, size=120, color_rgb=accent_rgb, font=MONO_FONT, bold=True, align=PP_ALIGN.CENTER)\n_add_text(slide, 'site-mixed external AUC, 5-seed mean', left=body_l, top=body_top + 3.2, width=body_w, height=0.5, size=18, color_rgb=MUTED_RGB, font=SANS_FONT, align=PP_ALIGN.CENTER)\n_add_rect(slide, left=body_l + body_w/2 - 1.5, top=body_top + 3.85, width=3.0, height=0.02, fill_rgb=accent_rgb)\n_add_text(slide, '± 0.040 across 5 random seeds', left=body_l, top=body_top + 4.0, width=body_w, height=0.4, size=14, color_rgb=DIM_RGB, font=MONO_FONT, align=PP_ALIGN.CENTER)",
+        "code": "_add_text(slide, '0.848', left=body_l, top=body_top + 0.5, width=body_w, height=2.5, size=120, color_rgb=accent_rgb, font=MONO_FONT, bold=True, align=PP_ALIGN.CENTER)\n_add_text(slide, 'site-mixed external AUC, 5-seed mean', left=body_l, top=body_top + 3.2, width=body_w, height=0.5, size=18, color_rgb=MUTED_RGB, font=SANS_FONT, align=PP_ALIGN.CENTER)\n_add_rect(slide, left=body_l + body_w/2 - 1.5, top=body_top + 3.85, width=3.0, height=0.02, fill_rgb=accent_rgb)\n_add_text(slide, '\u00b1 0.040 across 5 random seeds', left=body_l, top=body_top + 4.0, width=body_w, height=0.4, size=14, color_rgb=DIM_RGB, font=MONO_FONT, align=PP_ALIGN.CENTER)",
         "lede": "Bespoke takeaway with a giant number and annotation.",
         "section_label": "Custom big number",
-        "title": "Custom big number"
+        "title": "Custom big number",
+        "_provenance": "agent"
       },
       "slide_id": "h1-custom-big-number"
     }
