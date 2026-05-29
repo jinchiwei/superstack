@@ -1,11 +1,15 @@
 """Canonical presenter-handout PDF: each slide's image + its full speaker notes.
 
-One landscape page per slide — slide thumbnail on top (so every figure/image on
-the slide is included automatically), comprehensive notes below. Notes are read
-from the rendered pptx's notes panes (populated by render.py from params['notes']),
-so this stays in sync with the deck. Rasterization reuses qa.render_to_images
-(LibreOffice + pdftoppm); if those are missing it degrades gracefully (returns
-None) rather than failing the build.
+One slide per landscape page — slide thumbnail on top (so every figure/image
+on the slide is included automatically), comprehensive notes below. The title
+line is word-wrapped; long notes auto-shrink fontsize down to a floor, then
+overflow to a second/third page with a "(notes continued)" header instead of
+clipping off the bottom or running off the right edge.
+
+Notes are read from the rendered pptx's notes panes (populated by render.py
+from params['notes']), so this stays in sync with the deck. Rasterization
+reuses qa.render_to_images (LibreOffice + pdftoppm); if those are missing
+it degrades gracefully (returns None) rather than failing the build.
 """
 from __future__ import annotations
 
@@ -14,14 +18,57 @@ import textwrap
 from pathlib import Path
 
 
-def _wrap(text: str, width: int = 116) -> str:
-    out = []
+# Layout (landscape letter, figsize=(11, 8.5))
+_TITLE_WIDTH_CHARS = 95     # title wrap width (bigger font → narrower)
+_BODY_WIDTH_CHARS = 116     # body wrap width
+_BODY_FONT_MAX = 10.5       # starting body font (pt)
+_BODY_FONT_MIN = 8.0        # floor before overflow to next page
+_BODY_LINESPACING = 1.40
+
+# Available body area: from y_top (just below title) down to a bottom margin.
+_BODY_Y_TOP = 0.355
+_BODY_Y_BOTTOM = 0.045
+_BODY_AVAIL_FRAC = _BODY_Y_TOP - _BODY_Y_BOTTOM  # fraction of figure height
+
+
+def _wrap_lines(text: str, width: int) -> list[str]:
+    """Word-wrap each paragraph, preserving blank-line paragraph breaks."""
+    out: list[str] = []
     for para in (text or "").split("\n"):
         if not para.strip():
             out.append("")
             continue
         out.extend(textwrap.wrap(para, width=width) or [""])
-    return "\n".join(out)
+    return out
+
+
+def _fit_body(body_lines: list[str], fig_height_in: float) -> tuple[float, list[list[str]]]:
+    """Pick the largest fontsize that fits the body in available space; if even
+    the floor fontsize would overflow, split across multiple pages.
+
+    Returns (chosen_fontsize_pt, list_of_pages_each_a_list_of_lines).
+    """
+    body_avail_in = _BODY_AVAIL_FRAC * fig_height_in
+    n_lines = len(body_lines)
+    if n_lines == 0:
+        return _BODY_FONT_MAX, [[]]
+
+    for pt in (10.5, 10.0, 9.5, 9.0, 8.5, _BODY_FONT_MIN):
+        line_h_in = pt / 72.0 * _BODY_LINESPACING
+        max_lines = int(body_avail_in / line_h_in)
+        if n_lines <= max_lines:
+            return pt, [body_lines]
+
+    # Even at floor we overflow — paginate at floor font.
+    pt = _BODY_FONT_MIN
+    line_h_in = pt / 72.0 * _BODY_LINESPACING
+    max_lines = max(1, int(body_avail_in / line_h_in))
+    pages: list[list[str]] = []
+    i = 0
+    while i < n_lines:
+        pages.append(body_lines[i:i + max_lines])
+        i += max_lines
+    return pt, pages
 
 
 def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 130):
@@ -64,32 +111,53 @@ def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 130):
             FONT_BODY, FONT_TITLE = ["DejaVu Sans"], ["DejaVu Sans Mono"]
 
         n = min(len(pngs), len(notes))
+        fig_w, fig_h = 11.0, 8.5  # landscape letter
         with PdfPages(str(out_pdf)) as pdf:
             for i in range(n):
                 note = notes[i].strip()
                 lines = note.split("\n", 1)
-                head = lines[0] if lines else f"Slide {i + 1}"
+                raw_head = lines[0] if lines else f"Slide {i + 1}"
                 body = lines[1].strip() if len(lines) > 1 else ""
 
-                fig = plt.figure(figsize=(11, 8.5))  # landscape letter
-                fig.patch.set_facecolor("white")
+                # Word-wrap the title so long heads don't run off the right edge.
+                head_lines = textwrap.wrap(raw_head, width=_TITLE_WIDTH_CHARS) or [raw_head]
+                head_wrapped = "\n".join(head_lines)
+                # Each title line shifts the body anchor down ~1.7% of fig height.
+                title_offset = 0.017 * (len(head_lines) - 1)
 
-                # slide image — top 56%
-                ax_img = fig.add_axes([0.04, 0.46, 0.92, 0.50])
-                ax_img.axis("off")
-                try:
-                    ax_img.imshow(Image.open(pngs[i]))
-                except Exception:
-                    pass
+                # Wrap body + auto-fit (shrink, then paginate at floor font).
+                body_lines = _wrap_lines(body, _BODY_WIDTH_CHARS)
+                body_font_pt, body_pages = _fit_body(body_lines, fig_h)
 
-                # header + notes — bottom
-                fig.text(0.04, 0.40, f"Slide {i + 1} — {head}", ha="left", va="top",
-                         fontsize=13, fontfamily=FONT_TITLE, fontweight="bold", color="#1A1A1A")
-                fig.text(0.04, 0.355, _wrap(body), ha="left", va="top",
-                         fontsize=10.5, fontfamily=FONT_BODY, color="#1A1A1A",
-                         linespacing=1.45)
-                pdf.savefig(fig, facecolor="white")
-                plt.close(fig)
+                for page_idx, page_lines in enumerate(body_pages):
+                    fig = plt.figure(figsize=(fig_w, fig_h))
+                    fig.patch.set_facecolor("white")
+
+                    # Slide image — top 50% (always present, every page).
+                    ax_img = fig.add_axes([0.04, 0.46, 0.92, 0.50])
+                    ax_img.axis("off")
+                    try:
+                        ax_img.imshow(Image.open(pngs[i]))
+                    except Exception:
+                        pass
+
+                    # Title — wrapped, multi-line.
+                    title_text = f"Slide {i + 1} — {head_wrapped}"
+                    if len(body_pages) > 1:
+                        title_text += f"   ({page_idx + 1}/{len(body_pages)})"
+                    if page_idx > 0:
+                        title_text += "   (notes continued)"
+                    fig.text(0.04, 0.42, title_text, ha="left", va="top",
+                             fontsize=13, fontfamily=FONT_TITLE, fontweight="bold",
+                             color="#1A1A1A", linespacing=1.25)
+
+                    # Body anchored just below the (possibly wrapped) title.
+                    body_y = _BODY_Y_TOP - title_offset
+                    fig.text(0.04, body_y, "\n".join(page_lines), ha="left", va="top",
+                             fontsize=body_font_pt, fontfamily=FONT_BODY, color="#1A1A1A",
+                             linespacing=_BODY_LINESPACING)
+                    pdf.savefig(fig, facecolor="white")
+                    plt.close(fig)
 
     return out_pdf
 
