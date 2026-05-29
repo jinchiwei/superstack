@@ -11,6 +11,17 @@ Markdown → Jin-branded 16:9 PPTX via python-pptx.
 
 User asks to make slides from markdown for a research talk, lab meeting, conference presentation, or any deck that should be in Jin's brand identity.
 
+## Default: generate custom intro figures (research decks)
+
+For any **research-talk deck** — lab talks, conference talks, defenses, seminars, autoresearch reports — generating **3–5 custom matplotlib figures redrawing foundational reference papers** for the intro / background / motivation section is the **default**, not an extra. Each figure has clear "(adapted from Author Year)" attribution in its title. Follow [`intro_figures.md`](intro_figures.md) for the pattern + archetype catalog + code template + the reference implementation. Do not deliver a research deck with bullet-only intro slides.
+
+**Opt out** when the audience already knows the work — internal status updates, sprint reviews, "team weekly" decks, follow-up program decks for the same lab, or any deck where ≥ 3 background slides would be over-explanation. Opt-out signals (any one):
+- User says "skip intro figures" / "no intro figures" / "internal deck, no background"
+- Deck frontmatter has `no_intro_figures: true`
+- The deck is for a strictly internal audience the user identifies (e.g. "weekly to my team")
+
+If the request is ambiguous, default to generating intro figures and ask the user post-build whether to keep or strip them.
+
 ## Required arguments
 
 - `--input PATH` — markdown source
