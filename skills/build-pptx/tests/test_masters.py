@@ -145,33 +145,48 @@ def test_add_section_divider_accepts_accent_color_override():
     assert found_amber, "amber colorblock not found in section divider"
 
 
-def test_title_slide_has_amber_bottom_hairline():
-    """Title slide includes a thin amber bar at the bottom."""
+def test_title_slide_has_gray_bottom_rule():
+    """Title slide uses a thin gray rule (#DDDDDD) at the bottom, not amber."""
     prs = new_presentation()
     add_title_slide(prs, eyebrow="X", title="T", date="2026-05-01")
     s = prs.slides[0]
-    # Find any rect filled with amber #F0C840
+    found_gray = False
     found_amber = False
     for shp in s.shapes:
         try:
-            if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "F0C840":
-                found_amber = True
-                break
+            if shp.fill.type == 1:
+                c = str(shp.fill.fore_color.rgb).upper()
+                if c == "DDDDDD":
+                    found_gray = True
+                elif c == "F0C840":
+                    found_amber = True
         except Exception:
             pass
-    assert found_amber, "amber bottom hairline missing"
+    assert found_gray, "gray bottom rule missing"
+    assert not found_amber, "title slide should no longer have an amber fill bar"
 
 
-def test_end_slide_mirrors_title_amber_hairline():
+def test_end_slide_thanks_is_amber_no_hairline():
+    """End slide colors the 'Thanks' message amber and drops the amber hairline bar."""
     prs = new_presentation()
     add_end_slide(prs, message="Thanks", contact="me")
     s = prs.slides[0]
-    found_amber = False
+    amber_rect = False
+    thanks_amber = False
     for shp in s.shapes:
         try:
             if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "F0C840":
-                found_amber = True
-                break
+                amber_rect = True
         except Exception:
             pass
-    assert found_amber, "amber bottom hairline missing on end slide"
+        if shp.has_text_frame:
+            for para in shp.text_frame.paragraphs:
+                for run in para.runs:
+                    if run.text.strip() == "Thanks":
+                        try:
+                            if str(run.font.color.rgb).upper() == "F0C840":
+                                thanks_amber = True
+                        except Exception:
+                            pass
+    assert thanks_amber, "'Thanks' message should be amber"
+    assert not amber_rect, "end slide should no longer have an amber hairline bar"
