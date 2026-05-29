@@ -142,7 +142,11 @@ def _build_sheet(
                     style_fn, icon_name, icon_color = _MARKER_CONFIG[row_marker]
                     style_fn(ws, current_row, values)
                     if with_glyphs:
-                        glyph_cell = ws.cell(row=current_row, column=1)
+                        # Anchor the glyph in the first column PAST the table
+                        # (white background) so the brand-colored icon is
+                        # visible — rendering it over the same-colored fill in
+                        # column 1 made it invisible and clipped the row text.
+                        glyph_cell = ws.cell(row=current_row, column=n_cols + 1)
                         add_glyph_to_cell(
                             ws,
                             glyph_cell,
