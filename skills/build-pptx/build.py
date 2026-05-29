@@ -350,8 +350,8 @@ def add_quote_slide(prs, *, quote: str, attribution: str = ""):
 
 def add_end_slide(prs, *, message: str = "Thanks", contact: str = "", bg_rgb=None):
     """End slide: mirror title slide. Dark bg (theme canvas if bg_rgb given, else
-    navy), left double-rail, bottom amber hairline.
-    Big white "Thanks" centered, contact in dim mono below."""
+    navy), left double-rail.
+    Big amber "Thanks" centered, contact in dim mono below."""
     s = _blank(prs)
     _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
 
@@ -359,11 +359,8 @@ def add_end_slide(prs, *, message: str = "Thanks", contact: str = "", bg_rgb=Non
     _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
     _add_rect(s, left=0.8, top=0, width=0.25, height=7.5, fill_rgb=DEEPPINK_RGB)
 
-    # Bottom amber hairline (mirror of title)
-    _add_rect(s, left=0, top=7.44, width=13.333, height=0.06, fill_rgb=AMBER_RGB)
-
     _add_text(s, message, left=1.3, top=2.7, width=11.0, height=2.0,
-              size=64, color_rgb=WHITE_RGB, font=branding.MONO_FONT, bold=True,
+              size=64, color_rgb=AMBER_RGB, font=branding.MONO_FONT, bold=True,
               align=PP_ALIGN.CENTER)
     if contact:
         # Name in turquoise (the end slide's primary accent — mirrors the
