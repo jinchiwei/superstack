@@ -253,9 +253,20 @@ def _parse_slide_chunk(html_chunk: str, *, base_dir: Path | None = None) -> dict
 
 # === Primitive drawing helpers ===
 def _set_bg(slide, color_rgb: RGBColor) -> None:
+    # Slide-level <p:bg> fill — LibreOffice honors it, but PowerPoint / Keynote
+    # / Google Slides frequently ignore it, leaving a white slide (and any
+    # light-on-dark text then renders white-on-white). So ALSO paint a
+    # full-bleed rectangle (a real shape every viewer renders). _set_bg is
+    # called before any content in its callers, so this stays at the back.
     fill = slide.background.fill
     fill.solid()
     fill.fore_color.rgb = color_rgb
+    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE,
+                                Inches(0), Inches(0), Inches(13.333), Inches(7.5))
+    bg.shadow.inherit = False
+    bg.fill.solid()
+    bg.fill.fore_color.rgb = color_rgb
+    bg.line.fill.background()
 
 
 def _add_rect(slide, *, left, top, width, height,
