@@ -22,6 +22,10 @@ For any **research-talk deck** — lab talks, conference talks, defenses, semina
 
 If the request is ambiguous, default to generating intro figures and ask the user post-build whether to keep or strip them.
 
+## Default: ship comprehensive speaker notes
+
+Every deck ships with **comprehensive, didactic speaker notes** in the PowerPoint notes pane (Presenter View) — this is canonical, not optional. Put each slide's notes in its sidecar `params["notes"]`; `render.py` embeds them automatically (content slides + dividers). Notes must TEACH the slide — explain the concept in plain language for a presenter who's a little lost, translate the numbers to intuition, and give the transition. See [`speaker_notes.md`](speaker_notes.md). A non-fatal build warning lists content slides missing notes. Opt out only if the user says "no notes."
+
 ## Required arguments
 
 - `--input PATH` — markdown source

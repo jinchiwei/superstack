@@ -1266,6 +1266,14 @@ def main() -> int:
             "an agent in the loop must handcraft each slide instead."
         ),
     )
+    ap.add_argument(
+        "--no-notes-pdf", dest="no_notes_pdf", action="store_true",
+        help=(
+            "Skip the presenter-handout PDF (<output>_notes.pdf: each slide's "
+            "image + its speaker notes). By default it is generated whenever the "
+            "deck has notes and a rasterizer (LibreOffice + pdftoppm) is present."
+        ),
+    )
     ap.add_argument("--qa", action="store_true",
                     help="after rendering, emit per-slide PNGs for visual "
                          "inspection (requires LibreOffice + poppler)")
@@ -1458,6 +1466,26 @@ def main() -> int:
         )
         return 2
 
+    # --- Speaker-notes check (non-fatal) — see speaker_notes.md -------------
+    # Every content slide should ship comprehensive notes in params['notes'].
+    # This warns (never aborts) so gaps are visible before delivery.
+    missing_notes = [
+        s.slide_id for s in final_plan.slides
+        if s.kind != "section-divider"
+        and not str((s.params or {}).get("notes", "")).strip()
+    ]
+    if missing_notes:
+        shown = "".join(f"     - {sid}\n" for sid in missing_notes[:12])
+        if len(missing_notes) > 12:
+            shown += f"     ... and {len(missing_notes) - 12} more\n"
+        sys.stderr.write(
+            f"\n[build-pptx] NOTE: {len(missing_notes)} content slide(s) have no "
+            "speaker notes (params['notes']).\n"
+            "  Decks ship with comprehensive, didactic notes by default "
+            "(see speaker_notes.md):\n"
+            f"{shown}"
+        )
+
     # Render
     from render import render_from_plan
     render_from_plan(
@@ -1475,6 +1503,21 @@ def main() -> int:
                 print(f"  {p}")
         except RuntimeError as e:
             print(f"QA skipped: {e}", file=sys.stderr)
+
+    # Presenter-handout PDF (slide image + speaker notes per page). Canonical
+    # output when the deck has notes; skips gracefully without a rasterizer.
+    # See speaker_notes.md. Disable with --no-notes-pdf.
+    if not args.no_notes_pdf:
+        try:
+            from notes_pdf import build_notes_pdf
+            np = build_notes_pdf(output_path)
+            if np:
+                print(f"wrote notes PDF: {np}")
+            else:
+                print("notes PDF skipped (no notes, or no LibreOffice/pdftoppm).",
+                      file=sys.stderr)
+        except Exception as e:  # never let the handout abort a successful build
+            print(f"notes PDF skipped: {e}", file=sys.stderr)
     return 0
 
 

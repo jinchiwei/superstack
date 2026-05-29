@@ -46,6 +46,10 @@ After rendering, you MUST rasterize every slide to PNG (`--qa`, or `soffice --co
 
 Sandbox API + primitives are in `plan_prompt.md` (freeform section) and `_sandbox.py`. To author: run `build.py --plan-only --shake` for correct `slide_id`/`content_hash`, then rewrite each content slide entry to `{"kind": "freeform", "params": {"title", "lede": "", "section_label": "", "code": "<your handcrafted design>", "_provenance": "agent"}}`, keep section-dividers, render WITHOUT `--shake`. Use `--qa` to emit per-slide PNGs and iterate visually. Precompute geometry in Python; emit flat primitive calls; `ast.parse` each snippet. Re-apply institutional logos to the cover after rendering.
 
+### Speaker notes are part of the deliverable
+
+Every content slide also gets comprehensive, didactic speaker notes via `params["notes"]` (the renderer embeds them into the notes pane). A handcrafted deck without notes is unfinished. See [`speaker_notes.md`](speaker_notes.md).
+
 ### The enforcement gate — you cannot skip this
 
 `build.py` MECHANICALLY enforces bespoke. The agentless composer stamps every slide it generates with `params["_provenance"] = "composer"`. On a real render (not `--plan-only`), if **any** content slide is still stamped `"composer"`, the build **aborts with a non-zero exit and writes no `.pptx`**, listing the floor slides you still owe. The floor is a hard error, not a warning — because prose guidance here was ignored too many times.

@@ -199,6 +199,19 @@ def _preprocess_plan(plan) -> list:
     return result
 
 
+def _set_speaker_notes(slide, params) -> None:
+    """Write a slide's `params['notes']` into its PowerPoint notes pane
+    (Presenter View). Canonical speaker-notes support — see speaker_notes.md.
+    No-op when the slide carries no notes."""
+    notes = (params or {}).get("notes")
+    if not notes:
+        return
+    try:
+        slide.notes_slide.notes_text_frame.text = str(notes)
+    except Exception:
+        pass  # never let a notes failure abort the render
+
+
 def render_from_plan(*, md_path: Path, plan, output_path: Path,
                      no_cover: bool = False, no_end: bool = False,
                      theme=None) -> None:
@@ -300,6 +313,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
                 name=deck_name, org=deck_org, deck_title=deck_title,
                 bg_rgb=cover_bg,
             )
+            _set_speaker_notes(prs.slides[-1], params)
             continue
 
         # Update accent if the entry indicates a new section
@@ -323,6 +337,7 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
         renderer = catalog.get(entry.kind)
         renderer(s, params=params, accent_rgb=_rgb(accent_hex),
                  footer_kwargs=footer_kwargs, palette=palette)
+        _set_speaker_notes(s, params)
 
     # End slide
     if not no_end:
