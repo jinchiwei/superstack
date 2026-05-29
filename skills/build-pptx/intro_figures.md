@@ -1,6 +1,24 @@
-# Intro / background figures — redraw published references, don't leave placeholders
+# Custom deck figures — redraw published refs AND use real openly-licensed images, anywhere a concept needs one
 
-For **any research-talk deck** built with `build-pptx` — lab talks, conference talks, defenses, seminars, autoresearch reports — the intro / background / motivation slides need **custom figures that redraw foundational references** with clear citation. This is the **standing default**, not session-specific polish. Bullet-only intro slides are a regression.
+For **any research-talk deck** built with `build-pptx` — lab talks, conference talks, defenses, seminars, autoresearch reports — slides that explain a concept need a **custom figure**, not a bullet wall or a placeholder. This is the **standing default**, not session-specific polish.
+
+## Not just intro — the WHOLE deck
+
+The original framing was "intro/background figures." Generalize it: **any slide whose point is a concept, structure, mechanism, or comparison deserves a figure** — wherever it sits in the deck.
+
+- **Background:** disease cascade, mechanism, risk dose-response, conceptual framework.
+- **Methods:** model **architecture diagrams (e.g. a ResNet / U-Net / transformer block stack)**, preprocessing/pipeline flowcharts, cohort/CONSORT diagrams, estimator schematics, study-design timelines.
+- **Results:** conceptual schematics that frame a result (what a metric means, how a comparison is set up) — but never *replace* your real data figures (ROC, forest, calibration); those stay.
+- **Discussion:** decision-flow / clinical-pathway diagrams, limitation taxonomies.
+
+If a methods slide would benefit from, say, a hand-drawn ResNet block diagram, draw one (matplotlib `FancyBboxPatch` + `FancyArrowPatch`, brand-styled) — exactly as you would an intro cascade. Name it `methods_*.png`.
+
+## Two complementary figure sources — use BOTH
+
+1. **Redraw** foundational reference figures yourself in matplotlib (brand-styled), with `(adapted from Author Year)` in the **figure title** via `title(ax, ...)`. Best for *concepts/schematics*: cascades, dose-response, frameworks, architectures, pipelines. Never screenshot a paper figure.
+2. **Real openly-licensed images** where photographic realism IS the payload — an MRI, PET, histology slide, micrograph, gross specimen. Pull **CC / public-domain** primary images (Wikimedia `https://commons.wikimedia.org/wiki/Special:FilePath/<File>?width=N`; NIH/PD sources). Frame white-bg images on a `WHITE_RGB` card; dark-bg images (MRI/PET) sit on the dark canvas. Caption with **source + license**. This is distinct from (and NOT the same ethical category as) screenshotting a copyrighted journal figure — those are still forbidden.
+
+Redraw the concept; show the real thing. A mechanism slide can pair a redrawn schematic (the "how") with a real histology image (the "proof").
 
 ## Default vs opt-out
 
