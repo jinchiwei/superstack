@@ -110,7 +110,7 @@ def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 200):
         # Brand fonts if available (harmless fallback otherwise).
         try:
             import sys as _sys
-            _sys.path.insert(0, "/home/jiwei/arcadia/superstack/skills/_shared")
+            _sys.path.insert(0, str(Path.home() / "arcadia/superstack/skills/_shared"))
             from mpl_style import FONT_BODY, FONT_TITLE
         except Exception:
             FONT_BODY, FONT_TITLE = ["DejaVu Sans"], ["DejaVu Sans Mono"]
