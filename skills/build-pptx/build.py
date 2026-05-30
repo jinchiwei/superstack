@@ -1571,6 +1571,19 @@ def main() -> int:
     except Exception as e:
         print(f"contrast lint skipped: {e}", file=sys.stderr)
 
+    # Runtime contrast check — walks the rendered pptx, finds each text run's
+    # visual background by overlap with filled shapes (falling back to the
+    # theme canvas), and flags pairs below WCAG AA (4.5 normal / 3.0 large).
+    # Catches the WHITE-on-TURQUOISE, MUTED-on-canvas, etc. classes that the
+    # static lint can't see. Non-fatal stderr warning.
+    try:
+        from contrast_check import check_pptx, format_issues
+        ci = check_pptx(output_path, _sidecar if _sidecar.exists() else None)
+        if ci:
+            print(format_issues(ci), file=sys.stderr)
+    except Exception as e:
+        print(f"contrast check skipped: {e}", file=sys.stderr)
+
     # Presenter-handout PDF (slide image + speaker notes per page). Canonical
     # output when the deck has notes; skips gracefully without a rasterizer.
     # See speaker_notes.md. Disable with --no-notes-pdf.
