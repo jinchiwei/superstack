@@ -70,12 +70,19 @@ You don't need every archetype every time — pick ones that map to your slides.
 
 Use the shared canonical `mpl_style` (the project's brand). Save figures as `figures/intro_*.png` (or `figures/methods_*.png` for methods slides).
 
-```python
-import sys
-sys.path.insert(0, "/home/jiwei/arcadia/superstack/skills/_shared")
-from mpl_style import apply_style, title, TURQUOISE, DEEPPINK, AMBER, GOLD, BLUEVIOLET
+**Match the deck theme.** Read the deck's resolved theme from `<deck>.md.layout.json` (top-level `theme` field — e.g. `"slate"`, `"midnight"`, `"forest"`, `"paper"`, `"bone"`) and pass it to `apply_style(theme=...)`. Then save the figure with the theme's canvas color so the figure blends into the slide instead of being a stark white rectangle on a dark canvas:
 
-apply_style()
+```python
+import sys, json
+from pathlib import Path
+sys.path.insert(0, "/home/jiwei/arcadia/superstack/skills/_shared")
+from mpl_style import apply_style, title, theme_colors, \
+    TURQUOISE, DEEPPINK, AMBER, GOLD, BLUEVIOLET
+
+# Theme-aware setup — match the deck.
+DECK_THEME = json.loads(Path("deck.md.layout.json").read_text())["theme"]  # "slate" / "paper" / ...
+apply_style(theme=DECK_THEME)
+T = theme_colors(DECK_THEME)   # T.canvas, T.ink_text, T.muted_text, T.rule, T.surface, T.on_dark
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -83,12 +90,18 @@ import numpy as np
 fig, ax = plt.subplots(figsize=(11, 5), dpi=160)
 # ... your composition (sigmoids / bars / boxes / arrows) ...
 
-# Citation in the title -- THIS IS NOT OPTIONAL
-title(ax, "AD biomarker cascade -- where free-water could sit  (Jack 2013, NEJM)")
+# Citation in the title — THIS IS NOT OPTIONAL.
+title(ax, "AD biomarker cascade — where free-water could sit  (Jack 2013, NEJM)")
+
+# Annotation text uses theme ink, not hardcoded black/white.
+ax.text(x, y, "FW: candidate upstream N+ marker",
+        color=T.ink_text, fontsize=10, weight="bold")
 
 fig.tight_layout()
-fig.savefig("figures/intro_cascade.png", bbox_inches="tight", facecolor="white")
+fig.savefig("figures/intro_cascade.png", bbox_inches="tight", facecolor=T.canvas)
 ```
+
+If the deck theme is unknown / the figure is going to a document (not a deck), omit `theme=` and you get the default light/paper styling — black text on white.
 
 Reference the figure in `deck.md` with the citation in the alt text:
 
@@ -98,14 +111,25 @@ Reference the figure in `deck.md` with the citation in the alt text:
 
 ## Brand lock (same as everywhere)
 
-- Titles + suptitles: **Geist Mono, black** (via `title(ax, ...)` from `mpl_style`)
-- Body text (axis labels, ticks, annotations): **Geist sans, black**
-- Data marks (bars, lines, markers): brand palette in priority order — **TURQUOISE → DEEPPINK → AMBER → BLUEVIOLET**
-- Solid filled shapes (bar fills, filled markers, filled patches): swap `AMBER` → `GOLD` (matplotlib named color) for the deeper readability tone Jin uses for fills
-- Errorbar / annotation text: black; only data marks may be colored
-- White figure facecolor (`facecolor="white"`); `dpi=160`
+- Titles + suptitles: **Geist Mono**, themed ink color (via `title(ax, ...)` from `mpl_style`)
+- Body text (axis labels, ticks, annotations): **Geist sans**, themed ink (use `T.ink_text` not hardcoded `"black"` / `"white"`)
+- Data marks (bars, lines, markers): brand palette in priority order — **TURQUOISE → DEEPPINK → AMBER → BLUEVIOLET**. These work on light AND dark canvases — never swap them per theme.
+- Solid filled shapes (bar fills, filled markers, filled patches): swap `AMBER` → `GOLD` (matplotlib named color) for the deeper readability tone
+- Errorbar / annotation text: themed ink (`T.ink_text`); only data marks may be colored
+- Figure facecolor: `T.canvas` (so it matches the slide canvas); `dpi=160` (200 for high-density)
 
-Hand-rolling `rcParams` or inlining hex codes is a regression — always use `apply_style()` + the named palette imports.
+## Readability sanity check — non-negotiable
+
+Before delivering, **render every figure to PNG and look at it**. Common readability failures:
+
+- **Annotation text overlaps a curve / bar / data mark.** Move the annotation to a whitespace region of the plot — typically lower-left or lower-right corner if the curves cluster elsewhere. An arrow can still point from the safe text location to the data feature.
+- **Text contrast against the canvas is wrong.** Forgot `color=T.ink_text` and used a default that doesn't read against a dark theme.
+- **Tick labels overlap each other** at the chosen figsize.
+- **Legend covers a data series.** Use `loc="best"` or specify a clearer corner.
+
+When in doubt: render, look, fix. Inline `print()` of slide PNGs during iteration is faster than mentally simulating layout.
+
+Hand-rolling `rcParams` or inlining hex codes is a regression — always use `apply_style(theme=...)` + `theme_colors(theme)` + the named palette imports.
 
 ## Citation rules — non-negotiable
 
