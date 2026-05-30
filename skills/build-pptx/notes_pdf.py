@@ -76,7 +76,7 @@ def _fit_body(body_lines: list[str], fig_height_in: float) -> tuple[float, list[
     return pt, pages
 
 
-def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 130):
+def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 200):
     """Build `<deck>_notes.pdf`. Returns the Path, or None if it couldn't run
     (e.g. no LibreOffice/pdftoppm, or the deck has no notes)."""
     import matplotlib
@@ -136,7 +136,9 @@ def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 130):
                 body_font_pt, body_pages = _fit_body(body_lines, fig_h)
 
                 for page_idx, page_lines in enumerate(body_pages):
-                    fig = plt.figure(figsize=(fig_w, fig_h))
+                    # Higher figure DPI gives crisper embedded slide images
+                    # (the slide is rasterized at `dpi` then drawn into matplotlib).
+                    fig = plt.figure(figsize=(fig_w, fig_h), dpi=150)
                     fig.patch.set_facecolor("white")
 
                     # Slide image — top 50% (always present, every page).
