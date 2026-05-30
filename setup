@@ -103,7 +103,7 @@ done
 # build-pdf/build-pptx/build-docx render best when these are installed.
 # Per-user install (no sudo). Idempotent: skips when all 8 already in place.
 echo ""
-echo "[4/4] Installing brand fonts (Geist + Geist Mono)..."
+echo "[4/5] Installing brand fonts (Geist + Geist Mono)..."
 FONT_SRC="$REPO_DIR/fonts"
 case "$(uname -s)" in
     Darwin)  FONT_DST="$HOME/Library/Fonts" ;;
@@ -142,6 +142,16 @@ else
             echo "  fc-cache refreshed."
         fi
     fi
+fi
+
+# --- 5. CJK fallback font (for build-pptx CJK glyphs in headless render) ---
+echo ""
+echo "[5/5] Ensuring a CJK font (for CJK glyphs in headless QA / notes-PDF)..."
+if [ -x "$REPO_DIR/scripts/ensure-cjk-font.sh" ]; then
+    "$REPO_DIR/scripts/ensure-cjk-font.sh" || true
+else
+    bash "$REPO_DIR/scripts/ensure-cjk-font.sh" 2>/dev/null || \
+        echo "  (scripts/ensure-cjk-font.sh not found — skipped.)"
 fi
 
 echo ""

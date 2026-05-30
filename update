@@ -77,5 +77,10 @@ for skill in $CUSTOM_SKILLS; do
     echo "  Refreshed $skill"
 done
 
+# --- 4. CJK fallback font (no-op if a CJK font already exists) ---
+echo ""
+echo "[4/4] Ensuring a CJK font..."
+[ -f "$REPO_DIR/scripts/ensure-cjk-font.sh" ] && bash "$REPO_DIR/scripts/ensure-cjk-font.sh" || true
+
 echo ""
 echo "=== Update complete. ==="
