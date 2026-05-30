@@ -687,13 +687,44 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
     # Left accent bar
     _add_rect(slide, left=0, top=0, width=0.22, height=7.5, fill_rgb=accent)
 
-    title_h = 1.05 if title_wraps else 0.55
+    # Auto-fit the title: caller passes `title_wraps` as a coarse hint
+    # (usually len(title) > 30), but that's a worst-case assumption — a
+    # 40-char title fits comfortably on one line at 28pt in our 12.3 in
+    # title box. AND: if a title only just overflows to a 2nd line (e.g.
+    # one word on line 2), shrink the font slightly so it lands on a
+    # single line instead of leaving a near-empty 2nd line that wastes
+    # vertical space and looks ragged. Beyond a real overflow (too long
+    # to fit on one line even at 22pt), fall through to the original
+    # 2-line wrap at the default 28pt.
+    DEFAULT_TITLE_SIZE = 28
+    title_size = DEFAULT_TITLE_SIZE
+    title_wraps_final = bool(title_wraps)
+    if title_present and title:
+        # Char-width estimate for Geist Mono ≈ 0.6 × em-size in pts.
+        # Translate to inches and compare against the 12.30 in title box.
+        def _max_chars(size_pt: int) -> int:
+            char_in = size_pt * 0.6 / 72.0
+            return max(1, int(12.30 / char_in))
+        n = len(title)
+        if n <= _max_chars(DEFAULT_TITLE_SIZE):
+            title_wraps_final = False  # fits on one line at default size
+        else:
+            # Try shrinking in 2pt steps to land on a single line.
+            for try_size in (26, 24, 22):
+                if n <= _max_chars(try_size):
+                    title_size = try_size
+                    title_wraps_final = False
+                    break
+            else:
+                title_wraps_final = True  # genuinely too long — wrap
+
+    title_h = 1.05 if title_wraps_final else 0.55
     hairline_top = 0.30 + title_h + 0.10
     subtitle_top = hairline_top + 0.10
 
     if title_present:
         _add_text(slide, title, left=0.50, top=0.30, width=12.30, height=title_h,
-                  size=28, color_rgb=title_color, font=branding.MONO_FONT, bold=True)
+                  size=title_size, color_rgb=title_color, font=branding.MONO_FONT, bold=True)
         _add_rect(slide, left=0.50, top=hairline_top, width=12.30, height=0.005,
                   fill_rgb=rule_color)
 
