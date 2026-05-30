@@ -701,7 +701,8 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
     # overflow into the body region (slide 37 "Takeaways" had a 1.5-line
     # lede that ran into the top-row cards because the slot was a fixed
     # 0.40in). Cap at 1.0in so a sprawling lede doesn't eat the body.
-    if lede and not use_side_by_side:
+    has_lede = bool(lede) and not use_side_by_side
+    if has_lede:
         est_h = _estimate_paragraph_height(lede, width=12.30, size=13,
                                            line_spacing=1.30)
         lede_h = min(1.0, max(0.40, est_h))
@@ -709,14 +710,21 @@ def _add_chrome(slide, *, title: str, lede: str, footer_kwargs: dict,
                   height=lede_h,
                   size=13, color_rgb=lede_color, font=branding.SANS_FONT)
     else:
-        lede_h = 0.40
+        # No lede ⇒ no phantom slot. Previously reserved a fixed 0.40 in
+        # even when empty, wasting prime body real estate on every freeform
+        # slide (which typically sets lede="" so the design can own the
+        # whole body). Body now starts just below the hairline.
+        lede_h = 0.0
 
     if title_present:
         if use_side_by_side:
             body_top = hairline_top + 0.20
-        else:
-            # Push body_top below the dynamically-sized lede slot.
+        elif has_lede:
             body_top = subtitle_top + lede_h + 0.10
+        else:
+            # Tight gap under the hairline — gives ~0.40 in more body height
+            # for figures/tables when there is no lede beneath the title.
+            body_top = hairline_top + 0.20
     else:
         body_top = 0.40
     body_bottom = 6.85
