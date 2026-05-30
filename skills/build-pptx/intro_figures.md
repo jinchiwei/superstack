@@ -118,16 +118,11 @@ Reference the figure in `deck.md` with the citation in the alt text:
 - Errorbar / annotation text: themed ink (`T.ink_text`); only data marks may be colored
 - Figure facecolor: `T.canvas` (so it matches the slide canvas); `dpi=160` (200 for high-density)
 
-## Readability sanity check — non-negotiable
+## Self-QA — figures are visual artifacts; same discipline as slides
 
-Before delivering, **render every figure to PNG and look at it**. Common readability failures:
+Before delivering, **render every figure to PNG and look at it**. The full QA loop and the checklist of common failures (text overlap with data, contrast against the canvas, off-edge clipping, illegible tick labels, legend covering data, etc.) lives in [`self_qa.md`](self_qa.md) — **the same doc that governs slide QA**, because the principle is identical: render, look, fix; don't ship a visual you haven't looked at.
 
-- **Annotation text overlaps a curve / bar / data mark.** Move the annotation to a whitespace region of the plot — typically lower-left or lower-right corner if the curves cluster elsewhere. An arrow can still point from the safe text location to the data feature.
-- **Text contrast against the canvas is wrong.** Forgot `color=T.ink_text` and used a default that doesn't read against a dark theme.
-- **Tick labels overlap each other** at the chosen figsize.
-- **Legend covers a data series.** Use `loc="best"` or specify a clearer corner.
-
-When in doubt: render, look, fix. Inline `print()` of slide PNGs during iteration is faster than mentally simulating layout.
+Read [`self_qa.md`](self_qa.md) once; apply it to figures the same way you apply it to slides.
 
 Hand-rolling `rcParams` or inlining hex codes is a regression — always use `apply_style(theme=...)` + `theme_colors(theme)` + the named palette imports.
 

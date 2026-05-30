@@ -40,7 +40,9 @@ These are baseline craft, not extras. Get them right while designing:
 
 ## Self-QA is MANDATORY — do not deliver a deck you haven't looked at
 
-After rendering, you MUST rasterize every slide to PNG (`--qa`, or `soffice --convert-to pdf` then `pdftoppm`) and **visually inspect each one**. Fix, before handing it over: thumbnail/cramped figures, squished or unevenly-spaced text, text touching or overflowing its box, clipped numbers, low-contrast text, mismatched section accents, empty bands. Iterate render → look → fix until each slide is clean. Catching these is your responsibility — the user should not have to point at slide N and tell you a figure is tiny or text is squished. If you skipped the visual pass, you are not done.
+After rendering, you MUST rasterize every slide to PNG (`--qa`, or `soffice --convert-to pdf` then `pdftoppm`) and **visually inspect each one**. Iterate render → look → fix until each slide is clean.
+
+The full discipline — what to look for (text overlap, contrast, spacing, truncation, layout, mismatched accents, empty bands) and how to run the loop — lives in [`self_qa.md`](self_qa.md). It applies the same way to slide composition AND to custom matplotlib figures generated for the deck. **Read it once; apply it every deck.**
 
 ## Mechanics
 
