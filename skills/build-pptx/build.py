@@ -1504,6 +1504,22 @@ def main() -> int:
         except RuntimeError as e:
             print(f"QA skipped: {e}", file=sys.stderr)
 
+    # Contrast lint — flag freeform _add_text calls that use MUTED_RGB /
+    # DIM_RGB. Those colors are appropriate only for tiny secondary captions
+    # on the OPEN canvas; on a SURFACE / PAPER / accent card they produce
+    # low-contrast washed-out text (the bug from the AGF 2026-05-29 deck).
+    # Non-fatal — the agent decides whether each flagged call is OK.
+    try:
+        from contrast_lint import lint_sidecar, format_warnings
+        _sidecar = Path(args.input).resolve()
+        _sidecar = _sidecar.with_suffix(_sidecar.suffix + ".layout.json")
+        if _sidecar.exists():
+            cw = lint_sidecar(_sidecar)
+            if cw:
+                print(format_warnings(cw), file=sys.stderr)
+    except Exception as e:
+        print(f"contrast lint skipped: {e}", file=sys.stderr)
+
     # Presenter-handout PDF (slide image + speaker notes per page). Canonical
     # output when the deck has notes; skips gracefully without a rasterizer.
     # See speaker_notes.md. Disable with --no-notes-pdf.

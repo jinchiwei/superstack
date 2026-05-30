@@ -82,3 +82,12 @@ The agentic version: read the PNG file via your file-read tool, inspect visually
 ## The standard
 
 If a reasonable reader would say "this is hard to read" or "this looks off" or "there's clearly text on top of a curve here" — that's a self-QA failure, not a stylistic preference. Catch it before delivery.
+
+## Automated checks that fire during build
+
+`build.py` runs a couple of non-fatal lints after rendering. Read their stderr output as a TODO list — they catch the most common regression classes:
+
+- **Contrast lint** (`contrast_lint.py`) — scans every freeform slide's code for `_add_text(..., color_rgb=MUTED_RGB)` and `color_rgb=DIM_RGB`. These muted grays are appropriate ONLY for tiny secondary captions on the open canvas — on a SURFACE / PAPER / accent card they produce washed-out, low-contrast text. The lint prints `slide N (title) line L: MUTED_RGB` with the offending snippet so you can audit each call and either replace with `(WHITE_RGB if ON_DARK else INK_RGB)` (theme-aware ink) / `_text_on(fill_rgb)` (for accent fills), or confirm it's a legitimate canvas-side caption.
+- **Missing notes lint** — see [`speaker_notes.md`](speaker_notes.md). Lists content slides without `params['notes']` so gaps are visible.
+
+Automated lints catch known-pattern bugs; they DO NOT replace the visual pass. Things they can't catch include: text overlapping a data curve (geometric, not color), cramped figure layouts, mismatched accent colors that happen to satisfy contrast, off-edge clipping at render time. Eyes still required.

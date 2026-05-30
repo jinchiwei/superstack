@@ -124,6 +124,44 @@ Before delivering, **render every figure to PNG and look at it**. The full QA lo
 
 Read [`self_qa.md`](self_qa.md) once; apply it to figures the same way you apply it to slides.
 
+## Save the raw data so figures can be regenerated for any theme
+
+Every figure script should write the data it plots to a sibling file alongside the PNG. Two benefits:
+
+1. **Theme-matching versions** — if the deck theme changes (e.g. from `paper` to `slate`), you can re-run the figure script with `apply_style(theme=NEW)` and get a freshly-themed PNG in seconds. No analysis re-run.
+2. **A "canonical white" version always exists** — keep the default `theme=None` (paper / white background) PNG as the cross-context reference for papers, docs, posters. The slide-deck version is a separate file generated for that deck's theme.
+
+### Naming convention
+
+For a figure `figures/intro_apoe_risk.png`:
+
+- `figures/intro_apoe_risk.png` — the canonical (light / paper) version, always present
+- `figures/intro_apoe_risk_<theme>.png` — theme-matching version (e.g. `_slate.png`) used when embedded in a dark deck
+- `figures/raw/intro_apoe_risk.csv` (or `.npz`, `.json`) — the raw data the figure was plotted from
+- `figures/raw/intro_apoe_risk.gen.py` (optional) — minimal script that reads the CSV and regenerates the figure for any theme
+
+### What "raw data" means
+
+Whatever the chart eats. For:
+
+- A bar chart → CSV with `category, value, sem` columns
+- A line chart → CSV with `x, series_1, series_2, ...` columns or a long-format CSV with `series, x, y`
+- A forest plot → CSV with `study, effect, ci_lower, ci_upper, weight, label`
+- A 2D heatmap / matrix → numpy `.npz` with the matrix + row/column labels
+- A scatter → CSV with `x, y, group, label`
+
+Don't save derived plotting state (matplotlib `Line2D` objects, etc.) — save the *numbers that went in*. The regen script reads them and re-plots.
+
+### When you're authoring a new figure
+
+Pattern: split the figure into two phases — (a) compute the data, (b) plot. Phase (a) saves the data to `figures/raw/` and returns it. Phase (b) takes the data and a theme and writes the PNG. The deck-build step calls (b) with the deck's theme; the canonical-white version comes from calling (b) with `theme=None`.
+
+### Existing figures with no raw data
+
+Pre-existing figures (e.g. results from an earlier analysis that didn't save its tabular outputs) stay as-is — typically white-background. Don't retrofit unless you're already touching them. Going forward, every NEW figure should follow the raw-data contract.
+
+For `autoresearch`-driven analyses: the experiment driver scripts that write `fig_*.png` SHOULD also write `fig_*.csv` (or `.npz`) with the same stem, so the report-builder can regenerate the figure on-theme without re-running the experiment.
+
 Hand-rolling `rcParams` or inlining hex codes is a regression — always use `apply_style(theme=...)` + `theme_colors(theme)` + the named palette imports.
 
 ## Citation rules — non-negotiable
