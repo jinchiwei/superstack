@@ -183,6 +183,107 @@ def apply_style(theme: str | None = None) -> None:
     })
 
 
+def text_on_brand_fill(fill_hex: str) -> str:
+    """Pick the high-contrast text color (black or white) for text placed on
+    top of a brand-4 fill — mirrors the slide-side `layouts._common._text_on`
+    so figures get the same answer.
+
+    Per Jinchi's brand spec (validated against WCAG luminance):
+      * TURQUOISE (#40E0D0) → black  (L≈0.64 → ink ratio 12.1, white 1.5)
+      * AMBER     (#F0C840) → black  (L≈0.62 → ink ratio 11.7, white 1.5)
+      * DEEPPINK  (#FF1493) → white  (brand pref; ink 5.2, white 3.5 — knife's edge)
+      * BLUEVIOLET(#8A2BE2) → white  (L≈0.09 → white ratio 7.6, ink 1.8)
+
+    Any other fill falls back to WCAG luminance — whichever of black/white has
+    the higher contrast against the fill.
+
+    Use this anywhere a matplotlib figure puts text on top of a colored patch
+    (FancyBboxPatch, Rectangle, bar fill, …) instead of hardcoding "white" or
+    "black" — keeps figures consistent with slide composition and prevents the
+    "white text on turquoise" class of bug.
+    """
+    h = fill_hex.upper().lstrip("#")
+    # Explicit brand overrides
+    if h in ("40E0D0", "F0C840"):   # turquoise, amber
+        return "black"
+    if h in ("FF1493", "8A2BE2"):   # deeppink, blueviolet
+        return "white"
+    # Generic WCAG-based pick for non-brand fills
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    def _lin(c: int) -> float:
+        s = c / 255.0
+        return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+    lum = 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+    return "black" if lum > 0.5 else "white"
+
+
+def check_text_overflow(fig, *, tolerance_in: float = 0.02) -> list[dict]:
+    """Walk all text artists in `fig` and flag any whose rendered bbox
+    extends past its containing Axes' data-limit box.
+
+    Catches the "text wider than its FancyBboxPatch" / "label runs off the
+    plot edge" class of bug that slide-level contrast checks can't see (the
+    matplotlib figure is a flat raster image to python-pptx). Returns a list
+    of warning dicts: {axes, text, text_bbox, axes_bbox, side, overflow_in}.
+
+    Call AFTER fig.savefig (which forces a draw + computes real text extents).
+    Tolerance in inches for sub-pixel slop.
+    """
+    import matplotlib.pyplot as plt
+    fig.canvas.draw()  # ensure renderer + bboxes are real
+    renderer = fig.canvas.get_renderer()
+    fig_w_in, fig_h_in = fig.get_size_inches()
+    warnings: list[dict] = []
+    for ax in fig.axes:
+        # Axes bbox in display units → inches
+        ax_bbox_disp = ax.get_window_extent(renderer)
+        for text in ax.texts:
+            try:
+                tb = text.get_window_extent(renderer)
+            except Exception:
+                continue
+            if tb.width <= 0 or tb.height <= 0:
+                continue
+            # Convert overflow from display units to inches
+            dpi = fig.dpi
+            ax_l, ax_r = ax_bbox_disp.x0, ax_bbox_disp.x1
+            ax_b, ax_t = ax_bbox_disp.y0, ax_bbox_disp.y1
+            sides = {}
+            if tb.x0 < ax_l - tolerance_in * dpi:
+                sides["left"] = (ax_l - tb.x0) / dpi
+            if tb.x1 > ax_r + tolerance_in * dpi:
+                sides["right"] = (tb.x1 - ax_r) / dpi
+            if tb.y0 < ax_b - tolerance_in * dpi:
+                sides["bottom"] = (ax_b - tb.y0) / dpi
+            if tb.y1 > ax_t + tolerance_in * dpi:
+                sides["top"] = (tb.y1 - ax_t) / dpi
+            if sides:
+                warnings.append({
+                    "text": text.get_text()[:60],
+                    "ax": ax,
+                    "sides": sides,
+                })
+    return warnings
+
+
+def warn_text_overflow(fig, *, source: str = "") -> None:
+    """Convenience wrapper: run check_text_overflow and print warnings to stderr.
+
+    Call from a figure script right after savefig so a build log shows every
+    overflowing text artist by name. No-op when nothing overflows.
+    """
+    import sys
+    issues = check_text_overflow(fig)
+    if not issues:
+        return
+    prefix = f"[{source}] " if source else ""
+    print(f"{prefix}text overflow: {len(issues)} text artist(s) extend past their axes",
+          file=sys.stderr)
+    for w in issues:
+        sides = ", ".join(f"{k} {v:.2f}in" for k, v in w["sides"].items())
+        print(f'  "{w["text"]}" overflows: {sides}', file=sys.stderr)
+
+
 def title(ax, text: str, *, color: str | None = None, theme: str | None = None) -> None:
     """Geist Mono title. Color defaults to the active theme's ink_text.
 
@@ -208,4 +309,5 @@ __all__ = [
     "FONT_BODY", "FONT_TITLE",
     "ThemeColors", "THEMES", "theme_colors",
     "apply_style", "title", "palette",
+    "text_on_brand_fill", "check_text_overflow", "warn_text_overflow",
 ]
