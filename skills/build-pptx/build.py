@@ -348,27 +348,77 @@ def add_quote_slide(prs, *, quote: str, attribution: str = ""):
     return s
 
 
-def add_end_slide(prs, *, message: str = "Thanks", contact: str = "", bg_rgb=None):
-    """End slide: mirror title slide. Dark bg (theme canvas if bg_rgb given, else
-    navy), left double-rail.
-    Big amber "Thanks" centered, contact in dim mono below."""
+# Thank-You slide personal defaults (this is Jinchi's branded tool). Override
+# per deck via frontmatter `name`, `name_cjk`, `email` (set email: "" to omit).
+_DEFAULT_NAME_CJK = "魏晉祺"
+_DEFAULT_EMAIL = "jinchikwei@gmail.com"
+_CJK_FONT = "Noto Sans CJK TC"
+_SKILL_ASSETS = Path(__file__).resolve().parent / "assets"
+
+
+def _add_endslide_logos(slide, assets_dir, *, height_in=1.0, gap_in=0.22, margin_in=0.5):
+    """meng + xiang (夢想) identity logos, side-by-side in the lower-right.
+    No-op if the asset files are absent."""
+    paths = [Path(assets_dir) / "meng.png", Path(assets_dir) / "xiang.png"]
+    avail = [p for p in paths if p.exists()]
+    if not avail:
+        return
+    slide_w, slide_h = Inches(13.333), Inches(7.5)
+    gap, margin = Inches(gap_in), Inches(margin_in)
+    pics = [slide.shapes.add_picture(str(p), Inches(0), Inches(0), height=Inches(height_in))
+            for p in avail]
+    total_w = sum(p.width for p in pics) + gap * (len(pics) - 1)
+    block_h = max(p.height for p in pics)
+    left = slide_w - total_w - margin
+    top = slide_h - block_h - margin
+    cur = left
+    for pic in pics:
+        pic.left = int(cur)
+        pic.top = int(top + (block_h - pic.height) // 2)
+        cur = cur + pic.width + gap
+
+
+def add_end_slide(prs, *, message: str = "Thank You", contact: str = "",
+                  name: str = "", org: str = "", email=None, name_cjk=None,
+                  bg_rgb=None, assets_dir=None):
+    """Closing 'Thank You' slide — the build-pptx default. Dark bg + left
+    double-rail (mirrors the title slide); big deeppink "Thank You"; the
+    presenter's name (CJK over English, both turquoise); email in amber; and
+    the 夢想 identity logos lower-right. `email`/`name_cjk` fall back to the
+    tool owner's defaults; pass "" (or frontmatter `email: ""`) to omit either.
+    `contact` is a back-compat alias for `name`."""
+    name = name or contact
+    email = _DEFAULT_EMAIL if email is None else str(email)
+    name_cjk = _DEFAULT_NAME_CJK if name_cjk is None else str(name_cjk)
+    assets = assets_dir if assets_dir else _SKILL_ASSETS
+
     s = _blank(prs)
     _set_bg(s, bg_rgb if bg_rgb is not None else DARK_BG_RGB)
-
-    # Left double-rail (mirror of title)
     _add_rect(s, left=0, top=0, width=0.8, height=7.5, fill_rgb=TURQUOISE_RGB)
     _add_rect(s, left=0.8, top=0, width=0.25, height=7.5, fill_rgb=DEEPPINK_RGB)
 
-    _add_text(s, message, left=1.3, top=2.7, width=11.0, height=2.0,
-              size=64, color_rgb=AMBER_RGB, font=branding.MONO_FONT, bold=True,
+    _add_text(s, message, left=1.3, top=1.55, width=11.0, height=1.4,
+              size=60, color_rgb=DEEPPINK_RGB, font=branding.MONO_FONT, bold=True,
               align=PP_ALIGN.CENTER)
-    if contact:
-        # Name in turquoise (the end slide's primary accent — mirrors the
-        # title slide's left double-rail and the section-divider footer
-        # convention where Jin's name always appears in turquoise).
-        _add_text(s, contact, left=1.3, top=4.8, width=11.0, height=0.5,
-                  size=14, color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT,
-                  bold=True, align=PP_ALIGN.CENTER)
+    y = 3.55
+    if name_cjk:
+        _add_text(s, name_cjk, left=1.3, top=y, width=11.0, height=0.7, size=30,
+                  color_rgb=TURQUOISE_RGB, font=_CJK_FONT, align=PP_ALIGN.CENTER)
+        y += 0.74
+    if name:
+        _add_text(s, name, left=1.3, top=y, width=11.0, height=0.5, size=20,
+                  color_rgb=TURQUOISE_RGB, font=branding.MONO_FONT, bold=True,
+                  align=PP_ALIGN.CENTER)
+        y += 0.52
+    if org:
+        _add_text(s, org, left=1.3, top=y, width=11.0, height=0.4, size=13,
+                  color_rgb=WHITE_RGB, font=branding.SANS_FONT, align=PP_ALIGN.CENTER)
+        y += 0.44
+    if email:
+        _add_text(s, email, left=1.3, top=y + 0.04, width=11.0, height=0.4, size=16,
+                  color_rgb=AMBER_RGB, font=branding.MONO_FONT, align=PP_ALIGN.CENTER)
+
+    _add_endslide_logos(s, assets)
     return s
 
 
@@ -494,8 +544,9 @@ def _legacy_main(args) -> int:
                 _emit_content(slide, slide["title"])
 
     if not args.no_end:
-        add_end_slide(prs, message="Thanks",
-                      contact=str(meta.get("name") or ""))
+        add_end_slide(prs, name=str(meta.get("name") or ""),
+                      org=str(meta.get("org") or ""),
+                      email=meta.get("email"), name_cjk=meta.get("name_cjk"))
 
     prs.save(args.output)
     print(f"wrote {args.output}")

@@ -26,6 +26,10 @@ If the request is ambiguous, default to generating intro figures and ask the use
 
 Every deck ships with **comprehensive, didactic speaker notes** in the PowerPoint notes pane (Presenter View) — this is canonical, not optional. Put each slide's notes in its sidecar `params["notes"]`; `render.py` embeds them automatically (content slides + dividers). Notes must TEACH the slide — explain the concept in plain language for a presenter who's a little lost, translate the numbers to intuition, and give the transition. See [`speaker_notes.md`](speaker_notes.md). A non-fatal build warning lists content slides missing notes. Opt out only if the user says "no notes."
 
+## Default: rich "Thank You" closing slide
+
+The auto end slide is a branded **Thank-You** slide (replaces the old generic "Thanks"): big deeppink "Thank You", the presenter's name with **Chinese name over English, both turquoise**, email in amber, and the 夢想 identity logos (`assets/meng.png` + `assets/xiang.png`) lower-right. It pulls `name`/`org` from frontmatter; `name_cjk` and `email` fall back to the tool owner's defaults. Override per deck via frontmatter (`name:`, `org:`, `name_cjk:`, `email:`); set `email: ""` or `name_cjk: ""` to omit either. Suppress the whole slide with `--no-end`.
+
 ## Required arguments
 
 - `--input PATH` — markdown source

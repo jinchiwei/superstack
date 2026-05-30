@@ -339,9 +339,11 @@ def render_from_plan(*, md_path: Path, plan, output_path: Path,
                  footer_kwargs=footer_kwargs, palette=palette)
         _set_speaker_notes(s, params)
 
-    # End slide
+    # End slide (rich "Thank You" — name/CJK/email + identity logos by default)
     if not no_end:
-        add_end_slide(prs, message="Thanks", contact=deck_name, bg_rgb=cover_bg)
+        add_end_slide(prs, name=deck_name, org=deck_org,
+                      email=meta.get("email"), name_cjk=meta.get("name_cjk"),
+                      bg_rgb=cover_bg)
 
     prs.save(str(output_path))
     _os.chdir(_orig_cwd)

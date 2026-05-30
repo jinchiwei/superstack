@@ -166,27 +166,30 @@ def test_title_slide_has_gray_bottom_rule():
     assert not found_amber, "title slide should no longer have an amber fill bar"
 
 
-def test_end_slide_thanks_is_amber_no_hairline():
-    """End slide colors the 'Thanks' message amber and drops the amber hairline bar."""
+def test_end_slide_default_thank_you():
+    """Default end slide: deeppink 'Thank You' headline, turquoise presenter
+    name, amber email (the rich Thank-You closer)."""
     prs = new_presentation()
-    add_end_slide(prs, message="Thanks", contact="me")
+    add_end_slide(prs, name="Jinchi Wei", org="UCSF",
+                  email="x@example.com", name_cjk="")  # skip CJK glyph in unit test
     s = prs.slides[0]
-    amber_rect = False
-    thanks_amber = False
+    headline_deeppink = email_amber = name_turquoise = False
     for shp in s.shapes:
-        try:
-            if shp.fill.type == 1 and str(shp.fill.fore_color.rgb).upper() == "F0C840":
-                amber_rect = True
-        except Exception:
-            pass
-        if shp.has_text_frame:
-            for para in shp.text_frame.paragraphs:
-                for run in para.runs:
-                    if run.text.strip() == "Thanks":
-                        try:
-                            if str(run.font.color.rgb).upper() == "F0C840":
-                                thanks_amber = True
-                        except Exception:
-                            pass
-    assert thanks_amber, "'Thanks' message should be amber"
-    assert not amber_rect, "end slide should no longer have an amber hairline bar"
+        if not shp.has_text_frame:
+            continue
+        for para in shp.text_frame.paragraphs:
+            for run in para.runs:
+                t = run.text.strip()
+                try:
+                    c = str(run.font.color.rgb).upper()
+                except Exception:
+                    c = ""
+                if t == "Thank You" and c == "FF1493":
+                    headline_deeppink = True
+                if t == "x@example.com" and c == "F0C840":
+                    email_amber = True
+                if t == "Jinchi Wei" and c == "40E0D0":
+                    name_turquoise = True
+    assert headline_deeppink, "headline 'Thank You' should be deeppink"
+    assert email_amber, "email should be amber"
+    assert name_turquoise, "presenter name should be turquoise"
