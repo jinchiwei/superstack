@@ -19,8 +19,13 @@ from pathlib import Path
 
 
 # Layout (landscape letter, figsize=(11, 8.5))
-_TITLE_WIDTH_CHARS = 95     # title wrap width (bigger font → narrower)
-_BODY_WIDTH_CHARS = 116     # body wrap width
+# Title wrap width is measured AFTER prepending the "Slide N — " prefix, so
+# this is the actual on-page line length, not just the user-text portion.
+# Geist Mono (the brand title font) at 13pt is ~0.118 in/char; with 10.12 in
+# of usable width (0.92 of an 11-in page), the practical ceiling is ~85 chars.
+# Stay under that to leave a small right margin and survive non-mono fallbacks.
+_TITLE_WIDTH_CHARS = 78     # tight; accounts for prefix + non-mono fallback
+_BODY_WIDTH_CHARS = 110     # body wrap width (slightly tighter than before)
 _BODY_FONT_MAX = 10.5       # starting body font (pt)
 _BODY_FONT_MIN = 8.0        # floor before overflow to next page
 _BODY_LINESPACING = 1.40
@@ -119,9 +124,10 @@ def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 130):
                 raw_head = lines[0] if lines else f"Slide {i + 1}"
                 body = lines[1].strip() if len(lines) > 1 else ""
 
-                # Word-wrap the title so long heads don't run off the right edge.
-                head_lines = textwrap.wrap(raw_head, width=_TITLE_WIDTH_CHARS) or [raw_head]
-                head_wrapped = "\n".join(head_lines)
+                # Word-wrap the FULL title (prefix + head) so the on-page line
+                # length — not just the user-text portion — stays under the limit.
+                full_head = f"Slide {i + 1} — {raw_head}"
+                head_lines = textwrap.wrap(full_head, width=_TITLE_WIDTH_CHARS) or [full_head]
                 # Each title line shifts the body anchor down ~1.7% of fig height.
                 title_offset = 0.017 * (len(head_lines) - 1)
 
@@ -141,12 +147,14 @@ def build_notes_pdf(pptx_path, out_pdf=None, *, dpi: int = 130):
                     except Exception:
                         pass
 
-                    # Title — wrapped, multi-line.
-                    title_text = f"Slide {i + 1} — {head_wrapped}"
+                    # Title — wrapped, multi-line. Pagination suffix on its own
+                    # final line so it can't widen any wrapped title line.
+                    title_text = "\n".join(head_lines)
                     if len(body_pages) > 1:
-                        title_text += f"   ({page_idx + 1}/{len(body_pages)})"
-                    if page_idx > 0:
-                        title_text += "   (notes continued)"
+                        suffix = f"   ({page_idx + 1}/{len(body_pages)})"
+                        if page_idx > 0:
+                            suffix += "   (notes continued)"
+                        title_text += "\n" + suffix.strip()
                     fig.text(0.04, 0.42, title_text, ha="left", va="top",
                              fontsize=13, fontfamily=FONT_TITLE, fontweight="bold",
                              color="#1A1A1A", linespacing=1.25)
