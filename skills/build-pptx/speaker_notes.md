@@ -12,6 +12,8 @@ Put the notes for a slide in its sidecar entry under `params["notes"]` (a plain 
     "notes": "What this slide shows, what to SAY, the key numbers, the transition." } }
 ```
 
+Write `notes` as free-flowing paragraph(s) — **do NOT prefix your own headline line.** `render.py` automatically prepends the slide's own descriptive title (`params['title']`, or a divider's `label`) as the notes' first line. The presenter-handout PDF (`notes_pdf.py`) renders that first line as the **Geist-Mono-bold headline** ("Slide N — <title>") and your full paragraph below as **regular Geist-sans body**. So the handout always gets a clean bold title without you formatting one, and the body stays readable prose (not all-bold-monospace). The prepend is idempotent — it won't double-add if the notes already start with the title.
+
 (For a deck you've already rendered, you can also post-stamp notes with python-pptx via `slide.notes_slide.notes_text_frame.text` — but the sidecar `params['notes']` path is canonical and survives re-renders.)
 
 ## What good notes ARE — didactic, not a teleprompter

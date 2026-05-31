@@ -202,12 +202,24 @@ def _preprocess_plan(plan) -> list:
 def _set_speaker_notes(slide, params) -> None:
     """Write a slide's `params['notes']` into its PowerPoint notes pane
     (Presenter View). Canonical speaker-notes support — see speaker_notes.md.
-    No-op when the slide carries no notes."""
-    notes = (params or {}).get("notes")
+    No-op when the slide carries no notes.
+
+    The slide's own descriptive title (params['title'], or a divider's
+    'label') is prepended as the first line. notes_pdf.py renders that first
+    line as the Geist-Mono-bold handout headline and the rest as regular
+    Geist-sans body — so authors write notes as free paragraph(s) with NO
+    special headline formatting and the handout still gets a clean bold
+    title. Idempotent: won't double-prepend if notes already lead with it."""
+    params = params or {}
+    notes = params.get("notes")
     if not notes:
         return
+    notes = str(notes)
+    title = str(params.get("title") or params.get("label") or "").strip()
+    if title and not notes.lstrip().startswith(title):
+        notes = f"{title}\n\n{notes}"
     try:
-        slide.notes_slide.notes_text_frame.text = str(notes)
+        slide.notes_slide.notes_text_frame.text = notes
     except Exception:
         pass  # never let a notes failure abort the render
 
