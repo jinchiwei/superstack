@@ -30,9 +30,13 @@ DARK_BG = "#0E1A35"
 # === Semantic role aliases ===
 # These are the names used in renderers. If we ever swap which canonical
 # color plays which role, change here, no other code changes needed.
+# Body-heading color cascade (build-pdf / build-docx): brand-4 by depth.
+# H1 (big sections) turquoise, H2 (subsections) deeppink, H3 blueviolet.
+# Amber is intentionally skipped here: as text on a light page it fails WCAG
+# contrast (amber is the SOLID-FILL accent, not a text color).
 HEADING_1     = TURQUOISE
 HEADING_2     = DEEPPINK
-HEADING_3     = INK
+HEADING_3     = BLUEVIOLET
 NAME_COLOR    = TURQUOISE
 ORG_COLOR     = DEEPPINK
 METRIC_COLOR  = BLUEVIOLET
