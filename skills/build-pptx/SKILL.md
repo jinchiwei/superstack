@@ -22,6 +22,12 @@ For any **research-talk deck** — lab talks, conference talks, defenses, semina
 
 If the request is ambiguous, default to generating intro figures and ask the user post-build whether to keep or strip them.
 
+## Default: every results slide ships with a representative data figure
+
+For any slide that headlines a quantitative finding (β, OR, ratio, p-value, mean difference, etc.) in a research-talk deck, **the slide MUST pair the headline number with a figure showing the underlying data** — scatter + regression line, forest plot, longitudinal trajectory, bar chart with error bars, etc. Big-stat-only slides with bullet points are a regression. See [`results_figures.md`](results_figures.md) for the layout pattern (compact hero stat left + dominant data figure right), acceptable figure types per finding shape, and how to handle existing-figure vs need-to-regenerate cases.
+
+Use the figures the experiment scripts already produce (typically under `results/<date>_<scope>/<analysis>/figures/`) — copy/symlink them into the deck's `figures/` dir with a result-oriented name. Don't redraw if a clean version exists. If no figure exists for a finding, regenerate from the underlying summary CSV using the canonical `mpl_style` + the deck theme.
+
 ## Default: ship comprehensive speaker notes
 
 Every deck ships with **comprehensive, didactic speaker notes** in the PowerPoint notes pane (Presenter View) — this is canonical, not optional. Put each slide's notes in its sidecar `params["notes"]`; `render.py` embeds them automatically (content slides + dividers). Notes must TEACH the slide — explain the concept in plain language for a presenter who's a little lost, translate the numbers to intuition, and give the transition. See [`speaker_notes.md`](speaker_notes.md). A non-fatal build warning lists content slides missing notes. Opt out only if the user says "no notes."
