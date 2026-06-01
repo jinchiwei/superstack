@@ -83,9 +83,14 @@ def _is_brand_approved(text_hex: str, bg_hex: str, theme: str, font_pt: float) -
     #    edge with white at 3.64; brand spec keeps white over deeppink anyway.
     if bg_hex in BRAND_ACCENTS_HEX:
         return True
-    # 3) Chrome-muted text on canvas at small sizes — footers, separators,
-    #    tiny captions. Decorative; not body text.
-    if text_hex in CHROME_MUTED_HEX and on_canvas_or_surface and font_pt <= 12:
+    # 3) Chrome-muted text on canvas at TINY sizes — footers, separators,
+    #    page-number-style captions. Decorative; not body text. Threshold
+    #    is 11pt (exempts the build-pptx default footer at 11pt and below)
+    #    but NOT 11.5pt+: body-sized muted text on dark canvas becomes
+    #    unreadable (e.g. #555560 on slate at 11.5pt = ~2.0 ratio) and the
+    #    AGF Statistical Approach slide demonstrated this — must NOT be
+    #    exempted.
+    if text_hex in CHROME_MUTED_HEX and on_canvas_or_surface and font_pt <= 11:
         return True
     return False
 
