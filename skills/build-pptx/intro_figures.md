@@ -63,8 +63,47 @@ Aim for one custom figure per background concept. Typical research-deck intro ha
 | **Cohort demographics** | Grouped bars by group × cohort + modality availability matrix | Any consortium description figure |
 | **Pipeline / preprocessing flowchart** | FancyBboxPatch nodes + FancyArrowPatch arrows, color-coded by stage | Method papers' "Figure 1" pipeline diagrams |
 | **Timeline / treatment landscape** | Clinical-era stack: approvals, trials, key papers as year-stacked bars | Drug-approval / biomarker-validation timelines |
+| **Lit-positioning grid (this-work vs comparators)** | Dimensions × papers matrix with cells colored {primary axis / covariate / not covered / this-work primary}. Tells the audience exactly where your contribution sits in the field. | `where_this_work_sits_<topic>.png` — pairs with a "Where this work sits in the literature" slide |
 
 You don't need every archetype every time — pick ones that map to your slides.
+
+### Lit-positioning grid — recipe
+
+Use this when a slide needs to answer "what's already known vs what's the gap we fill". Two parts:
+
+1. **Figure** — a `dims × papers` matrix. Cell color encodes coverage:
+   - **turquoise + ✓** = paper makes this dimension its primary axis
+   - **deeppink + ✓** = THIS WORK's primary axis (visually distinct so the contribution pops)
+   - **amber + ~** = covered as covariate or adjacent dimension
+   - **muted-gray + —** = not covered
+
+   Sketch:
+   ```python
+   dims = ["Cortical FW", "APOE4 primary axis", "CDR-SB continuous", ...]
+   papers = ["Ofori 2019", "Maillard 2025", ..., "THIS WORK"]
+   M = np.array([[0.0, 1.0, ..., 1.0], ...])  # 0 / 0.5 / 1.0 per cell
+   for i, j in product(range(M.shape[0]), range(M.shape[1])):
+       v = M[i, j]
+       if v >= 0.95:  c, glyph = (TURQUOISE if j < last else DEEPPINK), "✓"
+       elif v > 0.2:  c, glyph = AMBER, "~"
+       else:          c, glyph = MUTED, "—"
+       ax.add_patch(Rectangle((j-.45, i-.45), .9, .9, fc=c, ec=T.canvas, lw=2.0))
+       ax.text(j, i, glyph, ha="center", va="center", weight="bold", family="monospace")
+   ```
+   Plus a small legend strip below ("primary axis / this-work primary / covariate / not covered") in those same four colors.
+
+2. **Slide right-rail** — pair the figure (~60% width) with a column of 4-5 "OUR ANGLE" cards on the right (~35%), each summarizing one dimension class: established / active frontier / gap-we-fill / additional contributions. Each card has a colored vertical strip matching its dimension-class chip color. Two-card example:
+
+   ```python
+   cards = [("Cortical FW",      "established -- not our headline", MUTED_RGB),
+            ("Cortical FW x tau", "active frontier (Bellaver '26)", AMBER_RGB),
+            ("APOE4 primary axis","gap -- our contribution",        TURQUOISE_RGB),
+            ("Longitudinal + multi-cohort", "additional gaps filled", DEEPPINK_RGB)]
+   ```
+
+The combined slide reads at a glance: rows = dimensions, last column = THIS WORK (pink ticks = our contribution); right rail = the narrative claim per dimension class. Established dimensions get the gray treatment so they don't compete visually with the new contribution.
+
+Worked example: `ad-genetics-fwf/docs/runs/2026-05-29_lab-talk/_make_figs.py:fig_lit_landscape()` (figure) + `_gen_lab_talk.py:DESIGNS["work sits in the literature"]` (right-rail design).
 
 ## How — code template
 
@@ -163,6 +202,17 @@ Pre-existing figures (e.g. results from an earlier analysis that didn't save its
 For `autoresearch`-driven analyses: the experiment driver scripts that write `fig_*.png` SHOULD also write `fig_*.csv` (or `.npz`) with the same stem, so the report-builder can regenerate the figure on-theme without re-running the experiment.
 
 Hand-rolling `rcParams` or inlining hex codes is a regression — always use `apply_style(theme=...)` + `theme_colors(theme)` + the named palette imports.
+
+## Figure titles — describe, don't editorialize (Nature-ready)
+
+A figure title states **what the figure shows**, not what to conclude from it. Write it like a Nature/journal figure title: concise, descriptive, professional, and representative of the axes/data — never a claim, takeaway, or sentence with a verb of judgment.
+
+- ✅ `"F1 by finding across 22 models"`, `"Mean sensitivity vs specificity by model"`, `"Per-model performance across metrics"`, `"ARIA incidence in pivotal anti-amyloid trials"`, `"Overall LLM ranking by composite score (n = 22)"`
+- ❌ `"ARIA-E most reliable, effusion & microhemorrhage hardest"`, `"o1 leads, all 22 above 0.67"`, `"Reasoning stays fluent even when the label is wrong"`, `"ARIA is common — it must be monitored at scale"`
+
+The **interpretation / takeaway / punchline belongs on the SIDE** — the slide's H2 headline, an aside card, a callout zone, or (in a paper) the figure caption prose. Never bake the editorial claim into the image itself: the same PNG gets reused in the paper, a poster, and the deck, and a claim-as-title reads as unprofessional and can't be re-captioned. Keep the matplotlib `title()` neutral; let the slide chrome carry the argument.
+
+This applies to schematics too: label them by what they depict (`"Mechanism of ARIA-E and ARIA-H"`), not by a rhetorical question or thesis (`"Can an LLM read ARIA reliably?"`). Legend/colorbar meaning (e.g. "best / worst") goes in the colorbar ticks or a small legend, not the title.
 
 ## Citation rules — non-negotiable
 

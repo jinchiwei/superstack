@@ -71,6 +71,7 @@ The agentic version: read the PNG file via your file-read tool, inspect visually
 - **Bars / markers cut off at axis edges**: extend `ylim` or `xlim` slightly past the data range.
 - **Error bars invisible** because they're the same color as the background or too thin to see.
 - **No citation in the title** when redrawing a published reference — see [`intro_figures.md`](intro_figures.md).
+- **Editorializing figure title**: the `title()` states a conclusion/takeaway/claim (`"o1 leads, all 22 above 0.67"`, `"Reasoning stays fluent even when wrong"`) instead of describing the data (`"Overall LLM ranking by composite score"`). Make it a neutral Nature-style descriptor; move the takeaway to the slide H2 / aside / caption — see [`intro_figures.md`](intro_figures.md).
 
 ## You did NOT do self-QA if
 
