@@ -284,6 +284,125 @@ def warn_text_overflow(fig, *, source: str = "") -> None:
         print(f'  "{w["text"]}" overflows: {sides}', file=sys.stderr)
 
 
+def check_box_padding(fig, *, min_clear_frac: float = 0.08) -> list[dict]:
+    """Flag text artists that sit inside a filled box but hug its top/bottom edge.
+
+    Complements check_text_overflow: that one only catches text leaving its Axes,
+    so a big number crammed against the top of an inner FancyBboxPatch (poor
+    interior padding, but well within the Axes) goes unseen. This walks each
+    solid-filled FancyBboxPatch / Rectangle and flags text it contains whose
+    clearance to the box's top or bottom edge is < `min_clear_frac` of the box
+    height (vertical only -- the common "number too close to top of box" bug).
+
+    Heuristics to avoid false positives on intentional designs:
+      - the box must be solidly filled (alpha >= 0.5),
+      - the box must be meaningfully taller than the text (>1.6x), which skips
+        tight header bands where the text is *meant* to fill the band,
+      - the text center must fall inside the box and the box must be wider than
+        the text (so footers / side labels that merely overlap aren't matched),
+      - the text must be roughly horizontally centered in the box (within 30% of
+        the box width of center), which skips corner badges and edge labels that
+        are *meant* to sit in a corner rather than float as the box's content,
+      - the box must hold at most two text artists (a number + a sublabel), so a
+        header above a multi-line panel or list is not mistaken for a drifted tile,
+      - boxes whose interior is covered by an image are skipped (media cards: the
+        text in them is a caption/header, not floating content).
+
+    Call AFTER fig.savefig. Returns dicts: {text, side, clearance_in, box_h_in}.
+    """
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    dpi = fig.dpi
+    issues: list[dict] = []
+    for ax in fig.axes:
+        # images (imshow)占 the box's interior -> any text in such a box is a header,
+        # not a floating element; collect their extents to exclude those boxes.
+        img_bboxes = []
+        for im in ax.images:
+            try:
+                ib = im.get_window_extent(renderer)
+                if ib.width > 0 and ib.height > 0:
+                    img_bboxes.append(ib)
+            except Exception:
+                pass
+        boxes = []
+        for p in ax.patches:
+            if not isinstance(p, (FancyBboxPatch, Rectangle)):
+                continue
+            fc = p.get_facecolor()
+            if fc is None or len(fc) < 4 or fc[3] < 0.5:  # need a solid fill
+                continue
+            bb = p.get_window_extent(renderer)
+            if bb.width <= 0 or bb.height <= 0:
+                continue
+            # skip a box whose interior is occupied by an image (it's a media card)
+            if any(ib.x1 > bb.x0 and ib.x0 < bb.x1 and ib.y1 > bb.y0 and ib.y0 < bb.y1
+                   and (min(ib.x1, bb.x1) - max(ib.x0, bb.x0)) * (min(ib.y1, bb.y1) - max(ib.y0, bb.y0))
+                   > 0.25 * bb.width * bb.height
+                   for ib in img_bboxes):
+                continue
+            boxes.append(bb)
+        if not boxes:
+            continue
+        # text centers, to tell tiles (a number + a label) from panels / lists
+        # (a header above many lines). Top-hugging only matters for the former.
+        centers = []
+        for t in ax.texts:
+            if not t.get_text().strip():
+                continue
+            try:
+                cb = t.get_window_extent(renderer)
+            except Exception:
+                continue
+            centers.append(((cb.x0 + cb.x1) / 2, (cb.y0 + cb.y1) / 2))
+
+        def _ntexts(b):
+            return sum(1 for (mx, my) in centers
+                       if b.x0 <= mx <= b.x1 and b.y0 <= my <= b.y1)
+
+        for text in ax.texts:
+            s = text.get_text().strip()
+            if not s:
+                continue
+            try:
+                tb = text.get_window_extent(renderer)
+            except Exception:
+                continue
+            if tb.width <= 0 or tb.height <= 0:
+                continue
+            cx, cy = (tb.x0 + tb.x1) / 2, (tb.y0 + tb.y1) / 2
+            contain = [b for b in boxes
+                       if b.x0 <= cx <= b.x1 and b.y0 <= cy <= b.y1
+                       and b.width >= tb.width and b.height > tb.height * 1.6
+                       and abs(cx - (b.x0 + b.x1) / 2) <= 0.30 * b.width]
+            if not contain:
+                continue
+            b = min(contain, key=lambda b: b.width * b.height)
+            if _ntexts(b) > 2:   # a panel/list header, not a centered tile element
+                continue
+            thresh = min_clear_frac * b.height
+            for side, clr in (("top", b.y1 - tb.y1), ("bottom", tb.y0 - b.y0)):
+                if clr < thresh:
+                    issues.append({"text": s[:40], "side": side,
+                                   "clearance_in": clr / dpi, "box_h_in": b.height / dpi})
+    return issues
+
+
+def warn_box_padding(fig, *, source: str = "", min_clear_frac: float = 0.08) -> None:
+    """Convenience wrapper: run check_box_padding and print warnings to stderr."""
+    import sys
+    issues = check_box_padding(fig, min_clear_frac=min_clear_frac)
+    if not issues:
+        return
+    prefix = f"[{source}] " if source else ""
+    print(f"{prefix}box padding: {len(issues)} text artist(s) hug a box edge",
+          file=sys.stderr)
+    for w in issues:
+        print(f'  "{w["text"]}" too close to {w["side"]} edge '
+              f'({w["clearance_in"]:.2f}in of a {w["box_h_in"]:.2f}in box)', file=sys.stderr)
+
+
 def title(ax, text: str, *, color: str | None = None, theme: str | None = None) -> None:
     """Geist Mono title. Color defaults to the active theme's ink_text.
 
