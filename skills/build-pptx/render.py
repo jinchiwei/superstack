@@ -214,12 +214,33 @@ def _set_speaker_notes(slide, params) -> None:
     notes = params.get("notes")
     if not notes:
         return
-    notes = str(notes)
+    notes = str(notes).strip()
     title = str(params.get("title") or params.get("label") or "").strip()
+    # Split into a headline + body. The headline renders Geist-Mono-bold; the
+    # body renders Geist-sans REGULAR. We must set the run fonts EXPLICITLY —
+    # assigning `notes_text_frame.text` alone inherits the notes placeholder's
+    # default run formatting (Geist Mono bold on the brand master), which makes
+    # the whole pane bold monospace. (Fix: 2026-06-02.)
     if title and not notes.lstrip().startswith(title):
-        notes = f"{title}\n\n{notes}"
+        headline, body = title, notes
+    else:
+        first, _, rest = notes.partition("\n")
+        headline, body = first.strip(), rest.strip()
+    paras = ([("mono", headline)] if headline else [])
+    paras += [("sans", c.strip()) for c in body.split("\n\n") if c.strip()]
+    if not paras:
+        paras = [("sans", notes)]
     try:
-        slide.notes_slide.notes_text_frame.text = notes
+        from pptx.util import Pt
+        tf = slide.notes_slide.notes_text_frame
+        tf.clear()
+        for i, (kind, txt) in enumerate(paras):
+            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+            run = p.add_run()
+            run.text = txt
+            run.font.name = branding.MONO_FONT if kind == "mono" else branding.SANS_FONT
+            run.font.bold = (kind == "mono")
+            run.font.size = Pt(13 if kind == "mono" else 11)
     except Exception:
         pass  # never let a notes failure abort the render
 

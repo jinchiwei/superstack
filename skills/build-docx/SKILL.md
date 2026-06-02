@@ -13,6 +13,8 @@ User asks to make a DOCX from markdown for a paper draft, manuscript, lab writeu
 
 For neutral/journal-default DOCX (Times/Calibri), the recipient's Word will substitute as needed; this skill produces the source-of-truth in your style.
 
+**Annotated outlines ship as DOCX too (default).** Whenever you author a paper/abstract *annotated outline* (bullet-per-sentence skeleton with citation markers + flow notes — the "PCNSL-style" outline Jinchi writes prose into), deliver it as a branded `.docx` alongside the `.md`, not just markdown. Jinchi writes into the Word doc, so the outline must land in his brand. Run `build.py --input <outline>.md --output <outline>.docx --toc`. Same for the full paper draft. Don't stop at the `.md`.
+
 ## Required arguments
 
 - `--input PATH` -- markdown source
