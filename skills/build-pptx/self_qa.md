@@ -67,7 +67,7 @@ The agentic version: read the PNG file via your file-read tool, inspect visually
 ### Figure-specific
 
 - **Axis labels too small to read at slide-scale**: the figure looks fine at 100% but tiny on a projected slide. Bump fontsize on axis labels, ticks, and any data annotations to 11-13pt.
-- **Legend covers data**: change `loc=` or move the legend outside the plot area.
+- **Legend covers data**: a legend on top of bars/points is a defect — move it OUTSIDE the plot (horizontal strip below the axis: `loc="upper center", bbox_to_anchor=(0.5, -0.11), ncol=2, frameon=False`, or above). Verify in the QA render that no data is covered.
 - **Bars / markers cut off at axis edges**: extend `ylim` or `xlim` slightly past the data range.
 - **Error bars invisible** because they're the same color as the background or too thin to see.
 - **No citation in the title** when redrawing a published reference — see [`intro_figures.md`](intro_figures.md).

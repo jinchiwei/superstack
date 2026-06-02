@@ -205,12 +205,15 @@ Hand-rolling `rcParams` or inlining hex codes is a regression — always use `ap
 
 ## Figure titles — describe, don't editorialize (Nature-ready)
 
-A figure title states **what the figure shows**, not what to conclude from it. Write it like a Nature/journal figure title: concise, descriptive, professional, and representative of the axes/data — never a claim, takeaway, or sentence with a verb of judgment.
+A figure title states **what the figure shows**, not what to conclude from it. Write it like a Nature axis label: a **short noun phrase (2–5 words)** naming what's plotted — no claim, no takeaway, no model counts, no `(n = …)` parentheticals, no sample sizes.
 
-- ✅ `"F1 by finding across 22 models"`, `"Mean sensitivity vs specificity by model"`, `"Per-model performance across metrics"`, `"ARIA incidence in pivotal anti-amyloid trials"`, `"Overall LLM ranking by composite score (n = 22)"`
-- ❌ `"ARIA-E most reliable, effusion & microhemorrhage hardest"`, `"o1 leads, all 22 above 0.67"`, `"Reasoning stays fluent even when the label is wrong"`, `"ARIA is common — it must be monitored at scale"`
+- ✅ `"F1 by ARIA finding"`, `"Sensitivity vs specificity"`, `"Performance by model and metric"`, `"Overall model ranking"`, `"Reasoning-quality ratings"`, `"ARIA incidence in anti-amyloid trials"`
+- ⚠️ too wordy (de-editorialized but still bloated): `"F1 by finding across 22 models"`, `"Chain-of-thought quality by label correctness"`, `"Overall LLM ranking by composite score (n = 22)"` — strip to the noun phrase.
+- ❌ a claim/comment: `"ARIA-E most reliable, microhemorrhage hardest"`, `"o1 leads, all 22 above 0.67"`, `"Reasoning stays fluent even when wrong"`, `"ARIA is common — must be monitored at scale"`
 
 The **interpretation / takeaway / punchline belongs on the SIDE** — the slide's H2 headline, an aside card, a callout zone, or (in a paper) the figure caption prose. Never bake the editorial claim into the image itself: the same PNG gets reused in the paper, a poster, and the deck, and a claim-as-title reads as unprofessional and can't be re-captioned. Keep the matplotlib `title()` neutral; let the slide chrome carry the argument.
+
+**Legend must never overlap the data.** A legend covering bars/points (e.g. `loc="lower left"` landing on the bars) is a defect. Put it OUTSIDE the plot — a horizontal strip below the axis (`ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.11), ncol=2, frameon=False)`) or above it — and confirm in the QA render that no data is covered.
 
 This applies to schematics too: label them by what they depict (`"Mechanism of ARIA-E and ARIA-H"`), not by a rhetorical question or thesis (`"Can an LLM read ARIA reliably?"`). Legend/colorbar meaning (e.g. "best / worst") goes in the colorbar ticks or a small legend, not the title.
 
