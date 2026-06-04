@@ -78,9 +78,9 @@ def test_expressive_freeform_has_zero_error_chips(tmp_path):
     assert not chips, chips
 
 
-def test_strict_mode_keeps_named_layouts(tmp_path):
-    """Strict mode must skip the composer entirely — named layouts, no
-    freeform."""
+def test_strict_mode_is_opt_in_only(tmp_path):
+    """strict is opt-in: an EXPLICIT --mode strict is honored (named layouts,
+    no composer freeform); but it is never the default (covered elsewhere)."""
     md = tmp_path / "deck.md"
     md.write_text(FIXTURE_REALISTIC.read_text())
     out = tmp_path / "out.pptx"
@@ -89,9 +89,19 @@ def test_strict_mode_keeps_named_layouts(tmp_path):
     plan, counts = _kinds(sidecar)
     assert plan["mode"] == "strict"
     assert not (_BLOCK_KINDS & set(counts)), counts
-    # And there ARE named content layouts.
     content = _content_slides(plan)
     assert content and all(s["kind"] not in _BLOCK_KINDS for s in content)
+
+
+def test_default_mode_is_expressive_not_strict(tmp_path):
+    """With no --mode flag, the deck is ALWAYS bespoke (expressive), never strict."""
+    md = tmp_path / "deck.md"
+    md.write_text(FIXTURE_REALISTIC.read_text())
+    out = tmp_path / "out.pptx"
+    _build(md, out)  # no --mode
+    sidecar = md.with_suffix(md.suffix + ".layout.json")
+    plan, _ = _kinds(sidecar)
+    assert plan["mode"] == "expressive"
 
 
 def test_agent_authored_freeform_sidecar_is_preserved(tmp_path):

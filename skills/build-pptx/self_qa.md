@@ -66,6 +66,8 @@ The agentic version: read the PNG file via your file-read tool, inspect visually
 
 ### Figure-specific
 
+- **Figure background ≠ slide background** (HARD FAIL): a white figure box sitting on a dark themed slide (or a dark box on a light slide) reads as a pasted screenshot. The figure MUST be rendered on the slide's canvas color (`figure`/`axes`/`savefig` facecolor = the theme canvas hex; foreground flipped to readable) — see the figure-background rule in [`bespoke_design.md`](bespoke_design.md). Regenerate from the saved raw data, don't reuse a white-bg figure on a dark slide.
+- **Raw data not saved**: if you generated a figure but didn't persist its underlying arrays/table next to the script, it's not done — re-theming or tweaking then needs a full re-run. Save npz/csv/parquet/json every time.
 - **Axis labels too small to read at slide-scale**: the figure looks fine at 100% but tiny on a projected slide. Bump fontsize on axis labels, ticks, and any data annotations to 11-13pt.
 - **Legend covers data**: a legend on top of bars/points is a defect — move it OUTSIDE the plot (horizontal strip below the axis: `loc="upper center", bbox_to_anchor=(0.5, -0.11), ncol=2, frameon=False`, or above). Verify in the QA render that no data is covered.
 - **Bars / markers cut off at axis edges**: extend `ylim` or `xlim` slightly past the data range.

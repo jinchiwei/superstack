@@ -46,7 +46,7 @@ The auto end slide is a branded **Thank-You** slide (replaces the old generic "T
 - `--no-cover` — suppress title slide
 - `--no-end` — suppress closing "Thanks" slide
 - `--use-blocks=auto|never|always` — control when `composition`/`freeform` layouts are admissible (default: `auto`)
-- `--mode=expressive|strict` — deck construction mode (default: `expressive`). See [Construction modes](#construction-modes).
+- `--mode=expressive|strict` — default `expressive` (bespoke). `strict` (named layouts) is **opt-in only** — pass it explicitly; never a default or silent fallback. See [Construction mode](#construction-mode--bespoke-by-default-strict-is-opt-in-only).
 - `--allow-composed` — bypass the bespoke gate and ship the agentless composer FLOOR. Non-interactive / cron use ONLY (see below). An agent in the loop must NOT pass this — handcraft instead.
 - `--qa` — after rendering, emit per-slide PNGs for visual inspection. See [Visual QA loop](#visual-qa-loop---qa).
 
@@ -384,14 +384,13 @@ For a section divider, you must set `accent_hex`:
 }
 ```
 
-## Construction modes
+## Construction mode — bespoke by default; strict is opt-in only
 
-`--mode` controls the overall deck aesthetic:
+**`expressive` (bespoke) is the DEFAULT and the only mode you get unless you ask otherwise.** The planner DESIGNS each slide freely (freeform-first, Anthropic-pptx aesthetic), with NO deterministic layout-selection rubric. The only hard constraints are the brand lock: fonts (Geist / Geist Mono) and the color palette (brand-4 accents + the theme's supplementary hues). Named layouts are optional tools the planner may use when content cleanly fits one; everything else is its call. A theme is auto-picked (seeded by `shake_seed`) and frozen into the sidecar.
 
-- **`expressive`** (default) — the planner DESIGNS each slide freely (freeform-first, Anthropic-pptx aesthetic), with NO deterministic layout-selection rubric. The only hard constraints are the brand lock: fonts (Geist / Geist Mono) and the color palette (brand-4 accents + the theme's supplementary hues). Named layouts are optional tools the planner may use when content cleanly fits one; everything else is its call. A theme is auto-picked (seeded by `shake_seed`, so a `--shake` reroll can pick a fresh one) and frozen into the sidecar as `"theme"`. Supplementary hues are uncapped.
-- **`strict`** — rules-based named-layout behavior; the revert path. Use to fall back to the deterministic v4 dispatch without theming.
+**`strict` (rules-based named layouts) is OPT-IN ONLY.** It is honored **only** when you pass `--mode=strict` explicitly on that invocation. It is **never** the default and is **never** silently inferred — there is no auto-revert to strict. On a plain re-render with no flag, a sidecar that recorded `strict` keeps it (determinism — it only got there by a deliberate earlier choice); omitting the flag on a fresh deck always yields expressive.
 
-If `--mode` is omitted, an existing sidecar's recorded mode wins; otherwise it defaults to `expressive`. The resolved mode is frozen in the sidecar, so replays stay deterministic.
+An agent in the loop must NOT reach for strict, `--no-plan` (legacy v3 renderer), or `--allow-composed` (agentless floor) on its own — those produce non-bespoke output and exist only for explicit user request / non-interactive cron. Default behavior is always bespoke. The "strict mode" guidance in some sections below (named-layout-first priority) applies ONLY when the user explicitly opted into strict.
 
 ## Visual QA loop (`--qa`)
 

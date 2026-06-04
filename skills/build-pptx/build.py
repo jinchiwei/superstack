@@ -1300,10 +1300,11 @@ def main() -> int:
         choices=["expressive", "strict"],
         default=None,
         help=(
-            "Deck construction mode. 'expressive' (default): themed + "
-            "guided-freeform, Anthropic-pptx aesthetic. 'strict': rules-based "
-            "named-layout behavior, the revert path. If omitted, an existing "
-            "sidecar's recorded mode wins; otherwise defaults to expressive."
+            "Deck construction mode. 'expressive' (DEFAULT, bespoke): themed "
+            "handcrafted-freeform, Anthropic-pptx aesthetic. 'strict': rules-based "
+            "named layouts — OPT-IN ONLY, pass it explicitly; it is never the "
+            "default and never silently inferred. Omitted → expressive (or a prior "
+            "sidecar's deliberately-chosen mode on re-render)."
         ),
     )
     ap.add_argument(
@@ -1328,6 +1329,11 @@ def main() -> int:
     ap.add_argument("--qa", action="store_true",
                     help="after rendering, emit per-slide PNGs for visual "
                          "inspection (requires LibreOffice + poppler)")
+    ap.add_argument("--allow-contrast-fail", dest="allow_contrast_fail",
+                    action="store_true",
+                    help="do NOT abort on WCAG-AA contrast failures (the runtime "
+                         "contrast check auto-runs and BLOCKS by default). Use only "
+                         "for a deliberate brand-edge case the checker can't model.")
     args = ap.parse_args()
 
     if args.no_plan:
@@ -1382,10 +1388,17 @@ def main() -> int:
         except Exception:
             pass
 
-    # Resolve effective mode: explicit flag > prior sidecar mode > default.
-    # prior_mode already covers the non-shake case (it reads the same sidecar
-    # existing_plan came from), so the existing_plan.mode term is redundant.
-    effective_mode = args.mode or prior_mode or "expressive"
+    # Bespoke (expressive) is the DEFAULT and the only silent path. `strict`
+    # (rules-based named layouts) is opt-in ONLY via an explicit `--mode=strict`
+    # on this invocation — it is never the default and never silently inferred.
+    # A prior sidecar's mode is honored on re-render for determinism (it only got
+    # there by a deliberate earlier `--mode=strict`). (cf. SKILL.md / bespoke_design.md.)
+    if args.mode:                       # explicit choice this run wins
+        effective_mode = args.mode
+    elif prior_mode:                    # re-render: keep the deliberately-chosen mode
+        effective_mode = prior_mode
+    else:                               # default is ALWAYS bespoke
+        effective_mode = "expressive"
     final_plan.mode = effective_mode
 
     # Expressive-freeform composer (Option B): the no-agent floor.
@@ -1574,15 +1587,34 @@ def main() -> int:
     # Runtime contrast check — walks the rendered pptx, finds each text run's
     # visual background by overlap with filled shapes (falling back to the
     # theme canvas), and flags pairs below WCAG AA (4.5 normal / 3.0 large).
-    # Catches the WHITE-on-TURQUOISE, MUTED-on-canvas, etc. classes that the
-    # static lint can't see. Non-fatal stderr warning.
+    # Catches the WHITE-on-TURQUOISE, INK/MUTED-on-dark-canvas, etc. classes the
+    # static lint can't see. This is the AUTO-QA gate: it runs on EVERY render
+    # and ABORTS (non-zero) if any non-brand-approved run is below AA, so a deck
+    # cannot ship with unreadable text. Override only with --allow-contrast-fail.
+    _contrast_failed = False
     try:
         from contrast_check import check_pptx, format_issues
         ci = check_pptx(output_path, _sidecar if _sidecar.exists() else None)
         if ci:
             print(format_issues(ci), file=sys.stderr)
+            _contrast_failed = True
     except Exception as e:
         print(f"contrast check skipped: {e}", file=sys.stderr)
+    # Block ONLY when an agent is in the loop (same contract as the bespoke
+    # gate): a handcrafted render must be readable. Agentless / cron renders
+    # (`--allow-composed`) accept the deterministic floor as-is, so they don't
+    # abort here — and `--allow-contrast-fail` is the explicit per-render override.
+    if _contrast_failed and not args.allow_contrast_fail and not args.allow_composed:
+        print(
+            "\nERROR: contrast check FAILED (see above) — text below WCAG AA on its\n"
+            "background. On a dark theme, canvas/body text must be light: use\n"
+            "_text_on(CANVAS_BG_RGB) (or (WHITE_RGB if ON_DARK else INK_RGB)) for\n"
+            "primary text and _text_on(<fill>) for text on a colored/surface rect —\n"
+            "never hardcode INK_RGB/MUTED_RGB on a dark canvas. Fix the freeform code\n"
+            "and re-render, or pass --allow-contrast-fail for a deliberate exception.",
+            file=sys.stderr,
+        )
+        sys.exit(3)
 
     # Presenter-handout PDF (slide image + speaker notes per page). Canonical
     # output when the deck has notes; skips gracefully without a rasterizer.
