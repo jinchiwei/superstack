@@ -695,6 +695,8 @@ for builder in docs/_build_pptx.py docs/_build_docx.py docs/_build_pdf.py docs/_
 done
 ```
 
+**`_build_pptx.py` WILL fail the first time — that is the forcing function, not a real failure.** By design it no longer passes `--allow-composed`, so build-pptx's bespoke gate aborts on the agentless composer FLOOR and writes the scaffold sidecar but no `.pptx`. The "best-effort, continuing" branch above logs it — but **the session is NOT done until you, the agent in the loop, handcraft the deck.** Do NOT accept a missing or floor `SESSION_REPORT.pptx`: open the scaffold `results/<date>_<scope>/_deck.md.layout.json`, handcraft every content slide's freeform `code` per **`skills/build-pptx/bespoke_design.md`** (set `_provenance="agent"`), generate the theme-matched custom figures per `intro_figures.md`, then re-render with `build.py` (no `--allow-composed`) and self-QA the rasterized slides. Shipping the floor is the documented recurring failure this gate exists to stop. (A genuinely headless cron autoresearch run with no agent — and only that — may export `AUTORESEARCH_ALLOW_FLOOR_DECK=1` to ship the floor.)
+
 The templates dropped by `init-project` honor this contract. If the project has its own opinionated builders (with different signatures), the user can either match the contract or replace this Step entirely. Report builds are best-effort — a builder failure does NOT prevent session termination.
 
 ## Question deferral mailbox
