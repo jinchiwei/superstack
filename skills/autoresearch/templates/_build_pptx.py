@@ -761,13 +761,33 @@ def main():
         sys.executable, str(build_pptx),
         "--input", str(deck_md),
         "--output", str(out_pptx),
-        # This non-interactive shell-out produces the agentless expressive
-        # FLOOR; build.py's bespoke gate would otherwise abort. The autoresearch
-        # agent is expected to then handcraft the sidecar per bespoke_design.md
-        # and re-render (without this flag) for the final, bespoke deck.
-        "--allow-composed",
     ]
-    subprocess.run(cmd, check=True)
+    # The bespoke gate in build.py aborts (non-zero, no .pptx) if any content
+    # slide is still the agentless composer FLOOR. That abort is the WHOLE POINT:
+    # at autoresearch termination an AGENT IS IN THE LOOP and MUST handcraft every
+    # content slide per build-pptx/bespoke_design.md (the scaffold sidecar is
+    # written next to the deck so you can edit it in place). Shipping the floor is
+    # the documented recurring failure — do NOT default to it.
+    #
+    # Only a genuinely headless / cron autoresearch run with NO agent may ship the
+    # floor; opt in explicitly with AUTORESEARCH_ALLOW_FLOOR_DECK=1.
+    if os.environ.get("AUTORESEARCH_ALLOW_FLOOR_DECK") == "1":
+        cmd.append("--allow-composed")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError:
+        sidecar = deck_md.with_name(deck_md.name + ".layout.json")
+        sys.stderr.write(
+            "\n*** BESPOKE GATE FIRED — no deck written. ***\n"
+            "The agentless composer FLOOR is not shippable. You (the agent in the\n"
+            "loop) must HANDCRAFT every content slide's freeform `code` in the\n"
+            f"scaffold sidecar:\n    {sidecar}\n"
+            "following build-pptx/bespoke_design.md (set _provenance='agent'),\n"
+            "then re-render with build.py WITHOUT --allow-composed. A genuinely\n"
+            "headless cron run with no agent may set AUTORESEARCH_ALLOW_FLOOR_DECK=1\n"
+            "to ship the floor.\n\n"
+        )
+        raise
     print(f"wrote {out_pptx}")
 
 
