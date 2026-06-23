@@ -242,3 +242,9 @@ This applies to schematics too: label them by what they depict (`"Mechanism of A
 - `methods_pipeline.png` — FERNET pipeline flowchart
 
 Copy that file, swap the topics, change the citations — that's the workflow.
+
+
+## See also
+
+- [`figure_archetypes.md`](figure_archetypes.md) — reusable matplotlib archetypes
+- [`results_figures.md`](results_figures.md) — every quant finding gets a data figure

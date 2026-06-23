@@ -4,6 +4,9 @@ For any research-talk deck, **every slide that reports a result needs a represen
 
 This is a standing default, parallel to [`intro_figures.md`](intro_figures.md) (which mandates custom intro/background figures redrawing published references). Where `intro_figures.md` covers BACKGROUND, this doc covers RESULTS.
 
+
+**Building these figures**: prefer the reusable archetypes in `skills/_shared/deck_figures.py` (cataloged in [`figure_archetypes.md`](figure_archetypes.md)) over hand-rolled matplotlib. Common patterns — multi-panel scorecards, region-dot strips, comparison-bar pairs, AIC sweeps, FDR survival grids, depth schematics, compartment partitions, pipeline flows — are all there as one-liner functions.
+
 ## The rule
 
 For every slide that headlines a quantitative finding (β, OR, ratio, p-value, mean difference, effect size, etc.), the slide MUST include a figure that visualizes the data behind the claim. Acceptable figure types per finding shape:
@@ -77,6 +80,10 @@ These were validated on the AGF 2026-05-29 lab-talk deck:
 - Per-region "tile grid" (slide 20 v1) listing 11 abbreviated region names without per-region effect sizes was decorative, not informative. Fixed by either adding p-values per tile (slide 20 v2) OR replacing with the data figure (slide 20 final = carrier panel scatter).
 
 ## See also
+
+- [`figure_archetypes.md`](figure_archetypes.md) — reusable matplotlib archetypes for common slide visuals (composite scorecards, dot strips, comparison bars, schematics, flows)
+
+### Other docs
 
 - [`intro_figures.md`](intro_figures.md) — background-figure doctrine (redraw published references + save raw data)
 - [`bespoke_design.md`](bespoke_design.md) — slide composition doctrine (handcraft each slide; brand lock; figures dominate)

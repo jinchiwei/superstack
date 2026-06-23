@@ -77,3 +77,10 @@ To clear the gate, **handcraft the slide and set `params["_provenance"] = "agent
 - A wall of bullets with no visual hierarchy.
 
 The deterministic `expressive_compose.py` composer is the floor for *agentless* renders only (a cron/pipeline with no LLM). When you — an agent — are building, you handcraft.
+
+
+## Figure-first default
+
+When a slide quantifies something (a scorecard, a comparison, a survey across regions), prefer a custom figure over a typed table. Reusable archetypes (4-panel scorecards, region dot strips, FDR grids, depth schematics, compartment diagrams, pipeline flows) live in `skills/_shared/deck_figures.py` — cataloged in [`figure_archetypes.md`](figure_archetypes.md). Use them; the brand lock is baked in.
+
+A typed table is a fallback, not the default. If you're typing a table of numbers, you're almost certainly missing a chart that would read in 2 seconds instead of 20.
