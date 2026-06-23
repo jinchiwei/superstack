@@ -246,5 +246,5 @@ Copy that file, swap the topics, change the citations — that's the workflow.
 
 ## See also
 
-- [`figure_archetypes.md`](figure_archetypes.md) — reusable matplotlib archetypes
+- [`bespoke_design.md`](bespoke_design.md) → *Concept figures* — bespoke diagrams for methods/motivation/framing slides
 - [`results_figures.md`](results_figures.md) — every quant finding gets a data figure

@@ -5,7 +5,7 @@ For any research-talk deck, **every slide that reports a result needs a represen
 This is a standing default, parallel to [`intro_figures.md`](intro_figures.md) (which mandates custom intro/background figures redrawing published references). Where `intro_figures.md` covers BACKGROUND, this doc covers RESULTS.
 
 
-**Building these figures**: prefer the reusable archetypes in `skills/_shared/deck_figures.py` (cataloged in [`figure_archetypes.md`](figure_archetypes.md)) over hand-rolled matplotlib. Common patterns — multi-panel scorecards, region-dot strips, comparison-bar pairs, AIC sweeps, FDR survival grids, depth schematics, compartment partitions, pipeline flows — are all there as one-liner functions.
+**Building these figures**: hand-roll each one in matplotlib, bespoke to the finding, dark/brand-locked (same palette + Geist/Geist Mono across the deck). Common shapes — multi-panel scorecards, dot strips, comparison-bar pairs, sweeps, survival grids, schematics, partitions, flows — but design each to the data; there is no archetype library.
 
 ## The rule
 
@@ -81,7 +81,7 @@ These were validated on the AGF 2026-05-29 lab-talk deck:
 
 ## See also
 
-- [`figure_archetypes.md`](figure_archetypes.md) — reusable matplotlib archetypes for common slide visuals (composite scorecards, dot strips, comparison bars, schematics, flows)
+- [`bespoke_design.md`](bespoke_design.md) → *Concept figures* — bespoke explanatory diagrams for methods/motivation/framing slides
 
 ### Other docs
 

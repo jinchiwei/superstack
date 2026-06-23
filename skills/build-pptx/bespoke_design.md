@@ -75,12 +75,28 @@ To clear the gate, **handcraft the slide and set `params["_provenance"] = "agent
 - Slides are forced into a fixed handful of compositions *regardless of their content* (coincidental resemblance between genuinely-similar slides is NOT this — forcing dissimilar content into the same mold is).
 - A slide is picked off the named-layout menu instead of designed.
 - A wall of bullets with no visual hierarchy.
+- A framing/methods/motivation slide is only text cards or a step-rail, with no explanatory diagram (see *Concept figures*).
 
 The deterministic `expressive_compose.py` composer is the floor for *agentless* renders only (a cron/pipeline with no LLM). When you — an agent — are building, you handcraft.
 
 
 ## Figure-first default
 
-When a slide quantifies something (a scorecard, a comparison, a survey across regions), prefer a custom figure over a typed table. Reusable archetypes (4-panel scorecards, region dot strips, FDR grids, depth schematics, compartment diagrams, pipeline flows) live in `skills/_shared/deck_figures.py` — cataloged in [`figure_archetypes.md`](figure_archetypes.md). Use them; the brand lock is baked in.
+When a slide quantifies something (a scorecard, a comparison, a survey across regions), prefer a custom figure over a typed table. A typed table is a fallback, not the default. If you're typing a table of numbers, you're almost certainly missing a chart that would read in 2 seconds instead of 20.
 
-A typed table is a fallback, not the default. If you're typing a table of numbers, you're almost certainly missing a chart that would read in 2 seconds instead of 20.
+## Concept figures — non-results slides need diagrams too (DON'T default to text cards)
+
+The figure-first rule is **not just for results**. The slides that most often fall back to text — intended use, methods/approach, motivation, study design, framing, recommendations — should ALSO carry a bespoke **explanatory diagram**, not a grid of text cards or a bulleted "steps" rail. Card-grids and step-rails are the *text* fallback; treat them like typed tables: a last resort, not the default. A reader should grasp the concept from the picture before reading a word.
+
+Build these by hand in matplotlib (dark/brand-locked, same palette + Geist/Geist Mono as your data figures). Hand-roll each one bespoke to the idea. Common concept-figure shapes and when to use them:
+
+- **Pipeline / flow** — for intended-use, system architecture, "how it works": input → process → model → decision, with a fork for outcomes. (e.g. patient → questionnaire → model → triage decision.)
+- **Method schematic** — for "why trust this": draw the actual procedure. A cross-validation schematic (fold grid with held-out highlighted), a data-split diagram, a leakage-control illustration. Show the mechanism, don't assert it.
+- **Funnel / cohort flow** — for population / inclusion-criteria / case-mix slides: a narrowing funnel with n and key rates at each stage makes spectrum/prevalence shifts obvious.
+- **Concept map / 2×2 / quadrant** — for trade-offs, positioning, taxonomies.
+- **Timeline / roadmap** — for study phases, milestones, sequencing.
+- **Annotated diagram** — for anatomy, device, or workflow context.
+
+A short caption strip under the diagram (one line of key points) is fine — but the diagram, not the text, is the slide. If a framing slide is only text cards or only a step-rail with no figure, you defaulted.
+
+This is the doctrine `intro_figures.md` (background) and `results_figures.md` (results) leave out: the **middle** of the deck (methods, motivation, design, recommendations) earns bespoke figures too.
