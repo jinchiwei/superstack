@@ -55,7 +55,10 @@ def _inject_byline(docx_path: str, meta: dict[str, str]) -> None:
     """Insert a branded byline (name turquoise, org deeppink, date dim) right
     after the title/subtitle block. No-op if python-docx is missing or there is
     no name/org to render."""
-    name, org, date = meta.get("name"), meta.get("org"), meta.get("date")
+    # Note: `date` is intentionally NOT injected here — pandoc already renders
+    # the frontmatter date via its built-in Date style, so adding it again would
+    # double it. We only add the byline pieces pandoc drops (name, org).
+    name, org = meta.get("name"), meta.get("org")
     if not (name or org):
         return
     try:
@@ -81,8 +84,6 @@ def _inject_byline(docx_path: str, meta: dict[str, str]) -> None:
         lines.append((name, _NAME_TURQUOISE, True, 14))
     if org:
         lines.append((org, _ORG_DEEPPINK, True, 13))
-    if date:
-        lines.append((date, _DATE_DIM, False, 11))
 
     prev_elem, parent = anchor._p, anchor._parent
     for text, color, bold, size in lines:
