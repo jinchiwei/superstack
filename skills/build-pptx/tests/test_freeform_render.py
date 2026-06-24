@@ -32,8 +32,11 @@ def test_freeform_demo_renders_to_pptx(tmp_path):
     shutil.copy(DEMO_SIDECAR, sidecar_dst)
     out = tmp_path / "out.pptx"
     proc = subprocess.run(
+        # This test exercises the freeform RENDER pipeline, not contrast QA;
+        # the demo fixture's snippet trips the WCAG-AA contrast gate, so opt out
+        # of that gate here (the gate itself is covered by its own tests).
         [sys.executable, str(BUILD_PY),
-         "--input", str(md_dst), "--output", str(out)],
+         "--input", str(md_dst), "--output", str(out), "--allow-contrast-fail"],
         capture_output=True, text=True,
     )
     assert proc.returncode == 0, proc.stderr
