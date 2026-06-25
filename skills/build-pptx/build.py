@@ -1319,6 +1319,15 @@ def main() -> int:
         ),
     )
     ap.add_argument(
+        "--no-logos", dest="no_logos", action="store_true",
+        help=(
+            "Skip institutional-logo embedding on the title slide. By default, "
+            "any PNGs in superstack/logos/ are embedded (lower-right paired block) "
+            "when that folder exists; a deck can also opt out via frontmatter "
+            "`logos: false`. Absent folder = silent no-op regardless."
+        ),
+    )
+    ap.add_argument(
         "--no-notes-pdf", dest="no_notes_pdf", action="store_true",
         help=(
             "Skip the presenter-handout PDF (<output>_notes.pdf: each slide's "
@@ -1337,8 +1346,18 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.no_plan:
-        # Legacy path — current main() behavior
-        return _legacy_main(args)
+        # --no-plan: skip plan regeneration. If a sidecar exists, route through
+        # the bespoke-aware path so freeform slides keep their _theme + canvas
+        # (the legacy v3 renderer loses both, blanking freeform slides to white).
+        # Only fall back to legacy when there's genuinely no sidecar to honor.
+        _sidecar_probe = Path(args.input).resolve().with_suffix(
+            Path(args.input).suffix + ".layout.json"
+        )
+        if not _sidecar_probe.exists():
+            return _legacy_main(args)
+        # Sidecar present — drop into the planned path. _infer_default_plan +
+        # merge_with_existing preserves agent-stamped freeform slides; theme is
+        # honored because resolve_theme runs in expressive mode.
 
     # Plan path
     from plan import (
@@ -1557,6 +1576,26 @@ def main() -> int:
         no_cover=args.no_cover, no_end=args.no_end, theme=theme,
     )
     print(f"wrote {output_path}")
+
+    # Institutional logos: auto-embed on the title slide from the
+    # superstack/logos convention (machine-agnostic; silent no-op if the
+    # folder is absent). Opt out per deck with frontmatter `logos: false`.
+    # Runs BEFORE qa/notes-pdf so both pick up the logos. See
+    # skills/_shared/apply_logos.py + the logos-folder convention.
+    if not getattr(args, "no_logos", False):
+        try:
+            import sys as _sys
+            _shared = str(Path(__file__).resolve().parent.parent / "_shared")
+            if _shared not in _sys.path:
+                _sys.path.insert(0, _shared)
+            from apply_logos import apply_logos_to_deck, deck_opts_out
+            if deck_opts_out(md_path):
+                print("logos: deck opts out (frontmatter logos: false)")
+            elif apply_logos_to_deck(output_path):
+                print(f"logos: embedded on title slide from superstack/logos/")
+        except Exception as e:  # never fail a build over logos
+            print(f"logos: skipped ({e})", file=sys.stderr)
+
     if args.qa:
         from qa import render_to_images
         qa_dir = output_path.with_suffix("").parent / (output_path.stem + "_qa")
@@ -1567,6 +1606,59 @@ def main() -> int:
                 print(f"  {p}")
         except RuntimeError as e:
             print(f"QA skipped: {e}", file=sys.stderr)
+
+    # Theme-regression check — when the sidecar declares a non-paper theme,
+    # the rendered pptx MUST carry that bg_hex in every freeform slide's
+    # full-bleed canvas rect. Catches the "--no-plan → legacy renderer →
+    # freeform slides blank to white" regression (AGF 2026-06-03). Non-fatal
+    # stderr warning; the pptx still ships so the user can inspect.
+    try:
+        _sidecar = Path(args.input).resolve()
+        _sidecar = _sidecar.with_suffix(_sidecar.suffix + ".layout.json")
+        if _sidecar.exists():
+            import json as _json, zipfile as _zip, re as _re
+            _plan = _json.loads(_sidecar.read_text(encoding="utf-8"))
+            _declared_theme = (_plan.get("theme") or "").lower()
+            if _declared_theme and _declared_theme not in {"paper", "bone"}:
+                from themes import THEMES as _THEMES
+                _expected_bg = _THEMES[_declared_theme].bg_hex.upper().lstrip("#")
+                _freeform_titles = {
+                    (s.get("params") or {}).get("title", "")
+                    for s in _plan.get("slides", [])
+                    if s.get("kind") == "freeform"
+                }
+                _freeform_titles.discard("")
+                _missing = []
+                with _zip.ZipFile(output_path) as _z:
+                    _slide_names = sorted(
+                        n for n in _z.namelist()
+                        if _re.match(r"ppt/slides/slide\d+\.xml$", n)
+                    )
+                    for _name in _slide_names:
+                        _xml = _z.read(_name).decode("utf-8", errors="ignore")
+                        if not any(t in _xml for t in _freeform_titles):
+                            continue
+                        # freeform.py paints the canvas as the FIRST shape
+                        # (full-bleed rect at 0,0). If the declared bg_hex
+                        # doesn't appear anywhere in the XML, theme wasn't
+                        # injected — the renderer used the white default.
+                        if _expected_bg not in _xml.upper():
+                            _missing.append(_name)
+                if _missing:
+                    print(
+                        f"\nWARNING: theme='{_declared_theme}' "
+                        f"(bg #{_expected_bg}) declared in sidecar but "
+                        f"{len(_missing)} freeform slide(s) do not contain "
+                        f"that color — theme NOT injected. This usually means "
+                        f"the build was routed to the legacy v3 renderer "
+                        f"(historically triggered by --no-plan without a "
+                        f"sidecar). Drop --no-plan, or ensure the sidecar "
+                        f"path is taken. First offenders: "
+                        + ", ".join(_missing[:5]),
+                        file=sys.stderr,
+                    )
+    except Exception as _e:
+        print(f"theme-regression check skipped: {_e}", file=sys.stderr)
 
     # Contrast lint — flag freeform _add_text calls that use MUTED_RGB /
     # DIM_RGB. Those colors are appropriate only for tiny secondary captions
@@ -1615,6 +1707,19 @@ def main() -> int:
             file=sys.stderr,
         )
         sys.exit(3)
+
+    # Proportion QA — walks the rendered pptx and flags slides where the
+    # chosen layout proportions probably don't match the slide's content
+    # (figure compressed by an aside, text widget can't plausibly fit, etc.).
+    # Doesn't prescribe layout — only flags measurable mismatches.
+    # See proportion_check.py. Non-fatal stderr warning.
+    try:
+        from proportion_check import check_pptx as _prop_check, format_issues as _prop_fmt
+        pi = _prop_check(output_path)
+        if pi:
+            print(_prop_fmt(pi), file=sys.stderr)
+    except Exception as e:
+        print(f"proportion check skipped: {e}", file=sys.stderr)
 
     # Presenter-handout PDF (slide image + speaker notes per page). Canonical
     # output when the deck has notes; skips gracefully without a rasterizer.

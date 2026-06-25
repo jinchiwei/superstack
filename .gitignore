@@ -5,3 +5,10 @@ skills/_shared/icons/cache/
 # python bytecode (added 2026-05-02 — was tracked before this)
 __pycache__/
 *.pyc
+
+# Per-machine institutional logos for build-pptx title slides (see logos/README.md).
+# The image files + manifest are machine-specific (UCSF+Cal here, other logos
+# elsewhere); only the README documenting the convention is tracked.
+logos/*.png
+logos/*.jpg
+logos/manifest.json
