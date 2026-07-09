@@ -31,12 +31,14 @@ DARK_BG = "#0E1A35"
 # These are the names used in renderers. If we ever swap which canonical
 # color plays which role, change here, no other code changes needed.
 # Body-heading color cascade (build-pdf / build-docx): brand-4 by depth.
-# H1 (big sections) turquoise, H2 (subsections) deeppink, H3 blueviolet.
-# Amber is intentionally skipped here: as text on a light page it fails WCAG
-# contrast (amber is the SOLID-FILL accent, not a text color).
+# H1 (big sections) turquoise, H2 (subsections) deeppink, H3 amber, H4 blueviolet.
+# Per Jinchi's explicit spec the cascade follows the brand-4 priority order by
+# header depth. Amber headings are bold + larger than body text, so they read
+# acceptably; the document TITLE stays ink/black (not colored).
 HEADING_1     = TURQUOISE
 HEADING_2     = DEEPPINK
-HEADING_3     = BLUEVIOLET
+HEADING_3     = AMBER
+HEADING_4     = BLUEVIOLET
 NAME_COLOR    = TURQUOISE
 ORG_COLOR     = DEEPPINK
 METRIC_COLOR  = BLUEVIOLET
