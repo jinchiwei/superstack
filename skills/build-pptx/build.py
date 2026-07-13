@@ -255,10 +255,23 @@ def add_section_divider(prs, *, label: str, index: int = 0,
     # Small DMG-style accent bar at the top, just right of the colorblock.
     _add_rect(s, left=0.85, top=0.7, width=0.18, height=0.45, fill_rgb=accent)
 
-    # Eyebrow = thematic category based on accent color.
+    # Eyebrow = thematic category based on accent color. Lighten toward white
+    # until it clears WCAG large-text (3.0) on the divider canvas — blueviolet
+    # (the darkest brand accent) otherwise fails on the dark navy background.
     eyebrow_text = branding.category_for_accent(bg_hex)
+    _div_bg = tuple(bg_rgb) if bg_rgb is not None else tuple(DARK_BG_RGB)
+    try:
+        from contrast_check import contrast_ratio as _cr
+        _eb = [accent[0], accent[1], accent[2]]
+        for _ in range(30):
+            if _cr(tuple(_eb), _div_bg) >= 3.0:
+                break
+            _eb = [int(x + (255 - x) * 0.15) for x in _eb]
+        eyebrow_rgb = RGBColor(*_eb)
+    except Exception:
+        eyebrow_rgb = accent
     _add_text(s, eyebrow_text, left=1.15, top=0.7, width=11.0, height=0.4,
-              size=14, color_rgb=accent, font=branding.MONO_FONT, bold=True)
+              size=14, color_rgb=eyebrow_rgb, font=branding.MONO_FONT, bold=True)
 
     # Big section title — H1 text in ALL CAPS.
     _add_text(s, label.upper(), left=0.85, top=2.4, width=12.0, height=3.0,
