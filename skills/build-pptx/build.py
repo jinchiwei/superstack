@@ -1468,7 +1468,23 @@ def main() -> int:
     if effective_mode == "expressive":
         import uuid
         from expressive import resolve_theme
-        if not args.shake and prior_theme:
+        from themes import THEMES as _ALL_THEMES
+        # An explicit frontmatter `theme:` is AUTHORITATIVE — it must never be
+        # silently overridden by the content-hash auto-pick or a frozen prior
+        # (the "declared slate but rendered paper" bug). Only auto-pick/seed
+        # when no valid theme is declared.
+        _declared_theme = ""
+        try:
+            _declared_theme = str(
+                (loaded.get("meta") or {}).get("theme") or ""
+            ).strip().lower()
+        except Exception:
+            _declared_theme = ""
+        if _declared_theme and _declared_theme in _ALL_THEMES:
+            # Declared theme wins, on first build and every re-render.
+            final_plan.theme = _declared_theme
+            final_plan.shake_seed = prior_seed or deck_md_hash
+        elif not args.shake and prior_theme:
             # Re-render: keep the frozen theme + seed (determinism).
             final_plan.theme = prior_theme
             final_plan.shake_seed = prior_seed
@@ -1477,8 +1493,8 @@ def main() -> int:
             final_plan.theme = None
             final_plan.shake_seed = uuid.uuid4().hex
         else:
-            # First build (no prior theme): seed from deck content so the
-            # same deck reproducibly picks the same theme across machines.
+            # First build (no declared/prior theme): seed from deck content so
+            # the same deck reproducibly picks the same theme across machines.
             final_plan.theme = None
             final_plan.shake_seed = deck_md_hash
         theme = resolve_theme(final_plan)
