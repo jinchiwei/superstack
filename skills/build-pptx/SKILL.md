@@ -51,6 +51,17 @@ Slide titles (and section dividers) should be **descriptive, accurate, concise, 
 
 This applies to **figure titles/suptitles too** — keep them descriptive ("Symptom-only AUROC by cohort definition") rather than narrating a conclusion. Emphasis belongs in the speaker notes and the data, not the title. Creative freedom on figure *design* is retained; only the wording of titles is constrained.
 
+## Default: figure gets the room; text regions are sized to their text
+
+On a slide that pairs a **figure with a caption/text region** (caption card, aside, bullet strip), size the text region to fit its content and give **all remaining space to the figure** — do not split the slide by a fixed fraction that leaves a half-empty text box while the figure is shrunk. A caption card with three lines of text should be about three lines tall, not 40% of the slide.
+
+- **Size the card to the text.** Estimate the wrapped line count from the prose length and set the card height from that (with a small min/max clamp). Short caption → short card; long caption → taller card.
+- **Figure takes the rest.** Compute the figure's available height as `body_h − card_h − gap`, and render it as large as width *and* that height allow (respect the figure's aspect ratio — read it from the PNG so you don't letterbox). Reducing the card height genuinely enlarges a height-limited figure.
+- **No dead vertical space** between the figure and its card; place the card immediately below the figure (a centered figure+card block is fine).
+- **Embedded data tables/plots must match the slide background** (same dark canvas) with high-contrast text — never a white-background figure dropped onto a dark slide, and never near-background-colored text (light-on-white / dark-on-dark). Set the figure `facecolor`/`savefig facecolor` to the slide background.
+
+The reference `figcall`-style helper computes `card_h` from the prose line count and sets `fig_h = min(body_w/aspect, body_h − card_h − gap)`; prefer that over a fixed image/caption split.
+
 ## Required arguments
 
 - `--input PATH` — markdown source
