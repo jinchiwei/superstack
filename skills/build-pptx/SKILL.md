@@ -40,6 +40,17 @@ Every deck ships with **comprehensive, didactic speaker notes** in the PowerPoin
 
 The auto end slide is a branded **Thank-You** slide (replaces the old generic "Thanks"): big deeppink "Thank You", the presenter's name with **Chinese name over English, both turquoise**, email in amber, and the 夢想 identity logos (`assets/meng.png` + `assets/xiang.png`) lower-right. It pulls `name`/`org` from frontmatter; `name_cjk` and `email` fall back to the tool owner's defaults. Override per deck via frontmatter (`name:`, `org:`, `name_cjk:`, `email:`); set `email: ""` or `name_cjk: ""` to omit either. Suppress the whole slide with `--no-end`.
 
+## Default: descriptive, professional slide titles
+
+Slide titles (and section dividers) should be **descriptive, accurate, concise, and professional** — they name what the slide shows, not how to feel about it. This is the default for every deck.
+
+- **Descriptive/accurate:** the title states the slide's actual content or finding. "Model comparison — internal OOF vs external holdout", "Imaging-eligible subset vs. full symptom cohort", "CDC seasonal prior — flu-vs-rest prediction lift".
+- **Concise:** a noun phrase, not a sentence. Prefer "Augmentation configuration — baseline preservation" over "The augmentation story — a bug we caught before it shipped".
+- **Professional, non-opinionated:** avoid dramatic, editorial, or salesy phrasing ("flattered us", "the image adds nothing", "a bug caught before it shipped", "the calls in front of us", "two problems, not one"). State the fact; let the data carry the emphasis.
+- **Consistent register:** use the same neutral, technical register across the whole deck; a `—` clause after the noun phrase is a good pattern for adding the specific comparison or metric.
+
+This applies to **figure titles/suptitles too** — keep them descriptive ("Symptom-only AUROC by cohort definition") rather than narrating a conclusion. Emphasis belongs in the speaker notes and the data, not the title. Creative freedom on figure *design* is retained; only the wording of titles is constrained.
+
 ## Required arguments
 
 - `--input PATH` — markdown source
