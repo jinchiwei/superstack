@@ -268,6 +268,27 @@ SOURCES = {
     "semanticscholar": search_semanticscholar,
 }
 
+# Extra sources live in sibling litsrc_*.py modules. They are registered
+# defensively: a missing or broken module degrades this tool to the built-in
+# three rather than breaking every caller. None of them requires an API key.
+_EXTRA = [
+    ("openalex", "litsrc_openalex", "search_openalex"),
+    ("europepmc", "litsrc_europepmc", "search_europepmc"),
+    ("crossref", "litsrc_crossref", "search_crossref"),
+    ("biorxiv", "litsrc_biorxiv", "search_biorxiv"),
+]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+for _name, _mod, _fn in _EXTRA:
+    try:
+        SOURCES[_name] = getattr(__import__(_mod), _fn)
+    except Exception as _exc:  # ImportError, AttributeError, syntax error in module
+        logger.debug("optional source %s unavailable: %s", _name, _exc)
+
+ALL_SOURCES = ",".join(SOURCES)
+# Default stays the original three so existing callers/tests see no behavior change;
+# the deep-novelty pipeline opts into the wider set explicitly via --source.
+DEFAULT_SOURCES = "pubmed,arxiv,semanticscholar"
+
 
 def cache_key(query: str, sources: list[str], max_results: int) -> str:
     canon = json.dumps(
@@ -283,8 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-results", type=int, default=10)
     p.add_argument(
         "--source",
-        default="pubmed,arxiv,semanticscholar",
-        help="Comma-separated subset of: pubmed,arxiv,semanticscholar",
+        default=DEFAULT_SOURCES,
+        help=f"Comma-separated subset of: {ALL_SOURCES} (or 'all')",
     )
     p.add_argument(
         "--cache-dir",
@@ -299,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(message)s",
     )
 
+    if args.source.strip() == "all":
+        args.source = ALL_SOURCES
     sources = [s.strip() for s in args.source.split(",") if s.strip()]
     bad = [s for s in sources if s not in SOURCES]
     if bad:

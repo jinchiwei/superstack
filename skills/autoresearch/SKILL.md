@@ -112,38 +112,108 @@ The user invocation is `/autoresearch "<scope>"`. The scope arg is in `$ARGS` or
 
 Use Read on `CLAUDE.md`, `README.md`, and 1-2 obviously relevant source files if present. Just enough to ground the axis enumeration. Don't read the world.
 
-### Step 2.5 — Literature review (research scopes only)
+### Step 2.5 — Deep literature review & novelty assessment (research scopes only)
 
-Run a focused literature review **before** axis enumeration so axes can be informed by what's been tried, and so the user sees the novelty case in Step 4 alongside the proposed sweep.
+Run **before** axis enumeration, so axes are informed by what's already been tried and the user sees a
+verified novelty case in Step 4 alongside the proposed sweep.
 
-**Stage A — classify + propose queries.** Apply `prompts/lit-review-classify.md` with:
-- `scope`: the scope text
-- `project_context`: a brief summary of what was read in Step 2
+Design premise: **the binding constraint on a novelty claim is recall, not verification.** A rigorous
+panel judging an incomplete candidate set produces a confident "this is novel" that is simply wrong —
+absence of evidence misread as evidence of absence. So this pipeline spends its effort on *finding
+everything first*, then verifies hard. It is deliberately slow; comprehensiveness is the goal.
 
-The output is one of:
-- `{"skip": true, "reason": "..."}` — non-research scope (QA automation, build matrix, ops sweep, etc.). Set `$LIT_REVIEW_AVAILABLE=false`, write `$state_dir/lit-review-skipped.txt` with the reason, and proceed to Step 3 (axis enumeration runs without lit context).
-- `{"queries": [...], "sources": [...], "focus": "..."}` — proceed to Stage B.
+All artifacts persist under `$state_dir/lit/` so the novelty claim is auditable and re-runnable later.
 
-**Stage B — fetch abstracts.** For each query, invoke:
+**Orchestration.** Stages 2, 5, 6 are wide fan-outs. Use the **Workflow tool** when available
+(`pipeline()`/`parallel()` over queries, papers, and lenses). Without it, run them as batched parallel
+`Agent` calls. Never run a fan-out serially — it changes hours into days for no gain.
 
+#### Stage 0 — Frame the claim
+Apply `prompts/novelty-frame.md` (`scope`, `project_context`).
+- `{"skip": true, ...}` → non-research scope (QA automation, build matrix, ops sweep). Set
+  `$LIT_REVIEW_AVAILABLE=false`, write `$state_dir/lit-review-skipped.txt`, go to Step 3.
+- Else save `claim_tuple` + `novelty_claim` to `$state_dir/lit/frame.json`.
+
+"Is this novel?" is unanswerable; the frame converts it into a falsifiable claim.
+
+#### Stage 1 — Expand queries
+Apply `prompts/query-expand.md` (`claim_tuple`, `novelty_claim`, `round`, `already_tried`,
+`critic_hints`). Yields **15–30 queries** across distinct axes (method / task / data / outcome / group /
+venue / adjacent) plus synonym and acronym expansion. Save `$state_dir/lit/queries-r<N>.json`.
+
+#### Stage 2 — Multi-source retrieval (parallel over queries)
 ```bash
-"$SKILL_DIR/bin/lit-search" \
-  --query "$Q" \
-  --max-results 8 \
-  --source "$(echo "$SOURCES" | tr ' ' ,)" \
-  > "$state_dir/lit-papers-$i.json"
+"$SKILL_DIR/bin/lit-search" --query "$Q" --max-results 50 --source all \
+  > "$state_dir/lit/raw-r${N}-${i}.json"
 ```
+`--source all` = pubmed, arxiv, semanticscholar, openalex, europepmc, crossref, biorxiv.
+**No API key is required for any of them.** `NCBI_API_KEY` / `S2_API_KEY` only raise throughput if set;
+Semantic Scholar 429s anonymously and is skipped cleanly, leaving the other six intact. Per-query
+failures are non-fatal. Merge and dedup by normalized URL/DOI → `$state_dir/lit/papers-r<N>.json`.
 
-Concatenate and de-duplicate by `url` across queries. Save the merged list to `$state_dir/lit-papers.json`. Per-query `bin/lit-search` failures are non-fatal; the script handles partial failures gracefully (e.g., a Semantic Scholar 429 leaves PubMed + arXiv results intact).
+#### Stage 3 — Citation snowballing (highest-recall stage)
+```bash
+python "$SKILL_DIR/bin/lit_snowball.py" --seeds <top-10 DOIs> --hops 1 --max-per-hop 50
+```
+Backward (references) + forward (citations) via OpenAlex. The paper that kills a novelty claim is
+usually adjacent in the citation graph to the nearest neighbour even when no keyword query surfaces it.
+Use `--hops 2` on the first round. Merge into the round's paper pool.
 
-If the merged list is empty after all queries, set `$LIT_REVIEW_AVAILABLE=true` but with the empty-result handling path (the synthesizer still runs and returns a "no comparable prior work" framing).
+#### Stage 4 — Triage
+Apply `prompts/lit-triage.md` (`claim_tuple`, `novelty_claim`, `papers` title+abstract only).
+Be inclusive — a wrongly dropped paper is invisible forever; a wrongly kept one costs one deep-read.
+Keep ≤40, prioritising `direct`. Save `$state_dir/lit/triage-r<N>.json`.
 
-**Stage C — synthesize.** Apply `prompts/lit-review-synthesize.md` with:
-- `scope`, `focus` (from Stage A), `project_context`, `papers` (merged list)
+#### Stage 5 — Full text + deep read (parallel over survivors)
+For each kept paper resolve full text, in order:
+1. `bin/lit_fulltext.py` — Europe PMC / PMC OA full-text XML (keeps Methods sections)
+2. `bin/lit_unpaywall.py` — `resolve_open_access(doi, title)`: Unpaywall legal OA copy, then the
+   arXiv/bioRxiv/medRxiv **preprint of the same work**
+3. otherwise abstract only
 
-Save the synthesis to `$state_dir/lit-review.json` and a human-readable `$state_dir/lit-review.md`. Surface the `axis_implications` field into Step 3 as additional context.
+Never bypass a paywall (no Sci-Hub/libgen) and never use credentials. Unreachable full text is recorded
+as such, not silently downgraded. Then apply `prompts/lit-deepread.md` per paper — the **Methods**
+section decides novelty, not the abstract. Abstract-only reads must set `fulltext_used: false` and cap
+`confidence` at `medium`. Save `$state_dir/lit/deepreads-r<N>.json`.
 
-**Failure modes:** if Stage A errors (LLM returns malformed JSON), retry once. If it fails again, set `$LIT_REVIEW_AVAILABLE=false` and proceed without lit review (do NOT block the session). If Stage C errors, save raw papers but proceed without synthesis. Lit review is **non-essential** — never block axis enumeration on a lit-review failure.
+#### Stage 6 — Adversarial novelty panel (parallel over lenses)
+Apply `prompts/novelty-verify.md` **once per lens** — four genuinely different ways the claim can die:
+`method-identity`, `task-data-identity`, `claim-identity`, `hunter` (runs its *own* fresh searches
+hunting a killer paper; also checks preprints and patents).
+
+Perspective diversity beats redundancy: identical skeptics share blind spots. A `refuted: true` verdict
+**must** name a concrete `killer_paper` or quote specific evidence — "this feels well-trodden" is not a
+refutation and is recorded as `refuted: false, confidence: low`. Save `$state_dir/lit/verdicts-r<N>.json`.
+
+#### Stage 7 — Completeness critic → saturation loop
+Apply `prompts/completeness-critic.md` (`rounds`, `current_top_relevant`, `verdicts`).
+It names what was *not* searched — untried database, missing synonym, pre-2010 terminology, adjacent
+subfield, non-English work, patents, trial registries, unindexed proceedings — and emits
+`suggested_queries`.
+
+**Stopping rule:** loop back to Stage 1 with `critic_hints` until **2 consecutive rounds each surface
+~zero new relevant papers** and no high-value gap remains (`saturated: true`). Hard cap 6 rounds to
+guarantee termination. "We ran 30 queries" is not a stopping rule; "we stopped finding anything new" is.
+Record per-round counts in `$state_dir/lit/rounds.json`.
+
+#### Stage 8 — Synthesize the verdict
+Apply `prompts/novelty-synthesize.md` (`novelty_claim`, `claim_tuple`, `deep_reads`, `verdicts`,
+`search_coverage`). Save `$state_dir/lit-review.json` (+ readable `lit-review.md`).
+
+It preserves the original downstream contract — `axis_implications` feeds `prompts/axis-enumeration.md`;
+`prior_work_summary`, `novelty_argument`, `top_relevant` render into Step 4 and the research-log entry —
+and adds `verdict` (novel-method / novel-application / novel-data / novel-scale / incremental /
+replication), `nearest_prior_work`, `delta`, `confidence`, `what_would_change_this`, `coverage_caveat`.
+
+`confidence` is capped at `medium` when saturation was not reached or most deep-reads were abstract-only.
+`coverage_caveat` states plainly that recall is never provable and names the real gaps. Report
+replication bluntly — the point is to inform *before* hours are spent, not to bless the sweep.
+
+**Failure modes (unchanged posture — lit review is NEVER allowed to block a sweep):** retry a malformed
+LLM stage once. If Stage 0 fails twice → `$LIT_REVIEW_AVAILABLE=false`, proceed. If any of Stages 2–7
+fail, degrade to the best result so far and continue (a failed snowball still leaves Stage 2's papers; a
+failed panel still leaves deep-reads). If Stage 8 fails, save raw artifacts and proceed without synthesis.
+Empty results are not an error: the synthesizer returns the "no comparable prior work" framing.
 
 ### Step 3 — Enumerate axes via the LLM
 
@@ -166,9 +236,13 @@ Use AskUserQuestion with the rendered plan. When `$LIT_REVIEW_AVAILABLE=true`, i
 Plan: <scope_slug>
 Target: <target_metric or "no explicit target — stop on exhaustion">
 
-Lit review: <N queries, M abstracts; top relevance: <top_relevant[0].title>>
-  Prior work: <prior_work_summary, 1-2 lines>
-  Novelty: <novelty_argument, 1 line>
+Novelty: <verdict> (confidence: <confidence>)
+  Nearest prior work: <nearest_prior_work.title> (<year>)
+  Delta: <delta, 1 line — what THIS adds over the nearest>
+  Searched: <S sources, Q queries, R rounds, P papers, D deep-reads>
+             <"saturated" | "NOT saturated — capped at 6 rounds">
+  Panel: <n_refuted>/4 lenses refuted<, killer: <killer_paper.title> if any>
+  Caveat: <coverage_caveat, 1 line>
   [or] Lit review skipped — <reason>
   [or] (block omitted on failure)
 
@@ -262,6 +336,22 @@ When `$LIT_REVIEW_AVAILABLE=true`, insert a `## Prior work & novelty` section be
 - ...
 
 **Novelty argument:** {novelty_argument}
+
+**Verdict:** {verdict} · confidence {confidence}
+
+**Nearest prior work:** [{nearest_prior_work.title}]({nearest_prior_work.url}) ({nearest_prior_work.year})
+
+**Delta over nearest:** {delta}
+
+**Adversarial panel:** {n_refuted}/4 lenses refuted — {per-lens one-liners, naming any killer_paper}
+
+**What would change this verdict:**
+- {what_would_change_this[0]}
+- ...
+
+**Search coverage:** {S} sources · {Q} queries · {R} rounds · {P} papers screened · {D} deep-reads · saturation {reached|not reached}
+
+**Coverage caveat:** {coverage_caveat}
 
 **Top relevant prior work:**
 1. [{top_relevant[0].title}]({top_relevant[0].url}) ({top_relevant[0].year}) — {top_relevant[0].why_relevant}
