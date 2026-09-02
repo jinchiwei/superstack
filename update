@@ -72,6 +72,12 @@ fi
 echo ""
 echo "[3/3] Refreshing custom pipeline skills..."
 for skill in $CUSTOM_SKILLS; do
+    # A symlinked skill dir already IS the repo copy; cp would just spam
+    # "are the same file" for every entry. Skip it.
+    if [ -L "$SKILLS_DIR/$skill" ]; then
+        echo "  $skill: symlink -> $(readlink -f "$SKILLS_DIR/$skill") (nothing to copy)"
+        continue
+    fi
     mkdir -p "$SKILLS_DIR/$skill"
     cp -r "$REPO_DIR/skills/$skill/"* "$SKILLS_DIR/$skill/"
     echo "  Refreshed $skill"

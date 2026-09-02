@@ -1,183 +1,196 @@
 ---
 name: pipeline
-description: Use when starting a new project from scratch or when the user says "pipeline" — walks through the full ideation-to-ship workflow step by step
+description: Use when starting a new project from scratch or when the user says "pipeline" — walks the full ideation-to-ship-to-reflect workflow step by step, choosing the right gstack / superpowers / superstack skill at each stage
 ---
 
-# Project Pipeline
+# Project Pipeline (v2 — Sep 2026)
 
-Full project workflow from idea to shipped code. Follow each step in order. Skip steps only when the user explicitly says to.
+End-to-end workflow: **Ground → Think → Design → Plan → Build → Review → Test → Ship → Reflect**.
+Each stage names its skill and the condition under which it runs. Conditional stages are skipped
+with a one-line reason, never silently.
 
 ## The Pipeline
 
 ```
-THINK ──────────────────────────────────────────────────────
-  0. /design-consultation  Greenfield UI projects only — produces DESIGN.md
-                           (aesthetic, typography, color, layout, motion).
-                           Skip for non-UI projects, or if a DESIGN.md
-                           already exists.
-  1. /office-hours         Clarify what to build
-  2. /writing-plans        Write the implementation plan
-  3. /autoplan             Batched plan review (CEO + design + eng + DX + codex)
-                           Fast path — auto-decides; surfaces close calls at a gate.
+GROUND (research-flavored projects only)
+  0a. autoresearch lit review     Recall-first literature sweep + adversarial novelty check
+                                   (7 sources incl. OpenAlex snowballing). Run when the project
+                                   makes a scientific or "nobody has done X" claim.
+  0b. /deep-research               Market / landscape / prior-art sweep with verified claims.
+                                   Run when positioning against competitors or existing tools.
 
-                           Manual path (offer if user wants granular control):
-                             3a. /plan-ceo-review    If scope/ambition is uncertain
-                             3b. /plan-design-review If the project has UI
-                             3c. /plan-eng-review    Lock architecture + test plan
-                             3d. /codex consult      Adversarial second opinion on the plan
+THINK
+  1.  /office-hours  OR  /spec     office-hours when intent is vague or ambitious (six forcing
+                                   questions -> design doc). /spec when intent is already clear
+                                   (five phases -> filed issue + executable spec). Never both.
 
-BUILD ──────────────────────────────────────────────────────
-  4. /guard <project-dir>  Scope edits + destructive-command warnings
-  5. /subagent-driven-development
-     Each subagent uses:
-       - /test-driven-development (TDD per task)
-       - /verification-before-completion (evidence before claims)
+DESIGN (UI projects only)
+  2a. /design-consultation         Greenfield: proposes the whole design system -> DESIGN.md
+  2b. /design-shotgun              Explore 4-6 mockup variants, pick with taste memory
+  2c. /design-html                 Turn the approved mockup into production HTML/CSS
 
-VERIFY ─────────────────────────────────────────────────────
-  6. /review               Pre-landing code review
-  7. /codex review         Cross-model diff review (independent model, catches what /review misses)
-  8. /health               Code quality dashboard (type check + lint + tests + dead code)
-                           Optional but cheap — flags rot before /ship.
-  9. /cso (or /security-review)
-                           Security audit. /cso daily mode = 8/10 confidence gate,
-                           low noise. Always run for code touching auth, secrets, PII,
-                           external network input, or shared infrastructure.
-  10. /qa                  If it has UI — test and fix bugs
-      /design-review       If it has UI — visual polish
+PLAN
+  3.  /writing-plans               Implementation plan: 2-5 min tasks, exact paths, complete code
+  4.  /autoplan                    Batched review: CEO -> design -> DX -> eng (eng last) + codex.
+                                   Surfaces only taste calls. Manual fallback: /plan-ceo-review,
+                                   /plan-design-review, /plan-devex-review, /plan-eng-review,
+                                   /codex consult.
 
-SHIP ───────────────────────────────────────────────────────
-  11. /ship                Version bump, changelog, PR
-  12. /land-and-deploy     Merge the PR, wait for CI + deploy, verify production health
-  13. /canary              Post-deploy monitoring — console errors, perf regressions,
-                           page failures. Establishes / refreshes baselines.
-  14. /document-release    Sync docs to what shipped
-  15. /unfreeze            Release the guard scope
+BUILD
+  5.  /guard <project-dir>         Scope edits + destructive-command warnings
+  6.  /subagent-driven-development Per task: /test-driven-development,
+                                   /verification-before-completion
+  7.  /verify                      Drive the real app end to end; observe the change working
+  7b. /simplify                    Optional: reuse / altitude / efficiency pass on the diff
 
-If a step fails or you hit a bug mid-pipeline:
-  * /investigate           Root-cause-first debugging before retrying the step
+REVIEW
+  8.  /review                      Staff-engineer diff review (fix-first)
+  9.  /codex review                Independent cross-model review, pass/fail gate
+  10. /health                      Optional: type + lint + tests + dead code composite score
+  11. /cso                         Security. REQUIRED for auth, secrets, PII, network input,
+                                   file/path handling, SQL, shared infra, LLM trust boundaries.
+
+TEST (by audience)
+  12. end users  -> /qa  then /design-review        (optional /benchmark for perf baselines)
+      developers -> /devex-review                   (docs, CLI, SDK, onboarding TTHW)
+
+SHIP
+  13. /ship                        Version bump, changelog, PR
+  14. /land-and-deploy             Merge, wait for CI + deploy, verify prod   (needs /setup-deploy once)
+  15. /canary                      Post-deploy monitoring (background)
+  16. /document-release            Sync docs to what shipped (calls /document-generate for gaps)
+  17. /unfreeze                    Release the /guard scope
+
+REFLECT
+  18. /learn  +  record_learning   gstack learnings + the vault kb (constraints / decisions /
+                                   postmortems / results). Non-optional: this is what compounds.
+  19. /retro                       Weekly; not per-project
+  20. Communicate (research work)  /build-pptx (autoresearch-style deck), /build-pdf, /paper-outline
+
+ANY TIME
+  * /investigate                   Root-cause first on any failure before retrying the step
+  * /context-save                  Before a long pause; /context-restore to resume
 ```
 
 ## Pre-Flight Check
 
-Before starting the pipeline, check if skills are stale:
+Before Step 0, check that the tooling is fresh. Works on Linux and macOS:
 
 ```bash
-# Check superpowers freshness (days since last pull)
-if [ -d ~/arcadia/repos/superpowers/.git ]; then
-    LAST_PULL=$(stat -f %m ~/arcadia/repos/superpowers/.git/FETCH_HEAD 2>/dev/null || echo 0)
-    NOW=$(date +%s)
-    DAYS_AGO=$(( (NOW - LAST_PULL) / 86400 ))
-    if [ "$DAYS_AGO" -gt 7 ]; then
-        echo "SUPERPOWERS_STALE ${DAYS_AGO}d"
-    fi
-fi
+for repo in ~/arcadia/superstack/.upstream/superpowers ~/.claude/skills/gstack; do
+  f="$repo/.git/FETCH_HEAD"; [ -f "$f" ] || continue
+  last=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+  days=$(( ( $(date +%s) - last ) / 86400 ))
+  [ "$days" -gt 14 ] && echo "STALE: $(basename "$repo") last pulled ${days}d ago"
+done
 ```
 
-If `SUPERPOWERS_STALE` is detected, tell the user: "Your pipeline skills haven't been updated in X days. Want me to run `/pipeline-update` first?" If they say yes, invoke `/pipeline-update` before proceeding. If they decline, continue.
+If anything is STALE, offer `/pipeline-update` (superpowers + gstack + superstack skills in one
+pass). If the user declines, continue.
 
 ## How to Run
 
-Work through the pipeline one step at a time. At each step:
+Go step by step. For each step:
+1. Say which step you are on and what it does (one sentence).
+2. Invoke the skill.
+3. When it completes, confirm before moving on — unless the user has said "autoresearch style"
+   or "run it through", in which case proceed autonomously and stop only at the gates marked
+   below (plan approval, ship, land).
 
-1. Tell the user which step you're on and what it does (one sentence)
-2. Invoke the skill
-3. When that skill completes, ask: "Ready for the next step?" before moving on
+## Stage Notes
 
-## Step Details
+### Ground (0a, 0b) — research-flavored projects
+Jinchi's projects usually carry a scientific claim. Run the autoresearch Step 2.5 engine
+(`bin/lit-search --source all`, `bin/lit_snowball.py`, the four-lens novelty panel) BEFORE
+office-hours so the framing conversation starts from what already exists. Output lands in a
+`lit/` directory the deck and paper can cite later. Skip for pure tooling / ops projects.
 
-### Step 0: Design Consultation (greenfield UI only)
-If the project has UI AND there's no existing DESIGN.md, ask the user if they want to run `/design-consultation`. This proposes a complete design system (aesthetic, typography, color, layout, spacing, motion) and produces font + color preview pages. The resulting DESIGN.md becomes the source of truth for downstream steps. Skip for CLI tools, libraries, backend services, or any project that already has a design system.
+### Think (1) — office-hours vs spec
+Decision rule: if you can already write the one-sentence deliverable and name the files it
+touches, use `/spec` (it files the issue and can spawn a worktree agent). If you cannot, use
+`/office-hours`. Running both is redundant; office-hours' design doc IS the input to
+`/writing-plans`, and `/spec`'s spec IS too.
 
-### Step 1: Office Hours
-Invoke `/office-hours`. This produces a design doc. Do not proceed until the user is satisfied with the design.
+### Design (2a-2c) — UI projects only
+`/design-consultation` only when there is no DESIGN.md. `/design-shotgun` when the user wants to
+see options; skip when the direction is already settled. `/design-html` is optional — use it
+when the plan will otherwise start from a blank page. Ask about UI here so Test knows whether
+`/qa` and `/design-review` apply.
 
-### Step 2: Writing Plans
-Invoke `/writing-plans`. Use the design doc from Step 1 as input. This produces an implementation plan with 2-5 minute tasks, complete code, and exact file paths.
+### Plan (3, 4)
+Always write the plan, even if the user says "just build it": plan quality is what makes the
+autonomous build phase work. `/autoplan` already runs DX review — do not add
+`/plan-devex-review` on top of it. **GATE: the user approves the reviewed plan before Build.**
 
-### Step 3: Plan Review
-Ask the user which path they want:
-- **Fast (recommended)**: `/autoplan` — batches CEO + design + eng + DX reviews with auto-decisions using 6 decision principles, surfaces only taste calls and codex disagreements at a final gate. One command, much less friction.
-- **Manual**: offer the individual reviews so the user can redirect mid-flight:
-  - `/plan-ceo-review` if scope/ambition is uncertain
-  - `/plan-design-review` if the project has UI
-  - `/plan-eng-review` to lock architecture + test coverage
-  - `/codex consult` for an adversarial second opinion from an independent model
+### Build (5-7b)
+`/guard` first; widen deliberately (`/unfreeze` then re-`/guard`) if the project spans dirs.
+`/verify` after the build is not optional for anything with a runtime surface: tests passing
+is not the same as the change working. `/simplify` is a quality pass, not a bug hunt.
 
-Always ask about UI at this step so you know whether `/qa` and `/design-review` are needed later.
+### Review (8-11)
+`/review` and `/codex review` are complementary; agreement between them is only ~30%, so one
+alone misses a lot. Builtin `/code-review` overlaps `/review` — pick one, default `/review`.
+`/security-review` (builtin, diff-scoped) is an alternative to `/cso` daily mode for small
+diffs; `/cso` for anything infra-touching.
 
-### Step 4: Guard
-Invoke `/guard` with the project directory to scope all edits to that path and warn before destructive commands. This is a safety rail for the autonomous build phase — a misfiring subagent can't clobber files outside the project. Use the project's parent dir if the project spans multiple folders.
+### Test (12) — pick by audience
+| Building for | Live audit |
+|---|---|
+| End users (UI, web, mobile) | `/qa` -> `/design-review` (+ `/benchmark` for perf) |
+| Developers (API, CLI, SDK, docs) | `/devex-review` |
+| iOS on device | `/ios-qa` -> `/ios-fix` -> `/ios-design-review` |
 
-### Step 5: Build
-Invoke `/subagent-driven-development` with the reviewed plan. Each subagent should follow `/test-driven-development` and `/verification-before-completion`.
+### Ship (13-17)
+`/ship` opens the PR. **GATE: user confirms before `/land-and-deploy`** — landing is
+outward-facing. `/canary` runs in the background while docs update. `/document-release` will
+call `/document-generate` for anything the Diataxis coverage map shows missing.
 
-This is the autonomous execution phase. It may run for a while.
-
-### Step 6: Review
-Invoke `/review` to review the full diff before shipping. Checks SQL safety, LLM trust boundaries, conditional side effects, and structural issues.
-
-### Step 7: Codex Review
-Invoke `/codex review` for an independent diff review from an outside model (OpenAI Codex). This is cross-model validation — different models flag different classes of issue. The gstack v1.5.1 release notes document a ~30% agreement rate between Claude review and Codex, meaning one reviewer alone misses a lot.
-
-Pass/fail gate. If Codex flags blockers, fix them before shipping.
-
-### Step 8: Health (optional)
-Invoke `/health`. Wraps the project's existing tools — type checker, linter, test runner, dead-code detector, shell linter — and computes a weighted composite 0–10 score. Tracks trends across runs. Cheap, fast, surfaces rot that diff-only review can't catch (dead code, type drift, lint regressions).
-
-Skip on tiny patches with no test or lint surface.
-
-### Step 9: Security Review (optional but defaulted-on for sensitive code)
-For most diffs, invoke `/cso` in **daily mode** — infrastructure-first audit (secrets, dependency supply chain, CI/CD, plus OWASP Top 10 / STRIDE). Daily mode runs at an 8/10 confidence gate with zero-noise output, so most clean diffs pass quietly.
-
-For tighter, change-scoped review, `/security-review` is an alternative — it focuses on the pending diff specifically.
-
-ALWAYS run a security pass for diffs that touch: authentication, authorization, secrets/credentials, PII, external network input, file/path handling with user input, SQL/query construction, shared infrastructure, or LLM trust boundaries. For pure UI/refactor/docs changes, you can skip with a note.
-
-### Step 10: QA (if UI)
-If the project has UI, ask the user if they want to run `/qa` and/or `/design-review`.
-
-### Step 11: Ship
-Invoke `/ship` to version bump, generate changelog, commit, push, and create a PR.
-
-### Step 12: Land + Deploy
-Invoke `/land-and-deploy`. Merges the PR, waits for CI to pass and the deploy to complete, then runs canary health checks against production. This is the natural completion of `/ship` — without it, the pipeline ends at "PR open" and the user has to land + verify by hand.
-
-If `/setup-deploy` hasn't been run for this project, `/land-and-deploy` will prompt for the deploy platform (Fly / Render / Vercel / Netlify / Heroku / GitHub Actions / custom), production URL, and health check endpoint, and persist them to CLAUDE.md so subsequent runs are zero-friction.
-
-### Step 13: Canary
-Invoke `/canary` to start post-deploy monitoring. Watches the live app for console errors, performance regressions, and page failures via the browse daemon. Establishes baselines if none exist; compares against pre-deploy baselines if they do. Especially valuable in the first 15–30 minutes post-deploy when most regressions surface. Can run in the background while you do Steps 14–15.
-
-### Step 14: Document Release
-Invoke `/document-release` to update docs to match what shipped (README, ARCHITECTURE, CONTRIBUTING, CLAUDE.md, CHANGELOG voice, TODOS, optional VERSION bump).
-
-### Step 15: Unfreeze
-Invoke `/unfreeze` to release the `/guard` edit-scope restriction set in Step 4. This ends the safety session — subsequent work can edit anywhere.
+### Reflect (18-20)
+`/learn` + `record_learning` are the compounding step: constraints hit, decisions made, dead
+ends ruled out, results worth not rediscovering. `/retro` is weekly cadence, not per-project.
+For research work the last deliverable is the communication artifact — an autoresearch-style
+`/build-pptx` deck (bespoke figures, lit-positioning grid, data-and-processing slide) and/or
+`/build-pdf`.
 
 ## Abbreviated Pipelines
 
-If the user wants to move fast, suggest these shorter versions:
-
 **Minimal (side project, CLI tool, no UI, no deploy):**
 ```
-/office-hours → /writing-plans → /plan-eng-review → /subagent-driven-development → /ship
+/spec -> /writing-plans -> /plan-eng-review -> /subagent-driven-development -> /verify -> /ship -> /learn
 ```
 
 **Standard (most projects with deploy):**
 ```
-/office-hours → /writing-plans → /autoplan → /guard → /subagent-driven-development
-  → /review → /codex review → /ship → /land-and-deploy → /canary → /unfreeze
+/office-hours -> /writing-plans -> /autoplan -> /guard -> /subagent-driven-development -> /verify
+  -> /review -> /codex review -> /ship -> /land-and-deploy -> /canary -> /unfreeze -> /learn
 ```
 
-**Full (ambitious project with UI):**
-All 15 steps (0 through 15), with `/design-consultation` if greenfield.
+**Research (claims a scientific result; Jinchi's default):**
+```
+autoresearch lit review -> /office-hours -> /writing-plans -> /autoplan -> /guard
+  -> /subagent-driven-development -> /verify -> /review -> /codex review -> /ship
+  -> record_learning -> /build-pptx
+```
+
+**Full (ambitious project with UI):** all stages 0-20, with 2a-2c as applicable.
+
+## Removed from v1, and why
+
+- `/plan-devex-review` as a separate step: `/autoplan` already runs it.
+- `/checkpoint`: renamed upstream to `/context-save`.
+- `/make-pdf` as the default PDF path: `/build-pdf` is the branded default here; `/make-pdf`
+  only for neutral, unbranded output.
+- Separate 3a-3d enumeration as the primary path: it is now the manual fallback under `/autoplan`.
+- BSD-only `stat -f %m` in pre-flight: silently failed on Linux, so staleness was never detected.
 
 ## Rules
 
-- Never skip a step silently. If you think a step should be skipped, say why and ask.
-- Never start building (Step 5) without a reviewed plan.
-- Always ask about UI at Step 3 to determine whether design review and QA are needed later.
-- If the user says "just build it" after Step 1, still run Step 2 (writing-plans) — the plan quality directly affects autonomous execution quality.
-- If any step fails or surfaces unexpected behavior, invoke `/investigate` before retrying — treat the failure as a symptom and find the root cause first, don't paper over it.
-- `/guard` scope is session-wide. Don't try to edit outside the scoped dir mid-pipeline; if the project needs it, widen the scope deliberately via `/unfreeze` → re-`/guard` the wider path.
-- Steps 8 (`/health`) and 9 (`/cso`) are optional but defaulted-on. Skip explicitly with a one-line reason — don't quietly drop them on diffs where they'd add value.
-- For code that touches auth, secrets, PII, or shared infrastructure, Step 9 (`/cso` or `/security-review`) is REQUIRED, not optional.
+- Never skip a step silently. Say why, then skip.
+- Never start Build without an approved reviewed plan.
+- Never `/land-and-deploy` without the user's explicit go: it is outward-facing.
+- Ask about UI at Plan time so Test is scoped correctly.
+- On any failure, `/investigate` before retrying. Treat the failure as a symptom.
+- `/guard` scope is session-wide; widen deliberately, not by editing around it.
+- Steps 10 (`/health`) and 11 (`/cso`) default on; skip only with a one-line reason.
+- Step 18 (Reflect) is not optional. A pipeline that does not record what it learned will
+  rediscover it next time.
